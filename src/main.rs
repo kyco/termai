@@ -14,7 +14,7 @@ fn main() -> Result<()> {
     if let Some(chat_gpt_api_key) = args.chat_gpt_api_key {
         config_service::write_config(
             &repo,
-            &ConfigKeys::chat_gpt_api_key.to_key(),
+            &ConfigKeys::ChatGptApiKey.to_key(),
             &chat_gpt_api_key,
         )?;
     }
