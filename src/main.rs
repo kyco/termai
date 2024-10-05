@@ -1,11 +1,14 @@
 mod args;
 mod config;
+mod openai;
 mod repository;
 
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
 use repository::db::SqliteRepository;
+use std::io::IsTerminal;
+use std::io::{self, Read};
 
 fn main() -> Result<()> {
     let args = args::Args::parse();
@@ -27,6 +30,21 @@ fn main() -> Result<()> {
             Err(_) => println!("failed to fetch config"),
         }
     }
+
+    let input = if !args.data.is_empty() {
+        args.data.join(" ")
+    } else if !io::stdin().is_terminal() {
+        let mut buffer = String::new();
+        io::stdin()
+            .read_to_string(&mut buffer)
+            .expect("Failed to read stdin");
+        buffer.trim().to_string()
+    } else {
+        eprintln!("No input provided. Use positional arguments or pipe data.");
+        std::process::exit(1);
+    };
+
+    println!("{}", input);
 
     Ok(())
 }
