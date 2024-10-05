@@ -1,15 +1,32 @@
-mod app;
-mod db;
+mod args;
+mod config;
 mod repository;
-mod ui;
 
-use app::App;
-use db::SqliteRepository;
-use std::error::Error;
+use anyhow::Result;
+use clap::Parser;
+use config::{model::keys::ConfigKeys, service::config_service};
+use repository::db::SqliteRepository;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
+    let args = args::Args::parse();
     let repo = SqliteRepository::new("app.db")?;
-    let mut app = App::new(repo)?;
-    ui::run(&mut app)?;
+
+    if let Some(chat_gpt_api_key) = args.chat_gpt_api_key {
+        config_service::write_config(
+            &repo,
+            &ConfigKeys::chat_gpt_api_key.to_key(),
+            &chat_gpt_api_key,
+        )?;
+    }
+
+    if args.print_config {
+        match config_service::fetch_config(&repo) {
+            Ok(configs) => configs.iter().for_each(|config| {
+                println!("{:} -> {:}", config.key, config.value);
+            }),
+            Err(_) => println!("failed to fetch config"),
+        }
+    }
+
     Ok(())
 }
