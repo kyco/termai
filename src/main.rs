@@ -48,8 +48,8 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     };
 
-    let openaikey = config_service::fetch_by_key(&repo, &ConfigKeys::ChatGptApiKey.to_key())?;
-    let chat_response = match chat(&openaikey.value, &input).await {
+    let open_ai_api_key = config_service::fetch_by_key(&repo, &ConfigKeys::ChatGptApiKey.to_key())?;
+    let chat_response = match chat(&open_ai_api_key.value, &input).await {
         Ok(response) => response,
         Err(err) => {
             println!("{:#?}", err);
