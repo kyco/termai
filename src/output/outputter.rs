@@ -29,13 +29,18 @@ pub fn print(messages: Vec<Message>) {
         for line in lines {
             if line.trim_start().starts_with("```") {
                 in_code = !in_code;
+                if in_code {
+                    println!("{}", "────────────────────────────────────".white().dimmed());
+                } else {
+                    println!("{}", "────────────────────────────────────".white().dimmed());
+                }
                 continue;
             }
 
             if in_code {
-                let ranges: Vec<(Style, &str)> = h.highlight(line, &ps);
+                let ranges: Vec<(Style, &str)> = h.highlight_line(line, &ps).unwrap();
                 let escaped = as_24_bit_terminal_escaped(&ranges, false);
-                println!("  {}", escaped);
+                println!("{}", escaped);
             } else {
                 println!("{}", line.white());
             }
