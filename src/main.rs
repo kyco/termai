@@ -6,11 +6,13 @@ mod repository;
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
+use openai::service::chat::chat;
 use repository::db::SqliteRepository;
 use std::io::IsTerminal;
 use std::io::{self, Read};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = args::Args::parse();
     let repo = SqliteRepository::new("app.db")?;
 
@@ -44,7 +46,8 @@ fn main() -> Result<()> {
         std::process::exit(1);
     };
 
-    println!("{}", input);
+    let openaikey = config_service::fetch_by_key(&repo, &ConfigKeys::ChatGptApiKey.to_key())?;
+    let chat_response = chat(&openaikey.value, &input).await?;
 
     Ok(())
 }

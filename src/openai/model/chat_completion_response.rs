@@ -1,0 +1,14 @@
+use crate::openai::model::choice::Choice;
+use crate::openai::model::usage::Usage;
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+pub struct ChatCompletionResponse {
+    pub id: Option<String>,
+    pub object: Option<String>,
+    pub created: Option<u64>,
+    pub model: Option<String>,
+    pub system_fingerprint: Option<String>,
+    pub choices: Option<Vec<Choice>>,
+    pub usage: Option<Usage>,
+}
