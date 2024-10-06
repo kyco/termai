@@ -1275,7 +1275,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "termAI"
+name = "termai"
 version = "0.1.0"
 dependencies = [
  "anyhow",
