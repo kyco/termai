@@ -7,6 +7,8 @@ pub struct Args {
     pub chat_gpt_api_key: Option<String>,
     #[arg(short, long)]
     pub print_config: bool,
-    #[arg(default_value = "test")]
-    pub data: Vec<String>,
+    pub data: String,
+    pub(crate) directory: Option<String>,
+    #[arg(short, long, value_delimiter = ',')]
+    pub(crate) exclude: Vec<String>,
 }

@@ -3,6 +3,7 @@ mod config;
 mod openai;
 mod output;
 mod repository;
+mod path;
 
 use anyhow::Result;
 use clap::Parser;
@@ -13,6 +14,9 @@ use repository::db::SqliteRepository;
 use std::io::IsTerminal;
 use std::io::{self, Read};
 use crate::args::Args;
+use crate::config::repository::ConfigRepository;
+use crate::path::extract::extract_content;
+use crate::path::model::Files;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -32,12 +36,13 @@ async fn main() -> Result<()> {
         return print_config(&repo);
     }
 
+    let local_context = extract_content(&args.directory, &args.exclude);
     let input = extract_input_or_quit(&args);
-    request_response_from_ai(&repo, &input).await
+    request_response_from_ai(&repo, &input, &local_context).await
 }
 
-fn print_config(repo: &SqliteRepository) -> Result<()> {
-    match config_service::fetch_config(&repo) {
+fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
+    match config_service::fetch_config(repo) {
         Ok(configs) => {
             configs.iter().for_each(|config| println!("{:} -> {:}", config.key, config.value));
             Ok(())
@@ -49,9 +54,20 @@ fn print_config(repo: &SqliteRepository) -> Result<()> {
     }
 }
 
-async fn request_response_from_ai(repo: &SqliteRepository, input: &String) -> Result<()> {
-    let open_ai_api_key = config_service::fetch_by_key(&repo, &ConfigKeys::ChatGptApiKey.to_key())?;
-    let chat_response = match chat(&open_ai_api_key.value, &input).await {
+async fn request_response_from_ai<R: ConfigRepository>(repo: &R, input: &String, local_context: &Option<Vec<Files>>) -> Result<()> {
+    let open_ai_api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())?;
+    let input_with_local_context = match local_context {
+        Some(files) => {
+            let local_context: Vec<String> = files.iter().map(|file| {
+                let file_path = file.path.clone();
+                let file_content = file.content.clone();
+                format!("{}\n```{}```", file_path, file_content)
+            }).collect();
+            format!("{}\n{}", input, local_context.join("\n"))
+        }
+        None => input.clone(),
+    };
+    let chat_response = match chat(&open_ai_api_key.value, &input_with_local_context).await {
         Ok(response) => response,
         Err(err) => {
             println!("{:#?}", err);
@@ -70,7 +86,7 @@ async fn request_response_from_ai(repo: &SqliteRepository, input: &String) -> Re
 
 fn extract_input_or_quit(args: &Args) -> String {
     let input = if !args.data.is_empty() {
-        args.data.join(" ")
+        args.data.to_string()
     } else if !io::stdin().is_terminal() {
         let mut buffer = String::new();
         io::stdin()
