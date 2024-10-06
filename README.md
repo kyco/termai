@@ -74,6 +74,10 @@ Usage
     ```shell
     echo "What is the capital of France?" | ./termAI
     ```
+    - Create git commit messages from diffs
+   ```shell
+   git diff | ./termAI "create a short git commit message"
+   ```
 
 Configuration
 -------------
