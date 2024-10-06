@@ -2,20 +2,19 @@ use std::fs;
 use std::path::Path;
 use crate::path::model::Files;
 
-pub fn extract_content(directory: &Option<String>, exclude: &[String]) -> Option<Vec<Files>> {
-    let mut files = Vec::new();
+pub fn extract_content(path_str: &Option<String>, exclude: &[String]) -> Option<Vec<Files>> {
+    let mut files = vec![];
 
-    let path = match directory {
-        Some(dir) => Path::new(dir),
+    let path = match path_str {
+        Some(p) => Path::new(p),
         None => return None,
     };
 
-    if path.exists() && path.is_dir() {
+    if path.exists() {
         collect_files(path, &mut files, exclude);
         Some(files)
     } else {
-        println!("{} is not a valid directory.",
-                 directory.as_deref().unwrap_or("."));
+        println!("{} does not exist.", path_str.as_deref().unwrap_or("."));
         None
     }
 }
@@ -23,15 +22,14 @@ pub fn extract_content(directory: &Option<String>, exclude: &[String]) -> Option
 fn collect_files(path: &Path, files: &mut Vec<Files>, exclude: &[String]) {
     if path.is_dir() {
         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name.starts_with('.') || exclude.contains(&name.to_lowercase()) {
+            if name.starts_with('.') || exclude.contains(&name.to_string()) {
                 return;
             }
         }
 
         if let Ok(entries) = fs::read_dir(path) {
             for entry in entries.flatten() {
-                let entry_path = entry.path();
-                collect_files(&entry_path, files, exclude);
+                collect_files(&entry.path(), files, exclude);
             }
         }
     } else if path.is_file() {
