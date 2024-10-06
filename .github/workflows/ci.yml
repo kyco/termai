@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build project
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Create tarball
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tar -czvf termai.tar.gz target/release/termai
