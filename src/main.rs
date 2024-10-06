@@ -15,6 +15,7 @@ use std::io::IsTerminal;
 use std::io::{self, Read};
 use crate::args::Args;
 use crate::config::repository::ConfigRepository;
+use crate::config::service::{open_ai_config, redacted_config};
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
 
@@ -23,12 +24,13 @@ async fn main() -> Result<()> {
     let args = args::Args::parse();
     let repo = SqliteRepository::new("app.db")?;
 
-    if let Some(ref chat_gpt_api_key) = args.chat_gpt_api_key {
-        config_service::write_config(
-            &repo,
-            &ConfigKeys::ChatGptApiKey.to_key(),
-            &chat_gpt_api_key,
-        )?;
+    if args.is_chat_gpt_api_key() {
+        open_ai_config::write_open_ai_key(&repo, &args)?;
+        return Ok(());
+    }
+
+    if args.is_redaction() {
+        redacted_config::redaction(&repo, &args)?;
         return Ok(());
     }
 
@@ -61,14 +63,19 @@ async fn request_response_from_ai<R: ConfigRepository>(repo: &R, input: &String,
             let local_context: Vec<String> = files.iter().map(|file| {
                 let file_path = file.path.clone();
                 let file_content = file.content.clone();
-                format!("{}\n```{}```", file_path, file_content)
+                format!("{}\n```\n{}```", file_path, file_content)
             }).collect();
             format!("{}\n{}", input, local_context.join("\n"))
         }
         None => input.clone(),
     };
 
-    let chat_response = match chat(&open_ai_api_key.value, &input_with_local_context).await {
+    let redactions = redacted_config::fetch_redactions(repo);
+    let input_with_redactions = redactions.iter().fold(input_with_local_context.clone(), |acc, redaction| {
+        acc.to_lowercase().replace(redaction.to_lowercase().as_str(), "<REDACTED>")
+    });
+
+    let chat_response = match chat(&open_ai_api_key.value, &input_with_redactions).await {
         Ok(response) => response,
         Err(err) => {
             println!("{:#?}", err);
