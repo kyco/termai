@@ -7,12 +7,10 @@ interactive experiences directly from your command line.
 Features
 --------
 
-- **Interactive Terminal UI**: Utilize a responsive and user-friendly interface built with `ratatui` and `crossterm`.
 - **Asynchronous Operations**: Powered by `tokio` for efficient asynchronous processing.
 - **Local Configuration Storage**: Manage configurations using SQLite via `rusqlite`.
 - **Command-Line Parsing**: Easy-to-use CLI with `clap`.
 - **Colored Output**: Enhanced terminal output with `colored`.
-- **Extensible Architecture**: Modular design allows for easy extensions and integrations.
 
 Installation
 ------------
