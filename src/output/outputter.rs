@@ -2,7 +2,6 @@ use crate::output::message::Message;
 use colored::*;
 
 pub fn print(messages: Vec<Message>) {
-    // Print a header with styling
     println!("{}", "=== Message Log ===".bold().underline().blue());
     println!();
 
