@@ -22,7 +22,7 @@ Installation
 
 2. **Clone the Repository**:
    ```sh
-   git clone https://github.com/yourusername/termAI.git
+   git clone https://github.com/kyco/term.git
    cd termAI
    ```
 
