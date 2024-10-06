@@ -18,6 +18,5 @@ pub async fn chat(
         .json()
         .await?;
 
-    println!("response from API {:#?}", response);
     Ok(response)
 }

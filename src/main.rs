@@ -1,12 +1,14 @@
 mod args;
 mod config;
 mod openai;
+mod output;
 mod repository;
 
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
 use openai::service::chat::chat;
+use output::outputter;
 use repository::db::SqliteRepository;
 use std::io::IsTerminal;
 use std::io::{self, Read};
@@ -48,6 +50,12 @@ async fn main() -> Result<()> {
 
     let openaikey = config_service::fetch_by_key(&repo, &ConfigKeys::ChatGptApiKey.to_key())?;
     let chat_response = chat(&openaikey.value, &input).await?;
+    let output_messages = chat_response
+        .iter()
+        .map(|message| message.to_output_message())
+        .collect();
+
+    outputter::print(output_messages);
 
     Ok(())
 }
