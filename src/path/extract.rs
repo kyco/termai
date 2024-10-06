@@ -7,7 +7,7 @@ pub fn extract_content(directory: &Option<String>, exclude: &[String]) -> Option
 
     let path = match directory {
         Some(dir) => Path::new(dir),
-        None => Path::new("."),
+        None => return None,
     };
 
     if path.exists() && path.is_dir() {

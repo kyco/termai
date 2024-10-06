@@ -67,6 +67,7 @@ async fn request_response_from_ai<R: ConfigRepository>(repo: &R, input: &String,
         }
         None => input.clone(),
     };
+
     let chat_response = match chat(&open_ai_api_key.value, &input_with_local_context).await {
         Ok(response) => response,
         Err(err) => {
@@ -85,17 +86,25 @@ async fn request_response_from_ai<R: ConfigRepository>(repo: &R, input: &String,
 }
 
 fn extract_input_or_quit(args: &Args) -> String {
-    let input = if !args.data.is_empty() {
-        args.data.to_string()
-    } else if !io::stdin().is_terminal() {
+    let mut input = String::new();
+    if let Some(ref data_arg) = args.data {
+        input.push_str(data_arg);
+    }
+    if !io::stdin().is_terminal() {
         let mut buffer = String::new();
         io::stdin()
             .read_to_string(&mut buffer)
-            .expect("Failed to read stdin");
-        buffer.trim().to_string()
-    } else {
+            .expect("Failed to read from stdin");
+        if !input.is_empty() {
+            input.push('\n');
+            input.push('\n');
+        }
+        input.push_str(buffer.trim());
+        println!("{}", input);
+    }
+    if input.is_empty() {
         eprintln!("No input provided. Use positional arguments or pipe data.");
         std::process::exit(1);
-    };
+    }
     input
 }
