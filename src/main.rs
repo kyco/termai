@@ -100,7 +100,6 @@ fn extract_input_or_quit(args: &Args) -> String {
             input.push('\n');
         }
         input.push_str(buffer.trim());
-        println!("{}", input);
     }
     if input.is_empty() {
         eprintln!("No input provided. Use positional arguments or pipe data.");
