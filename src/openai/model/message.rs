@@ -23,4 +23,21 @@ impl Message {
             message: self.content.to_string(),
         }
     }
+
+    pub fn prepend_content(&self, text: &str) -> Self {
+        let new_content = format!("{}\n\n{}", text, self.content);
+        Self {
+            role: self.role.to_string(),
+            content: new_content,
+        }
+    }
+
+    pub fn remove_from_content(&self, text: &str) -> Self {
+        let new_content = self.content.replace(text, "");
+        let new_content = new_content.trim();
+        Self {
+            role: self.role.to_string(),
+            content: new_content.to_string(),
+        }
+    }
 }

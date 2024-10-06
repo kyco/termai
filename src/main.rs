@@ -49,7 +49,14 @@ async fn main() -> Result<()> {
     };
 
     let openaikey = config_service::fetch_by_key(&repo, &ConfigKeys::ChatGptApiKey.to_key())?;
-    let chat_response = chat(&openaikey.value, &input).await?;
+    let chat_response = match chat(&openaikey.value, &input).await {
+        Ok(response) => response,
+        Err(err) => {
+            println!("{:#?}", err);
+            return Err(err);
+        }
+    };
+
     let output_messages = chat_response
         .iter()
         .map(|message| message.to_output_message())
