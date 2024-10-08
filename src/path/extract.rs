@@ -21,16 +21,16 @@ pub fn extract_content(path_str: &Option<String>, exclude: &[String]) -> Option<
 
 fn collect_files(path: &Path, files: &mut Vec<Files>, exclude: &[String]) {
     let path_str = match path.to_str() {
-        Some(s) => s,
+        Some(s) => remove_dot_slash(s),
         None => return,
     };
 
-    if exclude.contains(&path_str.to_string()) {
+    if must_exclude(exclude, path_str) {
         return;
     }
 
     if path.is_dir() {
-        if path_str.starts_with('.') {
+        if !path_str.starts_with("./") && path_str.starts_with('.') && path_str != "." {
             return;
         }
 
@@ -40,7 +40,7 @@ fn collect_files(path: &Path, files: &mut Vec<Files>, exclude: &[String]) {
             }
         }
     } else if path.is_file() {
-        if exclude.contains(&path_str.to_string()) {
+        if must_exclude(exclude, path_str) {
             return;
         }
         if let Ok(content) = fs::read_to_string(path) {
@@ -50,4 +50,15 @@ fn collect_files(path: &Path, files: &mut Vec<Files>, exclude: &[String]) {
             });
         }
     }
+}
+
+fn must_exclude(exclude: &[String], path: &str) -> bool {
+    if exclude.contains(&path.to_string()) {
+        return true;
+    }
+    return false;
+}
+
+fn remove_dot_slash(path: &str) -> &str {
+    path.strip_prefix("./").unwrap_or(path)
 }
