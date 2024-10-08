@@ -13,3 +13,7 @@ serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json"] }
 colored = "2.1.0"
 syntect = "5.0"
+tempfile = "3.13.0"
+dirs = "5.0.1"
+regex = "1.11.0"
+

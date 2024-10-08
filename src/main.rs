@@ -2,27 +2,31 @@ mod args;
 mod config;
 mod openai;
 mod output;
-mod repository;
 mod path;
+mod repository;
 
-use anyhow::Result;
-use clap::Parser;
-use config::{model::keys::ConfigKeys, service::config_service};
-use openai::service::chat::chat;
-use output::outputter;
-use repository::db::SqliteRepository;
-use std::io::IsTerminal;
-use std::io::{self, Read};
 use crate::args::Args;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::{open_ai_config, redacted_config};
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
+use anyhow::Result;
+use clap::Parser;
+use config::{model::keys::ConfigKeys, service::config_service};
+use openai::service::chat::chat;
+use output::outputter;
+use regex::Regex;
+use repository::db::SqliteRepository;
+use std::fs::create_dir_all;
+use std::io::IsTerminal;
+use std::io::{self, Read};
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = args::Args::parse();
-    let repo = SqliteRepository::new("app.db")?;
+    let db_path = db_path();
+    let repo = SqliteRepository::new(db_path.to_str().unwrap())?;
 
     if args.is_chat_gpt_api_key() {
         open_ai_config::write_open_ai_key(&repo, &args)?;
@@ -43,10 +47,20 @@ async fn main() -> Result<()> {
     request_response_from_ai(&repo, &input, &local_context).await
 }
 
+fn db_path() -> PathBuf {
+    let home_dir = dirs::home_dir().expect("Failed to get home directory");
+    let default_dir = home_dir.join(".config/termai");
+    create_dir_all(&default_dir).expect("Failed to create default directory");
+    let db_path = default_dir.join("app.db");
+    db_path
+}
+
 fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
     match config_service::fetch_config(repo) {
         Ok(configs) => {
-            configs.iter().for_each(|config| println!("{:} -> {:}", config.key, config.value));
+            configs
+                .iter()
+                .for_each(|config| println!("{:} -> {:}", config.key, config.value));
             Ok(())
         }
         Err(_) => {
@@ -56,24 +70,35 @@ fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
     }
 }
 
-async fn request_response_from_ai<R: ConfigRepository>(repo: &R, input: &String, local_context: &Option<Vec<Files>>) -> Result<()> {
+async fn request_response_from_ai<R: ConfigRepository>(
+    repo: &R,
+    input: &String,
+    local_context: &Option<Vec<Files>>,
+) -> Result<()> {
     let open_ai_api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())?;
     let input_with_local_context = match local_context {
         Some(files) => {
-            let local_context: Vec<String> = files.iter().map(|file| {
-                let file_path = file.path.clone();
-                let file_content = file.content.clone();
-                format!("{}\n```\n{}```", file_path, file_content)
-            }).collect();
+            let local_context: Vec<String> = files
+                .iter()
+                .map(|file| {
+                    let file_path = file.path.clone();
+                    let file_content = file.content.clone();
+                    format!("{}\n```\n{}```", file_path, file_content)
+                })
+                .collect();
             format!("{}\n{}", input, local_context.join("\n"))
         }
         None => input.clone(),
     };
 
     let redactions = redacted_config::fetch_redactions(repo);
-    let input_with_redactions = redactions.iter().fold(input_with_local_context.clone(), |acc, redaction| {
-        acc.to_lowercase().replace(redaction.to_lowercase().as_str(), "<REDACTED>")
-    });
+    let input_with_redactions =
+        redactions
+            .iter()
+            .fold(input_with_local_context.clone(), |acc, redaction| {
+                let re = Regex::new(&format!("(?i){}", regex::escape(redaction))).unwrap();
+                re.replace_all(&acc, "<redacted>").to_string()
+            });
 
     let chat_response = match chat(&open_ai_api_key.value, &input_with_redactions).await {
         Ok(response) => response,
