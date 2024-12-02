@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum Role {
     System,
     User,

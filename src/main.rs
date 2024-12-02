@@ -4,6 +4,7 @@ mod openai;
 mod output;
 mod path;
 mod repository;
+mod redactions;
 
 use crate::args::Args;
 use crate::config::repository::ConfigRepository;
@@ -15,7 +16,7 @@ use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
 use openai::service::chat::chat;
 use output::outputter;
-use regex::Regex;
+use output::message::Message;
 use repository::db::SqliteRepository;
 use std::fs::create_dir_all;
 use std::io::IsTerminal;
@@ -92,16 +93,9 @@ async fn request_response_from_ai<R: ConfigRepository>(
         None => input.clone(),
     };
 
-    let redactions = redacted_config::fetch_redactions(repo);
-    let input_with_redactions =
-        redactions
-            .iter()
-            .fold(input_with_local_context.clone(), |acc, redaction| {
-                let re = Regex::new(&format!("(?i){}", regex::escape(redaction))).unwrap();
-                re.replace_all(&acc, "<redacted>").to_string()
-            });
+    let (redacted_input, mapped_redactions) = redactions::redact::redact(repo, &input_with_local_context);
 
-    let chat_response = match chat(&open_ai_api_key.value, user_defined_system_prompt, &input_with_redactions).await {
+    let chat_response = match chat(&open_ai_api_key.value, user_defined_system_prompt, &redacted_input).await {
         Ok(response) => response,
         Err(err) => {
             println!("{:#?}", err);
@@ -112,9 +106,14 @@ async fn request_response_from_ai<R: ConfigRepository>(
     let output_messages = chat_response
         .iter()
         .map(|message| message.to_output_message())
-        .collect();
+        .collect::<Vec<Message>>();
 
-    outputter::print(output_messages);
+    let unredacted_messages = output_messages.iter().map(|message| {
+        let unredacted_message = redactions::revert::unredact(&mapped_redactions, &message.message);
+        message.copy_with_message(unredacted_message)
+    }).collect::<Vec<Message>>();
+
+    outputter::print(unredacted_messages);
     Ok(())
 }
 
