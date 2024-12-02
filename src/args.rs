@@ -5,6 +5,8 @@ use clap::Parser;
 pub struct Args {
     #[arg(short, long)]
     pub chat_gpt_api_key: Option<String>,
+    #[arg(short, long)]
+    pub system_prompt: Option<String>,
     #[arg(long)]
     pub redact_add: Option<String>,
     #[arg(long)]

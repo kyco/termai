@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
 
     let local_context = extract_content(&args.directory, &args.exclude);
     let input = extract_input_or_quit(&args);
-    request_response_from_ai(&repo, &input, &local_context).await
+    request_response_from_ai(&repo, &input, args.system_prompt, &local_context).await
 }
 
 fn db_path() -> PathBuf {
@@ -73,6 +73,7 @@ fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
 async fn request_response_from_ai<R: ConfigRepository>(
     repo: &R,
     input: &String,
+    user_defined_system_prompt: Option<String>,
     local_context: &Option<Vec<Files>>,
 ) -> Result<()> {
     let open_ai_api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())?;
@@ -100,7 +101,7 @@ async fn request_response_from_ai<R: ConfigRepository>(
                 re.replace_all(&acc, "<redacted>").to_string()
             });
 
-    let chat_response = match chat(&open_ai_api_key.value, &input_with_redactions).await {
+    let chat_response = match chat(&open_ai_api_key.value, user_defined_system_prompt, &input_with_redactions).await {
         Ok(response) => response,
         Err(err) => {
             println!("{:#?}", err);
