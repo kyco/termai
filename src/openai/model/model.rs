@@ -2,6 +2,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
+#[allow(dead_code)]
 pub enum Model {
     Gpt4o,
     Gpt4oMini,
@@ -23,6 +24,8 @@ pub enum Model {
     TextModeration007,
     O1Preview,
     O1Mini,
+    O3Mini,
+    O1,
     Gpt4oRealtimePreview,
     Gpt4o20240806,
     Gpt4o20240513,
@@ -62,6 +65,8 @@ impl Model {
             Model::TextModeration007 => "text-moderation-007".to_owned(),
             Model::O1Preview => "o1-preview".to_owned(),
             Model::O1Mini => "o1-mini".to_owned(),
+            Model::O1 => "o1".to_owned(),
+            Model::O3Mini => "o3-mini".to_owned(),
             Model::Gpt4oRealtimePreview => "gpt-4o-realtime-preview".to_owned(),
             Model::Gpt4o20240806 => "gpt-4o-2024-08-06".to_owned(),
             Model::Gpt4o20240513 => "gpt-4o-2024-05-13".to_owned(),

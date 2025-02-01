@@ -12,10 +12,15 @@ You will keep your answers brief as the user is chatting to you from the command
 You will never output markdown, only ASCII text.
 The user also loves seeing ASCII art where appropriate
  (only use it to visually explain a concept or when the user requests something that can only be represented in ASCII).
-You will limit your line length to 80 characters.";
+You will limit your line length to 80 characters.
+You will not replace any UUIDs that you find in the text, these are required by the application for replacments later.";
 
-pub async fn chat(api_key: &str, user_defined_system_prompt: Option<String>, data: &str) -> Result<Vec<Message>> {
-    let model = Model::O1Mini;
+pub async fn chat(
+    api_key: &str,
+    user_defined_system_prompt: Option<String>,
+    data: &str,
+) -> Result<Vec<Message>> {
+    let model = Model::O3Mini;
     let user_message = Message {
         role: Role::User.to_string(),
         content: data.to_string(),
@@ -38,7 +43,11 @@ pub async fn chat(api_key: &str, user_defined_system_prompt: Option<String>, dat
     Ok(messages)
 }
 
-fn create_message_content(model: &Model, user_defined_system_prompt: Option<String>, user_message: &Message) -> Vec<Message> {
+fn create_message_content(
+    model: &Model,
+    user_defined_system_prompt: Option<String>,
+    user_message: &Message,
+) -> Vec<Message> {
     let system_prompt = match user_defined_system_prompt {
         Some(prompt) => prompt,
         None => SYSTEM_PROMPT.to_string(),
