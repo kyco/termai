@@ -4,12 +4,12 @@ use serde::Serialize;
 use super::role::Role;
 
 #[derive(Serialize, Clone)]
-pub struct Message {
+pub struct ChatMessage {
     pub role: String,
     pub content: String,
 }
 
-impl Message {
+impl ChatMessage {
     pub fn new(role: &str, content: &str) -> Self {
         Self {
             role: role.to_string(),

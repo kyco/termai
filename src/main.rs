@@ -1,23 +1,32 @@
 mod args;
+mod common;
 mod config;
 mod openai;
 mod output;
 mod path;
-mod repository;
 mod redactions;
+mod repository;
+mod session;
 
 use crate::args::Args;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::{open_ai_config, redacted_config};
+use crate::openai::model::role::Role;
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
+use crate::session::model::message::{contains_system_prompt, messages_with_system_prompt};
+use crate::session::model::session::Session;
+use crate::session::repository::{MessageRepository, SessionRepository};
+use crate::session::service::sessions_service;
+use crate::session::service::sessions_service::session_add_messages;
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
 use openai::service::chat::chat;
-use output::outputter;
 use output::message::Message;
+use output::outputter;
 use repository::db::SqliteRepository;
+use session::service::sessions_service::fetch_current_session;
 use std::fs::create_dir_all;
 use std::io::IsTerminal;
 use std::io::{self, Read};
@@ -39,13 +48,42 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    if args.is_sessions_all() {
+        sessions_service::fetch_all_sessions(&repo, &repo)?;
+        return Ok(());
+    }
+
+    if args.is_session_add() {
+        let name = session_name(&args);
+        sessions_service::session_add(&repo, &name)?;
+    }
+
     if args.print_config {
         return print_config(&repo);
     }
 
+    let mut current_session = fetch_current_session(&repo, &repo)?;
     let local_context = extract_content(&args.directory, &args.exclude);
     let input = extract_input_or_quit(&args);
-    request_response_from_ai(&repo, &input, args.system_prompt, &local_context).await
+    request_response_from_ai(
+        &repo,
+        &repo,
+        &repo,
+        &input,
+        &mut current_session,
+        args.system_prompt,
+        &local_context,
+    )
+    .await
+}
+
+fn session_name(args: &Args) -> String {
+    let name = if let Some(session_name) = &args.sessions_new {
+        session_name
+    } else {
+        &common::unique_id::generate_uuid_v4().to_string()
+    };
+    name.to_string()
 }
 
 fn db_path() -> PathBuf {
@@ -71,13 +109,27 @@ fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
     }
 }
 
-async fn request_response_from_ai<R: ConfigRepository>(
+async fn request_response_from_ai<
+    R: ConfigRepository,
+    SR: SessionRepository,
+    MR: MessageRepository,
+>(
     repo: &R,
+    session_repository: &SR,
+    message_repository: &MR,
     input: &String,
+    session: &mut Session,
     user_defined_system_prompt: Option<String>,
     local_context: &Option<Vec<Files>>,
 ) -> Result<()> {
     let open_ai_api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())?;
+
+    let contains_system_prompt = contains_system_prompt(&session.messages);
+    if !contains_system_prompt {
+        session.messages =
+            messages_with_system_prompt(user_defined_system_prompt, &session.messages);
+    }
+
     let input_with_local_context = match local_context {
         Some(files) => {
             let local_context: Vec<String> = files
@@ -93,27 +145,25 @@ async fn request_response_from_ai<R: ConfigRepository>(
         None => input.clone(),
     };
 
-    let (redacted_input, mapped_redactions) = redactions::redact::redact(repo, &input_with_local_context);
+    session.add_raw_message(input_with_local_context, Role::User);
+    session.redact(repo);
 
-    let chat_response = match chat(&open_ai_api_key.value, user_defined_system_prompt, &redacted_input).await {
-        Ok(response) => response,
-        Err(err) => {
-            println!("{:#?}", err);
-            return Err(err);
-        }
-    };
+    if let Err(err) = chat(&open_ai_api_key.value, session).await {
+        println!("{:#?}", err);
+        return Err(err);
+    }
 
-    let output_messages = chat_response
+    session.unredact();
+    session_add_messages(session_repository, message_repository, session)
+        .expect("could not write new messages to repo");
+
+    let output_messages = session
+        .messages
         .iter()
         .map(|message| message.to_output_message())
         .collect::<Vec<Message>>();
 
-    let unredacted_messages = output_messages.iter().map(|message| {
-        let unredacted_message = redactions::revert::unredact(&mapped_redactions, &message.message);
-        message.copy_with_message(unredacted_message)
-    }).collect::<Vec<Message>>();
-
-    outputter::print(unredacted_messages);
+    outputter::print(output_messages);
     Ok(())
 }
 

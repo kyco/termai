@@ -7,9 +7,9 @@ pub struct Message {
 
 impl Message {
     pub fn copy_with_message(&self, message: String) -> Self {
-        return Message {
+        Self {
             role: self.role.clone(),
-            message
+            message,
         }
     }
 }

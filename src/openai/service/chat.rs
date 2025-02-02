@@ -1,66 +1,51 @@
 use crate::openai::{
     adapter::open_ai_adapter,
     model::{
-        chat_completion_request::ChatCompletionRequest, message::Message, model::Model, role::Role,
+        chat_completion_request::ChatCompletionRequest, chat_message::ChatMessage, model::Model,
+        role::Role,
     },
 };
+use crate::session::model::message::Message;
+use crate::session::model::session::Session;
 use anyhow::Result;
 
-const SYSTEM_PROMPT: &str = "
+pub const SYSTEM_PROMPT: &str = "
 You're an assistant in the terminal.
 You will keep your answers brief as the user is chatting to you from the command line.
-You will never output markdown, only ASCII text.
-The user also loves seeing ASCII art where appropriate
- (only use it to visually explain a concept or when the user requests something that can only be represented in ASCII).
+You will never output markdown, only ASCII text or ASCII art.
 You will limit your line length to 80 characters.
-You will not replace any UUIDs that you find in the text, these are required by the application for replacments later.";
+You will not replace any UUIDs that you find in the text, these are required by the application for replacements later.";
 
-pub async fn chat(
-    api_key: &str,
-    user_defined_system_prompt: Option<String>,
-    data: &str,
-) -> Result<Vec<Message>> {
+pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
     let model = Model::O3Mini;
-    let user_message = Message {
-        role: Role::User.to_string(),
-        content: data.to_string(),
-    };
+
+    let chat_messages = session
+        .messages
+        .iter()
+        .map(|m| ChatMessage {
+            role: m.role.to_string(),
+            content: m.content.to_string(),
+        })
+        .collect::<Vec<ChatMessage>>();
+
     let request = ChatCompletionRequest {
         model: model.to_string(),
-        messages: create_message_content(&model, user_defined_system_prompt, &user_message),
+        messages: chat_messages,
     };
     let response = open_ai_adapter::chat(&request, api_key).await?;
 
-    let mut messages: Vec<Message> = vec![user_message.clone().remove_from_content(SYSTEM_PROMPT)];
     if let Some(choices) = response.choices {
         for choice in choices {
             let role = choice.message.role;
             let message = choice.message.content;
-            messages.push(Message::new(&role, &message));
+            session.messages.push(Message {
+                id: "".to_string(),
+                role: Role::from_str(&role),
+                content: message,
+                redaction_mapping: None,
+            });
         }
     }
 
-    Ok(messages)
-}
-
-fn create_message_content(
-    model: &Model,
-    user_defined_system_prompt: Option<String>,
-    user_message: &Message,
-) -> Vec<Message> {
-    let system_prompt = match user_defined_system_prompt {
-        Some(prompt) => prompt,
-        None => SYSTEM_PROMPT.to_string(),
-    };
-
-    match model {
-        Model::O1Mini | Model::O1Preview => vec![user_message.prepend_content(&system_prompt)],
-        _ => vec![
-            Message {
-                role: Role::System.to_string(),
-                content: system_prompt,
-            },
-            user_message.clone(),
-        ],
-    }
+    Ok(())
 }

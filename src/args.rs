@@ -15,6 +15,10 @@ pub struct Args {
     pub redact_list: bool,
     #[arg(short, long)]
     pub print_config: bool,
+    #[arg(long)]
+    pub sessions_all: bool,
+    #[arg(long)]
+    pub sessions_new: Option<String>,
     pub data: Option<String>,
     pub(crate) directory: Option<String>,
     #[arg(short, long, value_delimiter = ',')]
@@ -28,5 +32,13 @@ impl Args {
 
     pub fn is_chat_gpt_api_key(&self) -> bool {
         self.chat_gpt_api_key.is_some()
+    }
+
+    pub fn is_sessions_all(&self) -> bool {
+        return self.sessions_all;
+    }
+
+    pub fn is_session_add(&self) -> bool {
+        return self.sessions_new.is_some();
     }
 }
