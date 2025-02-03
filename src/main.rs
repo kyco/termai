@@ -26,7 +26,6 @@ use openai::service::chat::chat;
 use output::message::Message;
 use output::outputter;
 use repository::db::SqliteRepository;
-use session::service::sessions_service::fetch_current_session;
 use std::fs::create_dir_all;
 use std::io::IsTerminal;
 use std::io::{self, Read};
@@ -53,16 +52,20 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    if args.is_session_add() {
-        let name = session_name(&args);
-        sessions_service::session_add(&repo, &name)?;
-    }
+    let mut session = if args.is_session() {
+        if let Some(name) = &args.session {
+            sessions_service::session(&repo, &repo, name)?
+        } else {
+            Session::new_temporary()
+        }
+    } else {
+        Session::new_temporary()
+    };
 
     if args.print_config {
         return print_config(&repo);
     }
 
-    let mut current_session = fetch_current_session(&repo, &repo)?;
     let local_context = extract_content(&args.directory, &args.exclude);
     let input = extract_input_or_quit(&args);
     request_response_from_ai(
@@ -70,20 +73,11 @@ async fn main() -> Result<()> {
         &repo,
         &repo,
         &input,
-        &mut current_session,
+        &mut session,
         args.system_prompt,
         &local_context,
     )
     .await
-}
-
-fn session_name(args: &Args) -> String {
-    let name = if let Some(session_name) = &args.sessions_new {
-        session_name
-    } else {
-        &common::unique_id::generate_uuid_v4().to_string()
-    };
-    name.to_string()
 }
 
 fn db_path() -> PathBuf {
@@ -160,6 +154,7 @@ async fn request_response_from_ai<
     let output_messages = session
         .messages
         .iter()
+        .filter(|message| message.role != Role::System)
         .map(|message| message.to_output_message())
         .collect::<Vec<Message>>();
 

@@ -1,12 +1,11 @@
 use crate::output::message::Message;
+use colored::*;
 use syntect::easy::HighlightLines;
-use syntect::highlighting::{ThemeSet, Style};
+use syntect::highlighting::{Style, ThemeSet};
 use syntect::parsing::SyntaxSet;
 use syntect::util::as_24_bit_terminal_escaped;
-use colored::*;
 
 pub fn print(messages: Vec<Message>) {
-    println!("{}", "=== message log ===".bold().underline().blue());
     println!();
 
     let ps = SyntaxSet::load_defaults_newlines();
@@ -30,9 +29,15 @@ pub fn print(messages: Vec<Message>) {
             if line.trim_start().starts_with("```") {
                 in_code = !in_code;
                 if in_code {
-                    println!("{}", "────────────────────────────────────".white().dimmed());
+                    println!(
+                        "{}",
+                        "────────────────────────────────────".white().dimmed()
+                    );
                 } else {
-                    println!("{}", "────────────────────────────────────".white().dimmed());
+                    println!(
+                        "{}",
+                        "────────────────────────────────────".white().dimmed()
+                    );
                 }
                 continue;
             }
@@ -47,6 +52,4 @@ pub fn print(messages: Vec<Message>) {
         }
         println!();
     }
-
-    println!("{}", "=== end of log ===".bold().underline().blue());
 }

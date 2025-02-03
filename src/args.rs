@@ -18,7 +18,7 @@ pub struct Args {
     #[arg(long)]
     pub sessions_all: bool,
     #[arg(long)]
-    pub sessions_new: Option<String>,
+    pub session: Option<String>,
     pub data: Option<String>,
     pub(crate) directory: Option<String>,
     #[arg(short, long, value_delimiter = ',')]
@@ -35,10 +35,10 @@ impl Args {
     }
 
     pub fn is_sessions_all(&self) -> bool {
-        return self.sessions_all;
+        self.sessions_all
     }
 
-    pub fn is_session_add(&self) -> bool {
-        return self.sessions_new.is_some();
+    pub fn is_session(&self) -> bool {
+        self.session.is_some()
     }
 }

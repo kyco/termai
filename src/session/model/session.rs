@@ -1,10 +1,11 @@
+use crate::common;
 use crate::config::repository::ConfigRepository;
 use crate::openai::model::role::Role;
 use crate::redactions::redact::redact;
 use crate::redactions::revert::unredact;
 use crate::session::entity::session_entity::SessionEntity;
 use crate::session::model::message::Message;
-use chrono::NaiveDateTime;
+use chrono::{Duration, NaiveDateTime, Utc};
 
 #[derive(Debug)]
 pub struct Session {
@@ -13,6 +14,7 @@ pub struct Session {
     pub expires_at: NaiveDateTime,
     pub current: bool,
     pub messages: Vec<Message>,
+    pub temporary: bool,
 }
 
 impl From<&SessionEntity> for Session {
@@ -23,11 +25,25 @@ impl From<&SessionEntity> for Session {
             expires_at: value.expires_at,
             current: value.current == 1,
             messages: Vec::new(),
+            temporary: false,
         }
     }
 }
 
 impl Session {
+    pub fn new_temporary() -> Self {
+        let now = Utc::now().naive_utc();
+        let expires_at: NaiveDateTime = now + Duration::hours(24);
+        Self {
+            id: common::unique_id::generate_uuid_v4().to_string(),
+            name: "temporary".to_string(),
+            expires_at,
+            current: true,
+            messages: Vec::new(),
+            temporary: true,
+        }
+    }
+
     pub fn copy_with_messages(&self, messages: Vec<Message>) -> Self {
         Self {
             id: self.id.clone(),
@@ -35,6 +51,7 @@ impl Session {
             expires_at: self.expires_at.clone(),
             current: self.current.clone(),
             messages: messages.to_vec(),
+            temporary: self.temporary,
         }
     }
 

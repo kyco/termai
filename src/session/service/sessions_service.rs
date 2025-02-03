@@ -31,24 +31,39 @@ pub fn fetch_all_sessions<SR: SessionRepository, MR: MessageRepository>(
     Ok(())
 }
 
-pub fn session_add<SR: SessionRepository>(session_repo: &SR, name: &str) -> Result<()> {
-    let id = generate_uuid_v4().to_string();
-    let now = Utc::now().naive_utc();
-    let expires_at: NaiveDateTime = now + Duration::hours(24);
+pub fn session<SR: SessionRepository, MR: MessageRepository>(
+    session_repo: &SR,
+    message_repository: &MR,
+    name: &str,
+) -> Result<Session> {
+    let session = match session_repo.fetch_session_by_name(name) {
+        Err(_) => {
+            let id = generate_uuid_v4().to_string();
+            let now = Utc::now().naive_utc();
+            let expires_at: NaiveDateTime = now + Duration::hours(24);
 
-    match session_repo.remove_current_from_all() {
-        Ok(_) => {}
-        Err(err) => panic!(
-            "could not remove current from previous sessions: {:#?}",
-            err
-        ),
-    }
+            match session_repo.remove_current_from_all() {
+                Ok(_) => {}
+                Err(err) => panic!(
+                    "could not remove current from previous sessions: {:#?}",
+                    err
+                ),
+            }
 
-    match session_repo.add_session(&id, name, expires_at, true) {
-        Ok(_) => println!("New session '{}' expires at {}", name, expires_at),
-        Err(err) => panic!("Could not create a new session: {:#?}", err),
-    }
-    Ok(())
+            match session_repo.add_session(&id, name, expires_at, true) {
+                Ok(_) => println!("New session '{}' expires at {}", name, expires_at),
+                Err(err) => panic!("Could not create a new session: {:#?}", err),
+            }
+            let session = session_repo
+                .fetch_session_by_name(name)
+                .expect("could not fetch session");
+            Session::from(&session)
+        }
+        Ok(session) => Session::from(&session),
+    };
+
+    let session = session_with_messages(message_repository, &session);
+    Ok(session)
 }
 
 pub fn session_add_messages<SR: SessionRepository, MR: MessageRepository>(
@@ -56,37 +71,25 @@ pub fn session_add_messages<SR: SessionRepository, MR: MessageRepository>(
     message_repository: &MR,
     session: &Session,
 ) -> Result<()> {
-    let new_messages = session
-        .messages
-        .iter()
-        .filter(|message| message.id == "")
-        .collect::<Vec<&Message>>();
-    for message in new_messages {
-        let message_with_id = message.copy_with_id(generate_uuid_v4().to_string());
-        message_repository
-            .add_message_to_session(&message_with_id.to_entity(&session.id))
-            .expect("could not add new message to session");
-    }
-    let now = Utc::now().naive_utc();
-    let expires_at: NaiveDateTime = now + Duration::hours(24);
-    session_repo
-        .update_session(&session.id, &session.name, expires_at, session.current)
-        .expect("could not update session");
-    Ok(())
-}
-
-pub fn fetch_current_session<SR: SessionRepository, MR: MessageRepository>(
-    session_repo: &SR,
-    message_repository: &MR,
-) -> Result<Session> {
-    match session_repo.fetch_current_session() {
-        Ok(session) => {
-            let session = Session::from(&session);
-            let session = session_with_messages(message_repository, &session);
-            Ok(session)
+    if !session.temporary {
+        let new_messages = session
+            .messages
+            .iter()
+            .filter(|message| message.id == "")
+            .collect::<Vec<&Message>>();
+        for message in new_messages {
+            let message_with_id = message.copy_with_id(generate_uuid_v4().to_string());
+            message_repository
+                .add_message_to_session(&message_with_id.to_entity(&session.id))
+                .expect("could not add new message to session");
         }
-        Err(_) => Err(anyhow::anyhow!("could not fetch current session")),
+        let now = Utc::now().naive_utc();
+        let expires_at: NaiveDateTime = now + Duration::hours(24);
+        session_repo
+            .update_session(&session.id, &session.name, expires_at, session.current)
+            .expect("could not update session");
     }
+    Ok(())
 }
 
 fn session_with_messages<MR: MessageRepository>(
