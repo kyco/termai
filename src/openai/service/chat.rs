@@ -1,3 +1,4 @@
+use crate::openai::model::reasoning_effort::ReasoningEffort;
 use crate::openai::{
     adapter::open_ai_adapter,
     model::{
@@ -31,6 +32,7 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
     let request = ChatCompletionRequest {
         model: model.to_string(),
         messages: chat_messages,
+        reasoning_effort: ReasoningEffort::High,
     };
     let response = open_ai_adapter::chat(&request, api_key).await?;
 
