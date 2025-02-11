@@ -1,14 +1,7 @@
-use std::collections::HashMap;
 use regex::Regex;
-use crate::config::repository::ConfigRepository;
-use crate::config::service::redacted_config;
+use std::collections::HashMap;
 
-use super::common;
-
-pub fn redact<R: ConfigRepository>(repo: &R, content: &str) -> (String, HashMap<String, String>) {
-    let redactions = redacted_config::fetch_redactions(repo);
-    let mapped_redactions = common::redaction_map(redactions);
-
+pub fn redact(content: &str, mapped_redactions: &HashMap<String, String>) -> String {
     let input_with_redactions =
         mapped_redactions
             .iter()
@@ -17,5 +10,5 @@ pub fn redact<R: ConfigRepository>(repo: &R, content: &str) -> (String, HashMap<
                 re.replace_all(&acc, id).to_string()
             });
 
-    (input_with_redactions.to_string(), mapped_redactions)
+    input_with_redactions.to_string()
 }

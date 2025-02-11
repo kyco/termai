@@ -147,10 +147,10 @@ async fn request_response_from_ai<
         return Err(err);
     }
 
-    session.unredact();
     session_add_messages(session_repository, message_repository, session)
         .expect("could not write new messages to repo");
 
+    session.unredact();
     let output_messages = session
         .messages
         .iter()

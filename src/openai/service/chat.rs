@@ -44,7 +44,6 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
                 id: "".to_string(),
                 role: Role::from_str(&role),
                 content: message,
-                redaction_mapping: None,
             });
         }
     }

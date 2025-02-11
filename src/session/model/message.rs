@@ -2,14 +2,12 @@ use crate::openai::model::role::Role;
 use crate::openai::service::chat::SYSTEM_PROMPT;
 use crate::output::message;
 use crate::session::entity::message_entity::MessageEntity;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct Message {
     pub id: String,
     pub role: Role,
     pub content: String,
-    pub redaction_mapping: Option<HashMap<String, String>>,
 }
 
 impl From<&MessageEntity> for Message {
@@ -18,7 +16,6 @@ impl From<&MessageEntity> for Message {
             id: entity.id.to_string(),
             role: Role::from_str(&entity.role),
             content: entity.content.clone(),
-            redaction_mapping: None,
         }
     }
 }
@@ -50,7 +47,6 @@ impl Message {
             id: self.id.to_string(),
             role: self.role.clone(),
             content: new_content,
-            redaction_mapping: self.redaction_mapping.clone(),
         }
     }
 
@@ -61,7 +57,6 @@ impl Message {
             id: self.id.to_string(),
             role: self.role.clone(),
             content: new_content.to_string(),
-            redaction_mapping: self.redaction_mapping.clone(),
         }
     }
 }
@@ -80,7 +75,6 @@ pub fn messages_with_system_prompt(
         id: "".to_string(),
         role: Role::System,
         content: system_prompt,
-        redaction_mapping: None,
     });
     for m in messages {
         new_messages.push(m.clone());

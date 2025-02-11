@@ -1,11 +1,14 @@
 use crate::common;
 use crate::config::repository::ConfigRepository;
+use crate::config::service::redacted_config;
 use crate::openai::model::role::Role;
+use crate::redactions::common::redaction_map;
 use crate::redactions::redact::redact;
 use crate::redactions::revert::unredact;
 use crate::session::entity::session_entity::SessionEntity;
 use crate::session::model::message::Message;
 use chrono::{Duration, NaiveDateTime, Utc};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Session {
@@ -15,6 +18,7 @@ pub struct Session {
     pub current: bool,
     pub messages: Vec<Message>,
     pub temporary: bool,
+    pub redaction_mapping: Option<HashMap<String, String>>,
 }
 
 impl From<&SessionEntity> for Session {
@@ -26,6 +30,7 @@ impl From<&SessionEntity> for Session {
             current: value.current == 1,
             messages: Vec::new(),
             temporary: false,
+            redaction_mapping: None,
         }
     }
 }
@@ -41,6 +46,7 @@ impl Session {
             current: true,
             messages: Vec::new(),
             temporary: true,
+            redaction_mapping: None,
         }
     }
 
@@ -52,6 +58,7 @@ impl Session {
             current: self.current.clone(),
             messages: messages.to_vec(),
             temporary: self.temporary,
+            redaction_mapping: self.redaction_mapping.clone(),
         }
     }
 
@@ -60,39 +67,42 @@ impl Session {
             id: "".to_string(),
             role,
             content: message,
-            redaction_mapping: None,
         });
     }
 
     pub fn redact<R: ConfigRepository>(&mut self, repo: &R) {
         let mut redacted_messages = Vec::with_capacity(self.messages.len());
+        let redactions = redacted_config::fetch_redactions(repo);
+        let mapped_redactions = redaction_map(redactions);
         for message in self.messages.iter() {
-            let (redacted_input, mapped_redactions) = redact(repo, &message.content);
+            let redacted_input = redact(&message.content, &mapped_redactions);
             redacted_messages.push(Message {
                 id: message.id.to_string(),
                 role: message.role.clone(),
                 content: redacted_input,
-                redaction_mapping: Some(mapped_redactions),
             });
         }
 
+        self.redaction_mapping = Some(mapped_redactions);
         self.messages = redacted_messages;
     }
 
     pub fn unredact(&mut self) {
         let mut unredacted = Vec::with_capacity(self.messages.len());
         for message in self.messages.iter() {
-            match &message.redaction_mapping {
+            match &self.redaction_mapping {
                 Some(redaction_mapping) => {
                     let content = unredact(redaction_mapping, &message.content);
                     unredacted.push(Message {
                         id: message.id.to_string(),
                         role: message.role.clone(),
                         content,
-                        redaction_mapping: message.redaction_mapping.clone(),
                     });
                 }
-                None => unredacted.push(message.clone()),
+                None => {
+                    println!("no redaction mapping: {:#?}", message);
+                    unredacted.push(message.clone())
+                }
             }
         }
 
