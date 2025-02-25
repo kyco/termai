@@ -8,9 +8,10 @@ mod redactions;
 mod repository;
 mod session;
 
-use crate::args::Args;
+use crate::args::{Args, Provider};
 use crate::config::repository::ConfigRepository;
-use crate::config::service::{open_ai_config, redacted_config};
+use crate::config::service::provider_config::write_provider_key;
+use crate::config::service::{claude_config, open_ai_config, redacted_config};
 use crate::llm::common::model::role::Role;
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
@@ -22,7 +23,8 @@ use crate::session::service::sessions_service::session_add_messages;
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
-use llm::openai::service::chat::chat;
+use llm::claude;
+use llm::openai;
 use output::message::Message;
 use output::outputter;
 use repository::db::SqliteRepository;
@@ -42,6 +44,11 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    if args.is_claude_api_key() {
+        claude_config::write_claude_key(&repo, &args)?;
+        return Ok(());
+    }
+
     if args.is_redaction() {
         redacted_config::redaction(&repo, &args)?;
         return Ok(());
@@ -49,6 +56,11 @@ async fn main() -> Result<()> {
 
     if args.is_sessions_all() {
         sessions_service::fetch_all_sessions(&repo, &repo)?;
+        return Ok(());
+    }
+
+    if args.is_provider() {
+        write_provider_key(&repo, &args)?;
         return Ok(());
     }
 
@@ -116,7 +128,14 @@ async fn request_response_from_ai<
     user_defined_system_prompt: Option<String>,
     local_context: &Option<Vec<Files>>,
 ) -> Result<()> {
-    let open_ai_api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())?;
+    let provider = config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key())?;
+    let provider = Provider::new(&provider.value);
+    let provider_api_key = match provider {
+        Provider::Claude => config_service::fetch_by_key(repo, &ConfigKeys::ClaudeApiKey.to_key())?,
+        Provider::Openapi => {
+            config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())?
+        }
+    };
 
     let contains_system_prompt = contains_system_prompt(&session.messages);
     if !contains_system_prompt {
@@ -142,10 +161,20 @@ async fn request_response_from_ai<
     session.add_raw_message(input_with_local_context, Role::User);
     session.redact(repo);
 
-    if let Err(err) = chat(&open_ai_api_key.value, session).await {
-        println!("{:#?}", err);
-        return Err(err);
-    }
+    match provider {
+        Provider::Claude => {
+            if let Err(err) = claude::service::chat::chat(&provider_api_key.value, session).await {
+                println!("{:#?}", err);
+                return Err(err);
+            }
+        }
+        Provider::Openapi => {
+            if let Err(err) = openai::service::chat::chat(&provider_api_key.value, session).await {
+                println!("{:#?}", err);
+                return Err(err);
+            }
+        }
+    };
 
     session_add_messages(session_repository, message_repository, session)
         .expect("could not write new messages to repo");
