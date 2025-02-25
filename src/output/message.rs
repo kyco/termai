@@ -1,4 +1,4 @@
-use crate::openai::model::role::Role;
+use crate::llm::common::model::role::Role;
 
 pub struct Message {
     pub role: Role,

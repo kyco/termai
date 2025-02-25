@@ -5,6 +5,5 @@ pub(crate) mod completion_token_details;
 pub(crate) mod chat_message;
 pub(crate) mod message_content;
 pub(crate) mod model;
-pub(crate) mod role;
 pub(crate) mod usage;
 pub(crate) mod reasoning_effort;

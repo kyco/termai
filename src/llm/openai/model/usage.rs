@@ -1,4 +1,4 @@
-use crate::openai::model::completion_token_details::CompletionTokensDetails;
+use crate::llm::openai::model::completion_token_details::CompletionTokensDetails;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

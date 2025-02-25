@@ -1,21 +1,14 @@
-use crate::openai::model::reasoning_effort::ReasoningEffort;
-use crate::openai::{
+use crate::llm::common::model::role::Role;
+use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
+use crate::llm::openai::{
     adapter::open_ai_adapter,
     model::{
         chat_completion_request::ChatCompletionRequest, chat_message::ChatMessage, model::Model,
-        role::Role,
     },
 };
 use crate::session::model::message::Message;
 use crate::session::model::session::Session;
 use anyhow::Result;
-
-pub const SYSTEM_PROMPT: &str = "
-You're an assistant in the terminal.
-You will keep your answers brief as the user is chatting to you from the command line.
-You will never output markdown, only ASCII text or ASCII art.
-You will limit your line length to 80 characters.
-You will not replace any UUIDs that you find in the text, these are required by the application for replacements later.";
 
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
     let model = Model::O3Mini;

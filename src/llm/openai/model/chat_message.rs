@@ -1,7 +1,6 @@
 use crate::output::message;
 use serde::Serialize;
-
-use super::role::Role;
+use crate::llm::common::model::role::Role;
 
 #[derive(Serialize, Clone)]
 pub struct ChatMessage {

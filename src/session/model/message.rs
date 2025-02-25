@@ -1,5 +1,5 @@
-use crate::openai::model::role::Role;
-use crate::openai::service::chat::SYSTEM_PROMPT;
+use crate::llm::common::constants::SYSTEM_PROMPT;
+use crate::llm::common::model::role::Role;
 use crate::output::message;
 use crate::session::entity::message_entity::MessageEntity;
 

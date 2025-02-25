@@ -1,7 +1,7 @@
 use crate::common;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::redacted_config;
-use crate::openai::model::role::Role;
+use crate::llm::common::model::role::Role;
 use crate::redactions::common::redaction_map;
 use crate::redactions::redact::redact;
 use crate::redactions::revert::unredact;

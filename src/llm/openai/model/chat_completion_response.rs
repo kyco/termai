@@ -1,5 +1,5 @@
-use crate::openai::model::choice::Choice;
-use crate::openai::model::usage::Usage;
+use crate::llm::openai::model::choice::Choice;
+use crate::llm::openai::model::usage::Usage;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

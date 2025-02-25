@@ -1,5 +1,5 @@
-use crate::openai::model::chat_completion_request::ChatCompletionRequest;
-use crate::openai::model::chat_completion_response::ChatCompletionResponse;
+use crate::llm::openai::model::chat_completion_request::ChatCompletionRequest;
+use crate::llm::openai::model::chat_completion_response::ChatCompletionResponse;
 use anyhow::Result;
 use reqwest::Client;
 

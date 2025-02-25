@@ -1,4 +1,4 @@
-use crate::openai::model::message_content::MessageContent;
+use crate::llm::openai::model::message_content::MessageContent;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
