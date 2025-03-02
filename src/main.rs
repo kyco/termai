@@ -7,6 +7,7 @@ mod path;
 mod redactions;
 mod repository;
 mod session;
+mod ui;
 
 use crate::args::{Args, Provider};
 use crate::config::repository::ConfigRepository;
@@ -20,6 +21,7 @@ use crate::session::model::session::Session;
 use crate::session::repository::{MessageRepository, SessionRepository};
 use crate::session::service::sessions_service;
 use crate::session::service::sessions_service::session_add_messages;
+use crate::ui::timer::ThinkingTimer;
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
@@ -161,20 +163,26 @@ async fn request_response_from_ai<
     session.add_raw_message(input_with_local_context, Role::User);
     session.redact(repo);
 
+    let mut timer = ThinkingTimer::new();
+    timer.start();
+
     match provider {
         Provider::Claude => {
             if let Err(err) = claude::service::chat::chat(&provider_api_key.value, session).await {
                 println!("{:#?}", err);
+                timer.stop();
                 return Err(err);
             }
         }
         Provider::Openapi => {
             if let Err(err) = openai::service::chat::chat(&provider_api_key.value, session).await {
                 println!("{:#?}", err);
+                timer.stop();
                 return Err(err);
             }
         }
     };
+    timer.stop();
 
     session_add_messages(session_repository, message_repository, session)
         .expect("could not write new messages to repo");
