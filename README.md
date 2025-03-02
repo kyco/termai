@@ -5,9 +5,7 @@
 TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic
 Claude APIs with a focus on privacy, speed, and developer productivity.
 
-![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet)                                                                                                                            
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)                                                                                                                                                
-![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
+![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet) ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
 
 ## ✨ Features
 
