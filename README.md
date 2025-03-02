@@ -1,108 +1,147 @@
-TermAI
-======
+# TermAI
 
-**TermAI** is a terminal-based AI assistant developed in Rust. It leverages OpenAI's APIs to provide intelligent and
-interactive experiences directly from your command line.
+> A powerful, privacy-focused AI assistant for your terminal
 
-Features
---------
+TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic Claude APIs with a focus on privacy, speed, and developer productivity.
 
-- **Asynchronous Operations**: Powered by `tokio` for efficient asynchronous processing.
-- **Local Configuration Storage**: Manage configurations using SQLite via `rusqlite`.
-- **Command-Line Parsing**: Easy-to-use CLI with `clap`.
-- **Colored Output**: Enhanced terminal output with `colored`.
+![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
 
-Installation
-------------
+## ✨ Features
 
-1. **Prerequisites**:
-    - Ensure you have [Rust](https://www.rust-lang.org/tools/install) installed.
+- **Multi-Provider Support**: Works with both OpenAI and Claude APIs
+- **Local Context Understanding**: Analyze your code and files for more relevant responses
+- **Session Management**: Save and restore conversations for later reference
+- **Privacy-Focused**: Redact sensitive information before sending to APIs
+- **Developer-Optimized**: Perfect for generating code, explaining concepts, and assisting with daily dev tasks
+- **Fully Terminal-Based**: No web interfaces or external dependencies needed
+- **Fast Response Times**: Asynchronous processing with progress indicators
 
-2. **Clone the Repository**:
-   ```sh
-   git clone https://github.com/kyco/term.git
-   cd termAI
-   ```
+## 🚀 Installation
 
-3. **Build the Project**:
-   ```sh
-   cargo build --release
-   ```
+### Prerequisites
 
-4. **Run the Application**:
-   ```sh
-   ./target/release/termAI
-   ```
+- [Rust and Cargo](https://www.rust-lang.org/tools/install)
+- API key from OpenAI or Anthropic Claude
 
-Usage
------
+### Install from Source
 
-1. **Set OpenAI API Key**:
-   ```sh
-   ./termAI --chat-gpt-api-key YOUR_API_KEY
-   ```
+────────────────────────────────────
+#### Clone the repository
+git clone https://github.com/kyco/termai.git                                                                                                                                                                       
+cd termai
 
-2. **Prompts**:
-    - Use it directly in your terminal to chat with the AI assistant.
-    - It's currently designed for 1 shot requests
-   ```shell
-    ./termAI "What is the capital of France?"
-    ```
-    - You can also provide a path as context for the AI to understand the context of the request.
-   ```shell
-    ./termAI "Create a README for this project" .
-    ```
-    - You can also provide a path as context for the AI to understand the context of the request.
-   ```shell
-   ./termAI "create mocks for this file" ./src/main.rs
-   ```
+#### Build and install
+cargo install --path .                                                                                                                                                                                             
+────────────────────────────────────
 
-3. **Commands**:
-    - Use the following commands to interact with the application:
-    ```shell
-    ./termAI --help
-    ```
-    - To set the OpenAI API key:
-    ```shell
-    ./termAI --chat-gpt-api-key YOUR_API
-    ```
+## 🔧 Configuration
 
-4. **Piping**:
-    - You can also pipe the output of other commands into **TermAI**:
-    ```shell
-    echo "What is the capital of France?" | ./termAI
-    ```
-    - Create git commit messages from diffs
-   ```shell
-   git diff | ./termAI "create a short git commit message"
-   ```
+Set up TermAI with your API keys:
 
-Configuration
--------------
+────────────────────────────────────
+### Configure OpenAI API
+termai --chat-gpt-api-key YOUR_OPENAI_API_KEY
 
-Configurations are stored locally using SQLite. You can view and modify settings using the provided CLI commands.
+### Or configure Claude API
+termai --claude-api-key YOUR_CLAUDE_API_KEY
 
-Contributing
-------------
+### Set your preferred provider
+termai --provider claude  # or openapi                                                                                                                                                                             
+────────────────────────────────────
 
-Contributions are welcome! Please follow these steps:
+## 📖 Usage
 
-1. Fork the repository.
-2. Create a new branch for your feature or bugfix.
-3. Commit your changes with clear messages.
-4. Open a pull request describing your changes.
+### Basic Queries
 
-License
--------
+────────────────────────────────────
+# Ask a simple question
+termai "What is the capital of France?"
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+# Get coding advice
+termai "How do I implement binary search in Rust?"                                                                                                                                                                 
+────────────────────────────────────
 
-Support
--------
+### Using Local Context
 
-For support or questions, please open an issue on the [GitHub Issues](https://github.com/yourusername/termAI/issues)
-page.
+────────────────────────────────────
+# Create a README for your project
+termai "Create a README for this project" .
+
+# Generate tests for a specific file
+termai "Write unit tests for this file" ./src/main.rs
+
+# Provide explanations for complex code
+termai "Explain what this function does" ./path/to/complex_code.rs                                                                                                                                                 
+────────────────────────────────────
+
+### Working with Git
+
+────────────────────────────────────
+#### Generate a commit message from your changes
+git diff | termai "Write a concise git commit message"
+
+#### Explain a complex git diff
+git show | termai "Explain what changes were made in this commit"                                                                                                                                                  
+────────────────────────────────────
+
+### Session Management
+
+────────────────────────────────────
+#### Start or continue a named session
+termai --session my_project "Tell me about Rust's ownership model"
+
+#### List all saved sessions
+termai --sessions-all                                                                                                                                                                                              
+────────────────────────────────────
+
+### Privacy Features
+
+────────────────────────────────────
+#### Add text to be automatically redacted
+termai --redact-add "supersecretpassword"
+
+#### List current redactions
+termai --redact-list
+
+#### Remove a redaction
+termai --redact-remove "supersecretpassword"                                                                                                                                                                       
+────────────────────────────────────
+
+## 🏗️ Architecture
+
+TermAI is built with a clean architecture focusing on:
+
+- **Repository Pattern**: Data access through well-defined interfaces
+- **Service Layer**: Business logic separated from presentation
+- **Modular Design**: Support for multiple LLM providers
+- **Local Storage**: SQLite for configuration and session persistence
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+Please ensure your code follows the project's coding style and includes appropriate tests.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔮 Future Plans
+
+- Stream responses for faster feedback
+- Auto-completion plugins for common shells
+- Voice input/output support
+- Additional LLM providers
+- Custom fine-tuned models
 
 ---
 
-Thank you for using **TermAI**! 🖥️✨
+Made with ❤️ by [kyco](https://github.com/kyco)
