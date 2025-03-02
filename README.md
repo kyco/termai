@@ -2,10 +2,11 @@
 
 > A powerful, privacy-focused AI assistant for your terminal
 
-TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic Claude APIs with a focus on privacy, speed, and developer productivity.
+TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic
+Claude APIs with a focus on privacy, speed, and developer productivity.
 
-![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet)
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet)                                                                                                                            
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)                                                                                                                                                
 ![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
 
 ## ✨ Features
@@ -27,45 +28,56 @@ TermAI is a versatile command-line AI assistant built in Rust that brings the po
 
 ### Install from Source
 
-────────────────────────────────────
-#### Clone the repository
-git clone https://github.com/kyco/termai.git                                                                                                                                                                       
-cd termai
+### Clone the repository
 
-#### Build and install
-cargo install --path .                                                                                                                                                                                             
-────────────────────────────────────
+```                                                                                                                                                               
+git clone https://github.com/kyco/termai.git
+cd termai
+```
+
+### Build and install
+
+```
+cargo install --path .
+```
 
 ## 🔧 Configuration
 
 Set up TermAI with your API keys:
 
-────────────────────────────────────
 ### Configure OpenAI API
+
+```                                                                                                                                                               
 termai --chat-gpt-api-key YOUR_OPENAI_API_KEY
+```
 
 ### Or configure Claude API
+
+```
 termai --claude-api-key YOUR_CLAUDE_API_KEY
+```
 
 ### Set your preferred provider
-termai --provider claude  # or openapi                                                                                                                                                                             
-────────────────────────────────────
+
+```                                                                                                                                                               
+termai --provider claude  # or openapi
+```
 
 ## 📖 Usage
 
 ### Basic Queries
 
-────────────────────────────────────
+```
 # Ask a simple question
 termai "What is the capital of France?"
 
 # Get coding advice
-termai "How do I implement binary search in Rust?"                                                                                                                                                                 
-────────────────────────────────────
+termai "How do I implement binary search in Rust?"
+```
 
 ### Using Local Context
 
-────────────────────────────────────
+```
 # Create a README for your project
 termai "Create a README for this project" .
 
@@ -73,41 +85,56 @@ termai "Create a README for this project" .
 termai "Write unit tests for this file" ./src/main.rs
 
 # Provide explanations for complex code
-termai "Explain what this function does" ./path/to/complex_code.rs                                                                                                                                                 
-────────────────────────────────────
+termai "Explain what this function does" ./path/to/complex_code.rs
+```
 
 ### Working with Git
 
-────────────────────────────────────
-#### Generate a commit message from your changes
-git diff | termai "Write a concise git commit message"
+### Generate a commit message from your changes
 
-#### Explain a complex git diff
-git show | termai "Explain what changes were made in this commit"                                                                                                                                                  
-────────────────────────────────────
+```
+git diff | termai "Write a concise git commit message"
+```
+
+### Explain a complex git diff
+
+```                                                                                                                                                               
+git show | termai "Explain what changes were made in this commit"
+```
 
 ### Session Management
 
-────────────────────────────────────
-#### Start or continue a named session
-termai --session my_project "Tell me about Rust's ownership model"
+### Start or continue a named session
 
-#### List all saved sessions
-termai --sessions-all                                                                                                                                                                                              
-────────────────────────────────────
+```
+termai --session my_project "Tell me about Rust's ownership model"
+```
+
+### List all saved sessions
+
+```                                                                                                                                                               
+termai --sessions-all
+```
 
 ### Privacy Features
 
-────────────────────────────────────
-#### Add text to be automatically redacted
+### Add text to be automatically redacted
+
+```
 termai --redact-add "supersecretpassword"
+```
 
-#### List current redactions
+### List current redactions
+
+```                                                                                                                                                               
 termai --redact-list
+```
 
-#### Remove a redaction
-termai --redact-remove "supersecretpassword"                                                                                                                                                                       
-────────────────────────────────────
+### Remove a redaction
+
+```
+termai --redact-remove "supersecretpassword"
+```
 
 ## 🏗️ Architecture
 
@@ -142,6 +169,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Additional LLM providers
 - Custom fine-tuned models
 
----
+---                                                                                                                                                                                                                
 
-Made with ❤️ by [kyco](https://github.com/kyco)
+Made with ❤️ by [kyco](https://github.com/kyco)    
