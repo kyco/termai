@@ -1,8 +1,12 @@
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
-pub struct ContentBlock {
-    pub text: String,
-    #[serde(rename = "type")]
-    pub block_type: String,
+#[serde(tag = "type")]
+pub enum ContentBlock {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "thinking")]
+    Thinking { thinking: String, signature: String },
+    #[serde(rename = "redacted_thinking")]
+    RedactedThinking { data: String },
 }

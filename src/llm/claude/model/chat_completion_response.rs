@@ -1,6 +1,6 @@
-use serde::Deserialize;
 use crate::llm::claude::model::content_block::ContentBlock;
 use crate::llm::claude::model::usage::Usage;
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct ChatCompletionResponse {
