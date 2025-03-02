@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
         return print_config(&repo);
     }
 
-    let local_context = extract_content(&args.directory, &args.exclude);
+    let local_context = extract_content(&args.directory, &args.directories, &args.exclude);
     let input = extract_input_or_quit(&args);
     request_response_from_ai(
         &repo,

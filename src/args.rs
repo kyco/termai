@@ -27,6 +27,8 @@ pub struct Args {
     pub(crate) exclude: Vec<String>,
     #[arg(long, value_enum)]
     pub provider: Option<Provider>,
+    #[arg(short = 'd', long, value_delimiter = ',')]
+    pub(crate) directories: Vec<String>,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, ValueEnum)]

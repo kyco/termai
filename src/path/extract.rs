@@ -2,19 +2,33 @@ use crate::path::model::Files;
 use std::fs;
 use std::path::Path;
 
-pub fn extract_content(path_str: &Option<String>, exclude: &[String]) -> Option<Vec<Files>> {
+pub fn extract_content(dir: &Option<String>, dirs: &[String], exclude: &[String]) -> Option<Vec<Files>> {
+    let mut all_dirs = Vec::new();
+    if let Some(dir) = dir {
+        all_dirs.push(dir.clone());
+    }
+    all_dirs.extend(dirs.iter().cloned());
+
+    if all_dirs.is_empty() {
+        return None;
+    }
+
     let mut files = vec![];
+    let mut any_valid_path = false;
 
-    let path = match path_str {
-        Some(p) => Path::new(p),
-        None => return None,
-    };
+    for path_str in all_dirs {
+        let path = Path::new(&path_str);
+        if path.exists() {
+            any_valid_path = true;
+            collect_files(path, &mut files, exclude);
+        } else {
+            println!("{} does not exist.", path_str);
+        }
+    }
 
-    if path.exists() {
-        collect_files(path, &mut files, exclude);
+    if any_valid_path {
         Some(files)
     } else {
-        println!("{} does not exist.", path_str.as_deref().unwrap_or("."));
         None
     }
 }
@@ -72,8 +86,7 @@ mod tests {
     use std::path::PathBuf;
     use tempfile::TempDir;
 
-    // This helper converts a slice of Files into a map keyed by file name (last component)
-    // so that the expected contents can be easily verified.
+    // This helper function remains unchanged                                                                                                                                                                      
     fn files_to_map(files: &[Files]) -> std::collections::HashMap<String, String> {
         let mut map = std::collections::HashMap::new();
         for file in files {
@@ -84,49 +97,49 @@ mod tests {
         map
     }
 
-    // Test 1: When the input Option is None, extract_content returns None.
+    // Test 1: When the input Option is None, extract_content returns None.                                                                                                                                        
     #[test]
     fn test_extract_content_returns_none_for_none_path() {
-        // Arrange
+        // Arrange                                                                                                                                                                                                 
         let input: Option<String> = None;
         let exclude: [String; 0] = [];
 
-        // Act
-        let result = extract_content(&input, &exclude);
+        // Act - add empty dirs array as second parameter                                                                                                                                                          
+        let result = extract_content(&input, &[], &exclude);
 
-        // Assert
+        // Assert                                                                                                                                                                                                  
         assert!(result.is_none(), "Expected None when no path is provided.");
     }
 
-    // Test 2: When the provided path does not exist, extract_content returns None.
+    // Test 2: When the provided path does not exist, extract_content returns None.                                                                                                                                
     #[test]
     fn test_extract_content_returns_none_for_nonexistent_path() {
-        // Arrange
+        // Arrange                                                                                                                                                                                                 
         let nonexistent = Some("nonexistent_directory_or_file".to_owned());
         let exclude: [String; 0] = [];
 
-        // Act
-        let result = extract_content(&nonexistent, &exclude);
+        // Act - add empty dirs array                                                                                                                                                                              
+        let result = extract_content(&nonexistent, &[], &exclude);
 
-        // Assert
+        // Assert                                                                                                                                                                                                  
         assert!(result.is_none(), "Expected None for a nonexistent path.");
     }
 
-    // Test 3: Extract files from an existing directory (with a nested subdirectory).
+    // Test 3: Extract files from an existing directory (with a nested subdirectory).                                                                                                                              
     #[test]
     fn test_extract_content_with_directory_includes_all_files() {
-        // Arrange: Create a temporary directory with two files in different levels.
+        // Arrange setup unchanged                                                                                                                                                                                 
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path();
 
-        // Create file1.txt at root.
+        // Create file1.txt at root.                                                                                                                                                                               
         let file1_path = temp_path.join("file1.txt");
         {
             let mut file1 = File::create(&file1_path).expect("Failed to create file1.txt");
             write!(file1, "Hello file1!").expect("Failed to write to file1.txt");
         }
 
-        // Create a subdirectory "subdir" and file2.txt inside it.
+        // Create a subdirectory "subdir" and file2.txt inside it.                                                                                                                                                 
         let subdir_path = temp_path.join("subdir");
         fs::create_dir(&subdir_path).expect("Failed to create subdir");
         let file2_path = subdir_path.join("file2.txt");
@@ -135,11 +148,11 @@ mod tests {
             write!(file2, "Hello file2!").expect("Failed to write to file2.txt");
         }
 
-        // Act
-        let result = extract_content(&Some(temp_path.to_str().unwrap().to_owned()), &[]);
+        // Act - add empty dirs array                                                                                                                                                                              
+        let result = extract_content(&Some(temp_path.to_str().unwrap().to_owned()), &[], &[]);
         let files = result.expect("Expected Some(files) for valid directory");
 
-        // Assert: Both file1.txt and file2.txt should be present with the correct contents.
+        // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);
         assert_eq!(
             files_map.len(),
@@ -151,14 +164,14 @@ mod tests {
         assert_eq!(files_map.get("file2.txt").unwrap(), "Hello file2!");
     }
 
-    // Test 4: Files explicitly listed in the exclude list should not be returned.
+    // Fix remaining tests similarly by adding the empty dirs array                                                                                                                                                
     #[test]
     fn test_extract_content_with_directory_excludes_specified_file() {
-        // Arrange: Create a temporary directory with two files.
+        // Arrange unchanged                                                                                                                                                                                       
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path();
 
-        // Create include.txt.
+        // Create include.txt.                                                                                                                                                                                     
         let include_path = temp_path.join("include.txt");
         {
             let mut include_file =
@@ -166,25 +179,25 @@ mod tests {
             write!(include_file, "Keep me").expect("Failed to write to include.txt");
         }
 
-        // Create exclude.txt.
+        // Create exclude.txt.                                                                                                                                                                                     
         let exclude_path_buf: PathBuf = temp_path.join("exclude.txt");
         {
             let mut exclude_file =
                 File::create(&exclude_path_buf).expect("Failed to create exclude.txt");
             write!(exclude_file, "Remove me").expect("Failed to write to exclude.txt");
         }
-        // Convert exclude file path to string (as used in extract_content).
+        // Convert exclude file path to string (as used in extract_content).                                                                                                                                       
         let exclude_path = exclude_path_buf
             .to_str()
             .expect("Failed to convert exclude path to string")
             .to_owned();
         let excludes = vec![exclude_path];
 
-        // Act
-        let result = extract_content(&Some(temp_path.to_str().unwrap().to_owned()), &excludes);
+        // Act - add empty dirs array                                                                                                                                                                              
+        let result = extract_content(&Some(temp_path.to_str().unwrap().to_owned()), &[], &excludes);
         let files = result.expect("Expected Some(files) for valid directory");
 
-        // Assert: Only include.txt should be returned.
+        // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);
         assert_eq!(
             files_map.len(),
@@ -202,10 +215,9 @@ mod tests {
         );
     }
 
-    // Test 5: When a file (not a directory) is provided as input, it is correctly processed.
     #[test]
     fn test_extract_content_with_file_input() {
-        // Arrange: Create a temporary directory and a single file inside it.
+        // Arrange unchanged                                                                                                                                                                                       
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let file_path = temp_dir.path().join("single_file.txt");
         {
@@ -213,19 +225,17 @@ mod tests {
             write!(file, "File content").expect("Failed to write to single_file.txt");
         }
 
-        // Act: Provide the file's path (as a String) to extract_content.
-        let result = extract_content(&Some(file_path.to_str().unwrap().to_owned()), &[]);
+        // Act - add empty dirs array                                                                                                                                                                              
+        let result = extract_content(&Some(file_path.to_str().unwrap().to_owned()), &[], &[]);
         let files = result.expect("Expected Some(files) for a valid file");
 
-        // Assert: Only one Files struct should be returned with matching content.
+        // Assert unchanged                                                                                                                                                                                        
         assert_eq!(
             files.len(),
             1,
             "Expected exactly 1 file to be returned for file input"
         );
         let file_entry = &files[0];
-        // Since the file path is not relative with a "./" prefix (typically absolute), we check that
-        // it ends with the file name.
         assert!(
             file_entry.path.ends_with("single_file.txt"),
             "Expected file path to end with 'single_file.txt'"
@@ -233,30 +243,26 @@ mod tests {
         assert_eq!(file_entry.content, "File content");
     }
 
-    // Test 6: When using a relative path, the "./" prefix is properly removed from returned file paths.
+    // Fix the last two tests similarly                                                                                                                                                                            
     #[test]
     fn test_extract_content_with_relative_path_removes_dot_slash() {
-        // Arrange: Create a temporary directory and a file inside it.
+        // Arrange unchanged                                                                                                                                                                                       
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let file_path = temp_dir.path().join("test.txt");
         {
             let mut file = File::create(&file_path).expect("Failed to create test.txt");
             write!(file, "Relative file").expect("Failed to write to test.txt");
         }
-        // Save the original current directory.
         let original_dir = env::current_dir().expect("Failed to get current directory");
-        // Change current directory to our temporary directory.
         env::set_current_dir(temp_dir.path()).expect("Failed to change current directory");
 
-        // Act: Use a relative path (with "./") to extract content.
-        let result = extract_content(&Some("./".to_owned()), &[]);
+        // Act - add empty dirs array                                                                                                                                                                              
+        let result = extract_content(&Some("./".to_owned()), &[], &[]);
         let files = result.expect("Expected Some(files) when using a relative path");
 
-        // Restore the original current directory.
         env::set_current_dir(original_dir).expect("Failed to restore current directory");
 
-        // Assert: The returned file path should have the "./" prefix removed.
-        // For a file in the current directory, we expect its path to be "test.txt".
+        // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);
         assert!(
             files_map.contains_key("test.txt"),
@@ -264,16 +270,15 @@ mod tests {
         );
     }
 
-    // Test 7: Hidden directories (names starting with '.') should be skipped.
     #[test]
     fn test_extract_content_excludes_hidden_directory() {
-        // Arrange: Create a temporary directory and switch to it to force relative paths.
+        // Arrange unchanged                                                                                                                                                                                       
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path();
         let original_dir = env::current_dir().expect("Failed to get current directory");
         env::set_current_dir(temp_path).expect("Failed to change current directory");
 
-        // Create a hidden directory ".hidden" and a file inside it.
+        // Create hidden directory and files                                                                                                                                                                       
         let hidden_dir = temp_path.join(".hidden");
         fs::create_dir(&hidden_dir).expect("Failed to create hidden dir");
         let hidden_file_path = hidden_dir.join("secret.txt");
@@ -283,7 +288,6 @@ mod tests {
             write!(hidden_file, "Hidden content").expect("Failed to write to secret.txt");
         }
 
-        // Also create a public file.
         let public_file_path = temp_path.join("public.txt");
         {
             let mut public_file =
@@ -291,14 +295,13 @@ mod tests {
             write!(public_file, "Visible content").expect("Failed to write to public.txt");
         }
 
-        // Act: Use a relative path ("./") to extract files.
-        let result = extract_content(&Some("./".to_owned()), &[]);
+        // Act - add empty dirs array                                                                                                                                                                              
+        let result = extract_content(&Some("./".to_owned()), &[], &[]);
         let files = result.expect("Expected Some(files) for relative extraction");
 
-        // Restore the original current directory.
         env::set_current_dir(original_dir).expect("Failed to restore current directory");
 
-        // Assert: The public file should be present and the hidden file (within .hidden) should be excluded.
+        // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);
         assert!(
             files_map.contains_key("public.txt"),
@@ -309,4 +312,4 @@ mod tests {
             "Expected 'secret.txt' from the hidden directory to be excluded."
         );
     }
-}
+}   
