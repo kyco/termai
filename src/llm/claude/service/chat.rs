@@ -10,7 +10,7 @@ use crate::session::model::session::Session;
 use anyhow::Result;
 
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
-    let model = "claude-3-7-sonnet-20250219".to_string();
+    let model = "claude-opus-4-20250514".to_string();
 
     let chat_messages = session
         .messages
@@ -30,8 +30,8 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
         .collect::<Vec<String>>();
     let system_message = system_message.first().map(|m| m.to_string());
 
-    let max_tokens = 64000;
-    let budget_tokens = 32000;
+    let max_tokens = 32000;  // Claude Opus 4 maximum
+    let budget_tokens = 16000;  // Adjusted for thinking budget
     let request = ChatCompletionRequest {
         model,
         max_tokens,
@@ -44,6 +44,11 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
     };
 
     let (_, response) = claude_adapter::chat(&request, api_key).await?;
+
+    // Handle refusal stop reason introduced in Claude 4
+    if response.stop_reason == "refusal" {
+        anyhow::bail!("Claude declined to generate content for safety reasons");
+    }
 
     let mut response_text = String::new();
     for block in response.content {

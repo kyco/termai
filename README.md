@@ -3,13 +3,14 @@
 > A powerful, privacy-focused AI assistant for your terminal
 
 TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic
-Claude APIs with a focus on privacy, speed, and developer productivity.
+Claude APIs (now with Claude Opus 4 support) with a focus on privacy, speed, and developer productivity.
 
 ![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet) ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
 
 ## ✨ Features
 
 - **Multi-Provider Support**: Works with both OpenAI and Claude APIs
+- **Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
 - **Local Context Understanding**: Analyze your code and files for more relevant responses
 - **Session Management**: Save and restore conversations for later reference
 - **Privacy-Focused**: Redact sensitive information before sending to APIs
