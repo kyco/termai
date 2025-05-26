@@ -66,6 +66,10 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    if args.is_ui() {
+        return ui::tui::runner::run_tui(&repo, &repo, &repo).await;
+    }
+
     let mut session = if args.is_session() {
         if let Some(name) = &args.session {
             sessions_service::session(&repo, &repo, name)?

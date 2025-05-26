@@ -9,13 +9,14 @@ Claude APIs (now with Claude Opus 4 support) with a focus on privacy, speed, and
 
 ## ✨ Features
 
+- **Beautiful Terminal UI**: Interactive chat interface with session management and real-time updates
 - **Multi-Provider Support**: Works with both OpenAI and Claude APIs
 - **Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
 - **Local Context Understanding**: Analyze your code and files for more relevant responses
 - **Session Management**: Save and restore conversations for later reference
 - **Privacy-Focused**: Redact sensitive information before sending to APIs
 - **Developer-Optimized**: Perfect for generating code, explaining concepts, and assisting with daily dev tasks
-- **Fully Terminal-Based**: No web interfaces or external dependencies needed
+- **Dual Interface**: Both command-line and interactive TUI modes
 - **Fast Response Times**: Asynchronous processing with progress indicators
 
 ## 🚀 Installation
@@ -63,6 +64,21 @@ termai --provider claude  # or openapi
 ```
 
 ## 📖 Usage
+
+### Interactive Terminal UI
+
+Launch the beautiful terminal interface for an interactive chat experience:
+
+```
+termai --ui
+```
+
+**Controls:**
+- `Tab`: Cycle through areas (Sessions → Chat → Input)
+- `↑↓←→`: Navigate within focused area
+- `Enter`: Edit input (when focused) or send message
+- `Esc`: Exit edit mode
+- `Mouse`: Click to focus, scroll to navigate
 
 ### Basic Queries
 
