@@ -125,6 +125,9 @@ where
                                 };
                                 app.handle_directional_input(app_direction);
                             }
+                            KeyAction::NewSession => {
+                                app.create_new_session();
+                            }
                         }
                     } else {
                         // Handle other key events for input when editing

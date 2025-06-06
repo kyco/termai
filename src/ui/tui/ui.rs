@@ -296,6 +296,8 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(": Navigate ", Style::default().fg(Color::Gray)),
             Span::styled("Enter", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled(": Edit/Send ", Style::default().fg(Color::Gray)),
+            Span::styled("Ctrl+N", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(": New Session ", Style::default().fg(Color::Gray)),
             Span::styled("Esc", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled(": Exit Edit", Style::default().fg(Color::Gray)),
         ]),

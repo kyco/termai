@@ -109,6 +109,14 @@ impl App {
         }
     }
 
+    pub fn create_new_session(&mut self) {
+        let new_session = Session::new_temporary();
+        self.sessions.push(new_session);
+        self.current_session_index = self.sessions.len() - 1;
+        self.scroll_offset = 0;
+        self.session_scroll_offset = 0;
+    }
+
     pub fn scroll_up(&mut self) {
         if self.scroll_offset > 0 {
             self.scroll_offset -= 1;

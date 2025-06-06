@@ -66,7 +66,19 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    if args.print_config {
+        return print_config(&repo);
+    }
+
     if args.is_ui() {
+        return ui::tui::runner::run_tui(&repo, &repo, &repo).await;
+    }
+
+    // Check if we should use CLI mode (when input is provided)
+    let has_input = args.data.is_some() || !io::stdin().is_terminal();
+    
+    if !has_input {
+        // No input provided, start UI by default
         return ui::tui::runner::run_tui(&repo, &repo, &repo).await;
     }
 
@@ -79,10 +91,6 @@ async fn main() -> Result<()> {
     } else {
         Session::new_temporary()
     };
-
-    if args.print_config {
-        return print_config(&repo);
-    }
 
     let local_context = extract_content(&args.directory, &args.directories, &args.exclude);
     let input = extract_input_or_quit(&args);
