@@ -115,6 +115,8 @@ impl App {
         self.current_session_index = self.sessions.len() - 1;
         self.scroll_offset = 0;
         self.session_scroll_offset = 0;
+        self.focused_area = FocusedArea::Input;
+        self.input_mode = InputMode::Editing;
     }
 
     pub fn scroll_up(&mut self) {
