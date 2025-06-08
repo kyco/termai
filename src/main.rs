@@ -70,6 +70,10 @@ async fn main() -> Result<()> {
         return print_config(&repo);
     }
 
+    if args.is_print_session() {
+        return print_session(&repo, &repo, &args);
+    }
+
     if args.is_ui() {
         return ui::tui::runner::run_tui(&repo, &repo, &repo).await;
     }
@@ -126,6 +130,35 @@ fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
             println!("failed to fetch config");
             Ok(())
         }
+    }
+}
+
+fn print_session<SR: SessionRepository, MR: MessageRepository>(
+    session_repository: &SR,
+    message_repository: &MR,
+    args: &Args,
+) -> Result<()> {
+    if let Some(session_name) = &args.print_session {
+        match sessions_service::session(session_repository, message_repository, session_name) {
+            Ok(session) => {
+                let output_messages = session
+                    .messages
+                    .iter()
+                    .filter(|message| message.role != Role::System)
+                    .map(|message| message.to_output_message())
+                    .collect::<Vec<Message>>();
+                
+                outputter::print(output_messages);
+                Ok(())
+            }
+            Err(_) => {
+                println!("Session '{}' not found", session_name);
+                Ok(())
+            }
+        }
+    } else {
+        println!("No session name provided");
+        Ok(())
     }
 }
 

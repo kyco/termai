@@ -3,6 +3,7 @@ use crate::ui::tui::events::{AppEvent, EventHandler, KeyAction, MouseAction, han
 use crate::ui::tui::ui;
 use crate::ui::tui::chat;
 use crate::config::repository::ConfigRepository;
+use crate::config::service::config_service;
 use crate::session::repository::{MessageRepository, SessionRepository};
 use crate::session::service::sessions_service;
 use crate::llm::common::model::role::Role;
@@ -19,6 +20,33 @@ use ratatui::{
 use std::io;
 use std::time::Duration;
 use tui_textarea::Input;
+
+// Helper function to get setting value with masking for sensitive data
+fn get_setting_display_value<R: ConfigRepository>(repo: &R, key: &str) -> String {
+    match config_service::fetch_by_key(repo, key) {
+        Ok(config) => {
+            if key.contains("api_key") {
+                // Mask API keys for security
+                if config.value.is_empty() {
+                    "Not set".to_string()
+                } else {
+                    "****".to_string()
+                }
+            } else {
+                config.value
+            }
+        }
+        Err(_) => "Not set".to_string(),
+    }
+}
+
+// Helper function to get actual setting value for editing
+fn get_setting_actual_value<R: ConfigRepository>(repo: &R, key: &str) -> String {
+    match config_service::fetch_by_key(repo, key) {
+        Ok(config) => config.value,
+        Err(_) => "".to_string(),
+    }
+}
 
 pub async fn run_tui<R, SR, MR>(
     repo: &R,
@@ -57,7 +85,7 @@ where
 
     // Main event loop
     loop {
-        terminal.draw(|f| ui::draw(f, &mut app))?;
+        terminal.draw(|f| ui::draw(f, &mut app, Some(repo)))?;
 
         if app.should_quit {
             break;
@@ -75,43 +103,70 @@ where
                             KeyAction::EnterEditMode => {
                                 if matches!(app.focused_area, FocusedArea::Input) && matches!(app.input_mode, InputMode::Viewing) {
                                     app.enter_input_edit_mode();
+                                } else if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_none() {
+                                    // Start editing the selected setting
+                                    let settings_items = vec![
+                                        ("Chat GPT API Key", "chat_gpt_api_key"),
+                                        ("Claude API Key", "claude_api_key"),
+                                        ("Provider", "provider_key"),
+                                        ("Redactions", "redacted"),
+                                    ];
+                                    if let Some((_, key)) = settings_items.get(app.settings_selected_index) {
+                                        let current_value = get_setting_actual_value(repo, key);
+                                        app.start_editing_setting(key.to_string(), current_value);
+                                    }
                                 } else if app.is_input_editing() {
-                                    // Send message when Enter is pressed while editing
-                                    let message = app.get_input_text().trim().to_string();
-                                    if !message.is_empty() {
-                                        // Immediately add user message to current session and update UI
-                                        app.add_message_to_current_session(message.clone(), Role::User);
-                                        app.clear_input();
-                                        app.set_loading(true);
-                                        
-                                        // Force a redraw to show the user message immediately
-                                        terminal.draw(|f| ui::draw(f, &mut app))?;
-                                        
-                                        // Now do the API call
-                                        if let Some(session) = app.current_session_mut() {
-                                            match chat::send_message_async(
-                                                repo,
-                                                session_repository,
-                                                message_repository,
-                                                session,
-                                                message,
-                                            ).await {
-                                                Ok(_) => {
-                                                    app.set_error(None);
-                                                }
-                                                Err(e) => {
-                                                    app.set_error(Some(format!("Error: {}", e)));
-                                                }
+                                    if matches!(app.focused_area, FocusedArea::Settings) {
+                                        // Save settings value
+                                        let new_value = app.get_settings_input_text().trim().to_string();
+                                        if let Some(key) = &app.settings_editing_key.clone() {
+                                            if let Err(e) = config_service::write_config(repo, key, &new_value) {
+                                                app.set_error(Some(format!("Failed to save setting: {}", e)));
                                             }
                                         }
-                                        
-                                        app.set_loading(false);
+                                        app.cancel_settings_edit();
+                                    } else {
+                                        // Send message when Enter is pressed while editing
+                                        let message = app.get_input_text().trim().to_string();
+                                        if !message.is_empty() {
+                                            // Immediately add user message to current session and update UI
+                                            app.add_message_to_current_session(message.clone(), Role::User);
+                                            app.clear_input();
+                                            app.scroll_to_bottom(); // Auto-scroll to show new message
+                                            app.set_loading(true);
+                                            
+                                            // Force a redraw to show the user message immediately
+                                            terminal.draw(|f| ui::draw(f, &mut app, Some(repo)))?;
+                                            
+                                            // Now do the API call
+                                            if let Some(session) = app.current_session_mut() {
+                                                match chat::send_message_async(
+                                                    repo,
+                                                    session_repository,
+                                                    message_repository,
+                                                    session,
+                                                    message,
+                                                ).await {
+                                                    Ok(_) => {
+                                                        app.set_error(None);
+                                                        app.scroll_to_bottom(); // Auto-scroll to show AI response
+                                                    }
+                                                    Err(e) => {
+                                                        app.set_error(Some(format!("Error: {}", e)));
+                                                    }
+                                                }
+                                            }
+                                            
+                                            app.set_loading(false);
+                                        }
                                     }
                                 }
                             }
                             KeyAction::ExitEditMode => {
                                 if app.error_message.is_some() {
                                     app.set_error(None);
+                                } else if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_some() {
+                                    app.cancel_settings_edit();
                                 } else {
                                     app.exit_input_edit_mode();
                                 }
@@ -128,11 +183,18 @@ where
                             KeyAction::NewSession => {
                                 app.create_new_session();
                             }
+                            KeyAction::ToggleSettings => {
+                                app.toggle_settings();
+                            }
                         }
                     } else {
                         // Handle other key events for input when editing
                         if app.is_input_editing() {
-                            app.input_area.input(Input::from(key_event));
+                            if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_some() {
+                                app.settings_input_area.input(Input::from(key_event));
+                            } else {
+                                app.input_area.input(Input::from(key_event));
+                            }
                         }
                     }
                 }

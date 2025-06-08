@@ -22,6 +22,8 @@ pub struct Args {
     #[arg(long)]
     pub session: Option<String>,
     #[arg(long)]
+    pub print_session: Option<String>,
+    #[arg(long)]
     pub ui: bool,
     pub data: Option<String>,
     pub(crate) directory: Option<String>,
@@ -82,5 +84,9 @@ impl Args {
 
     pub fn is_ui(&self) -> bool {
         self.ui
+    }
+
+    pub fn is_print_session(&self) -> bool {
+        self.print_session.is_some()
     }
 }

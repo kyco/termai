@@ -88,6 +88,9 @@ pub fn handle_key_event(key_event: KeyEvent) -> Option<KeyAction> {
         KeyCode::Char('n') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
             Some(KeyAction::NewSession)
         }
+        KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(KeyAction::ToggleSettings)
+        }
         KeyCode::Tab => Some(KeyAction::CycleFocus),
         KeyCode::Enter => Some(KeyAction::EnterEditMode),
         KeyCode::Esc => Some(KeyAction::ExitEditMode),
@@ -107,6 +110,7 @@ pub enum KeyAction {
     ExitEditMode,
     DirectionalMove(Direction),
     NewSession,
+    ToggleSettings,
 }
 
 #[derive(Debug, Clone, PartialEq)]
