@@ -1,6 +1,6 @@
 use super::entity::config_entity::ConfigEntity;
 
-pub(crate) mod config_repository;
+pub mod config_repository;
 
 pub trait ConfigRepository {
     type Error;

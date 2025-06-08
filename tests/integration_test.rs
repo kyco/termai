@@ -1,3 +1,6 @@
+mod common;
+mod integration;
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 use rusqlite::Connection;

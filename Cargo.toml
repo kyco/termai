@@ -3,6 +3,14 @@ name = "termai"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "termai"
+path = "src/main.rs"
+
+[lib]
+name = "termai"
+path = "src/lib.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.33.0", features = ["bundled"] }
@@ -32,3 +40,6 @@ tempfile = "3.16.0"
 rusqlite = "0.33.0"
 assert_cmd = "2.0.12"
 predicates = "3.0.4"
+mockall = "0.13.0"
+wiremock = "0.6.0"
+tokio-test = "0.4.4"

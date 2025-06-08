@@ -3,8 +3,8 @@ use crate::session::entity::message_entity::MessageEntity;
 use chrono::NaiveDateTime;
 use std::fmt::Debug;
 
-pub(crate) mod session_repository;
-pub(crate) mod message_repository;
+pub mod session_repository;
+pub mod message_repository;
 
 pub trait SessionRepository
 where
