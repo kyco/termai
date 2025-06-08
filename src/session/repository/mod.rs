@@ -15,6 +15,7 @@ where
     fn fetch_all_sessions(&self) -> Result<Vec<SessionEntity>, Self::Error>;
     fn fetch_current_session(&self) -> Result<SessionEntity, Self::Error>;
     fn fetch_session_by_name(&self, name: &str) -> Result<SessionEntity, Self::Error>;
+    fn fetch_session_by_id(&self, id: &str) -> Result<SessionEntity, Self::Error>;
     fn add_session(
         &self,
         id: &str,

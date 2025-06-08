@@ -69,10 +69,9 @@ fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
     let sessions: Vec<ListItem> = app
         .sessions
         .iter()
-        .rev()
         .enumerate()
         .map(|(i, session)| {
-            let original_index = app.sessions.len() - 1 - i;
+            let original_index = i;
             let style = if original_index == app.current_session_index {
                 Style::default()
                     .fg(Color::Yellow)
@@ -119,7 +118,7 @@ fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
         );
 
     let mut list_state = ListState::default();
-    let reversed_index = app.sessions.len() - 1 - app.current_session_index;
+    let reversed_index = app.current_session_index;
     list_state.select(Some(reversed_index));
 
     f.render_stateful_widget(sessions_list, area, &mut list_state);

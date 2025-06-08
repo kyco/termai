@@ -85,6 +85,11 @@ where
 
     // Main event loop
     loop {
+        // Check if current session needs refresh and refresh it
+        if app.session_needs_refresh {
+            app.refresh_current_session(session_repository, message_repository);
+        }
+
         terminal.draw(|f| ui::draw(f, &mut app, Some(repo)))?;
 
         if app.should_quit {

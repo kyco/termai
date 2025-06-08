@@ -41,6 +41,8 @@ pub struct App {
     pub chat_area: Rect,
     pub input_area_rect: Rect,
     pub settings_area: Rect,
+    // Session refresh tracking
+    pub session_needs_refresh: bool,
 }
 
 impl Default for App {
@@ -71,6 +73,7 @@ impl Default for App {
             chat_area: Rect::default(),
             input_area_rect: Rect::default(),
             settings_area: Rect::default(),
+            session_needs_refresh: false,
         }
     }
 }
@@ -97,39 +100,84 @@ impl App {
     pub fn set_sessions(&mut self, sessions: Vec<Session>) {
         self.sessions = sessions;
         if self.current_session_index >= self.sessions.len() {
-            self.current_session_index = if self.sessions.is_empty() { 0 } else { self.sessions.len() - 1 };
+            self.current_session_index = 0;
         }
     }
 
     pub fn switch_to_session(&mut self, index: usize) {
-        if index < self.sessions.len() {
+        if index < self.sessions.len() && index != self.current_session_index {
             self.current_session_index = index;
             self.scroll_offset = 0;
+            self.session_needs_refresh = true;
         }
+    }
+
+    pub fn switch_to_session_by_id(&mut self, session_id: &str) -> bool {
+        // Find the session with the matching ID
+        for (index, session) in self.sessions.iter().enumerate() {
+            if session.id == session_id {
+                if index != self.current_session_index {
+                    self.current_session_index = index;
+                    self.scroll_offset = 0;
+                    self.session_needs_refresh = true;
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn refresh_current_session<SR: crate::session::repository::SessionRepository, MR: crate::session::repository::MessageRepository>(
+        &mut self,
+        session_repo: &SR,
+        message_repo: &MR,
+    ) {
+        if let Some(current_session) = self.current_session() {
+            let session_id = current_session.id.clone();
+            match crate::session::service::sessions_service::session_by_id(session_repo, message_repo, &session_id) {
+                Ok(updated_session) => {
+                    if let Some(session_slot) = self.sessions.get_mut(self.current_session_index) {
+                        *session_slot = updated_session;
+                    }
+                }
+                Err(_) => {
+                    // If we can't fetch the session, keep the current one
+                }
+            }
+        }
+        self.session_needs_refresh = false;
     }
 
     pub fn next_session(&mut self) {
         if !self.sessions.is_empty() {
-            self.current_session_index = (self.current_session_index + 1) % self.sessions.len();
-            self.scroll_offset = 0;
+            let new_index = (self.current_session_index + 1) % self.sessions.len();
+            if new_index != self.current_session_index {
+                self.current_session_index = new_index;
+                self.scroll_offset = 0;
+                self.session_needs_refresh = true;
+            }
         }
     }
 
     pub fn previous_session(&mut self) {
         if !self.sessions.is_empty() {
-            self.current_session_index = if self.current_session_index == 0 {
+            let new_index = if self.current_session_index == 0 {
                 self.sessions.len() - 1
             } else {
                 self.current_session_index - 1
             };
-            self.scroll_offset = 0;
+            if new_index != self.current_session_index {
+                self.current_session_index = new_index;
+                self.scroll_offset = 0;
+                self.session_needs_refresh = true;
+            }
         }
     }
 
     pub fn create_new_session(&mut self) {
         let new_session = Session::new_temporary();
-        self.sessions.push(new_session);
-        self.current_session_index = self.sessions.len() - 1;
+        self.sessions.insert(0, new_session);
+        self.current_session_index = 0;
         self.scroll_offset = 0;
         self.session_scroll_offset = 0;
         self.focused_area = FocusedArea::Input;
@@ -235,8 +283,8 @@ impl App {
         match self.focused_area {
             FocusedArea::SessionList => {
                 match direction {
-                    Direction::Up => self.next_session(),
-                    Direction::Down => self.previous_session(),
+                    Direction::Up => self.previous_session(), // Move up in visual list (to newer session)
+                    Direction::Down => self.next_session(), // Move down in visual list (to older session)
                     Direction::Right => {
                         // Select current session and move to chat
                         self.focused_area = FocusedArea::Chat;
@@ -316,11 +364,16 @@ impl App {
             
             // Calculate which session was clicked (accounting for borders)
             let relative_y = y.saturating_sub(self.session_list_area.y + 1); // +1 for top border
-            let session_index = relative_y as usize + self.session_scroll_offset;
+            let displayed_index = relative_y as usize + self.session_scroll_offset;
             
-            if session_index < self.sessions.len() {
-                self.current_session_index = session_index;
-                self.scroll_offset = 0; // Reset chat scroll when switching sessions
+            // Convert from displayed index to actual session index
+            if displayed_index < self.sessions.len() {
+                let actual_session_index = displayed_index;
+                // Use session ID to ensure we're selecting the right session
+                if let Some(session) = self.sessions.get(actual_session_index) {
+                    let session_id = session.id.clone();
+                    self.switch_to_session_by_id(&session_id);
+                }
             }
         }
         // Check if click is in input area

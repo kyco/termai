@@ -11,7 +11,7 @@ impl SessionRepository for SqliteRepository {
     fn fetch_all_sessions(&self) -> Result<Vec<SessionEntity>, Self::Error> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, name, expires_at, current FROM sessions")?;
+            .prepare("SELECT id, name, expires_at, current FROM sessions ORDER BY ROWID DESC")?;
         let rows = stmt.query_map([], row_to_session_entity())?;
 
         let mut sessions = Vec::new();
@@ -35,6 +35,16 @@ impl SessionRepository for SqliteRepository {
         let session = self.conn.query_row(
             "SELECT id, name, expires_at, current FROM sessions WHERE name = ?1",
             params![name],
+            row_to_session_entity(),
+        )?;
+
+        Ok(session)
+    }
+
+    fn fetch_session_by_id(&self, id: &str) -> Result<SessionEntity, Self::Error> {
+        let session = self.conn.query_row(
+            "SELECT id, name, expires_at, current FROM sessions WHERE id = ?1",
+            params![id],
             row_to_session_entity(),
         )?;
 
