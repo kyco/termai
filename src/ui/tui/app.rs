@@ -1,7 +1,5 @@
 use crate::session::model::session::Session;
-use crate::session::model::message::Message;
 use crate::llm::common::model::role::Role;
-use std::collections::HashMap;
 use tui_textarea::TextArea;
 use ratatui::layout::Rect;
 
@@ -104,13 +102,6 @@ impl App {
         }
     }
 
-    pub fn switch_to_session(&mut self, index: usize) {
-        if index < self.sessions.len() && index != self.current_session_index {
-            self.current_session_index = index;
-            self.scroll_offset = 0;
-            self.session_needs_refresh = true;
-        }
-    }
 
     pub fn switch_to_session_by_id(&mut self, session_id: &str) -> bool {
         // Find the session with the matching ID
@@ -200,22 +191,6 @@ impl App {
         self.scroll_offset = usize::MAX;
     }
 
-    pub fn clamp_scroll_to_content(&mut self, available_height: usize) {
-        if let Some(session) = self.current_session() {
-            let total_messages = session.messages.iter().filter(|msg| msg.role != Role::System).count();
-            if total_messages > 0 {
-                // If we have fewer messages than screen space, don't allow scrolling
-                if total_messages <= available_height {
-                    self.scroll_offset = 0;
-                } else {
-                    // Calculate the maximum useful scroll position
-                    // We want to ensure that we can always see content on screen
-                    let max_scroll = total_messages.saturating_sub(available_height.max(1));
-                    self.scroll_offset = self.scroll_offset.min(max_scroll);
-                }
-            }
-        }
-    }
 
     pub fn clamp_scroll_to_content_lines(&mut self, content_lines: usize, available_height: usize) {
         if content_lines > 0 {
@@ -466,10 +441,6 @@ impl App {
         self.settings_input_area.lines().join("\n")
     }
 
-    pub fn clear_settings_input(&mut self) {
-        self.settings_input_area = TextArea::default();
-        self.settings_input_area.set_placeholder_text("Enter new value...");
-    }
 
     pub fn toggle_help(&mut self) {
         self.show_help = !self.show_help;

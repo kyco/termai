@@ -7,10 +7,11 @@ pub enum AppEvent {
     Key(KeyEvent),
     Mouse(MouseEvent),
     Tick,
-    Resize(u16, u16),
+    Resize((), ()),
 }
 
 pub struct EventHandler {
+    #[allow(dead_code)]
     sender: mpsc::UnboundedSender<AppEvent>,
     receiver: mpsc::UnboundedReceiver<AppEvent>,
     handler: tokio::task::JoinHandle<()>,
@@ -40,8 +41,8 @@ impl EventHandler {
                                     break;
                                 }
                             }
-                            Event::Resize(width, height) => {
-                                if let Err(_) = sender.send(AppEvent::Resize(width, height)) {
+                            Event::Resize(_, _) => {
+                                if let Err(_) = sender.send(AppEvent::Resize((), ())) {
                                     break;
                                 }
                             }
@@ -128,7 +129,9 @@ pub enum MouseAction {
     ScrollUp(u16, u16),
     ScrollDown(u16, u16),
     Click(u16, u16),
+    #[allow(dead_code)]
     FocusInput(u16, u16),
+    #[allow(dead_code)]
     SelectSession(u16, u16),
 }
 

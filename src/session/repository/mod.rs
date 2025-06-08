@@ -13,6 +13,7 @@ where
     type Error;
 
     fn fetch_all_sessions(&self) -> Result<Vec<SessionEntity>, Self::Error>;
+    #[allow(dead_code)]
     fn fetch_current_session(&self) -> Result<SessionEntity, Self::Error>;
     fn fetch_session_by_name(&self, name: &str) -> Result<SessionEntity, Self::Error>;
     fn fetch_session_by_id(&self, id: &str) -> Result<SessionEntity, Self::Error>;
@@ -39,6 +40,7 @@ where
 {
     type Error;
 
+    #[allow(dead_code)]
     fn fetch_all_messages(&self) -> Result<Vec<MessageEntity>, Self::Error>;
     fn fetch_messages_for_session(&self, session_id: &str) -> Result<Vec<MessageEntity>, Self::Error>;
     fn add_message_to_session(&self, message: &MessageEntity) -> Result<(), Self::Error>;

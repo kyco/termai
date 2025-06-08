@@ -5,16 +5,15 @@ use crate::ui::tui::chat;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::config_service;
 use crate::session::repository::{MessageRepository, SessionRepository};
-use crate::session::service::sessions_service;
 use crate::llm::common::model::role::Role;
 use anyhow::Result;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     Terminal,
 };
 use std::io;
@@ -22,23 +21,6 @@ use std::time::Duration;
 use tui_textarea::Input;
 
 // Helper function to get setting value with masking for sensitive data
-fn get_setting_display_value<R: ConfigRepository>(repo: &R, key: &str) -> String {
-    match config_service::fetch_by_key(repo, key) {
-        Ok(config) => {
-            if key.contains("api_key") {
-                // Mask API keys for security
-                if config.value.is_empty() {
-                    "Not set".to_string()
-                } else {
-                    "****".to_string()
-                }
-            } else {
-                config.value
-            }
-        }
-        Err(_) => "Not set".to_string(),
-    }
-}
 
 // Helper function to get actual setting value for editing
 fn get_setting_actual_value<R: ConfigRepository>(repo: &R, key: &str) -> String {

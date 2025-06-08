@@ -6,7 +6,15 @@ pub enum ContentBlock {
     #[serde(rename = "text")]
     Text { text: String },
     #[serde(rename = "thinking")]
-    Thinking { thinking: String, signature: String },
+    Thinking {
+        #[allow(dead_code)]
+        thinking: String,
+        #[allow(dead_code)]
+        signature: String
+    },
     #[serde(rename = "redacted_thinking")]
-    RedactedThinking { data: String },
+    RedactedThinking {
+        #[allow(dead_code)]
+        data: String
+    },
 }

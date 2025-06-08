@@ -41,24 +41,7 @@ impl Message {
         Self { id, ..self.clone() }
     }
 
-    pub fn prepend_content(&self, text: &str) -> Self {
-        let new_content = format!("{}\n\n{}", text, self.content);
-        Self {
-            id: self.id.to_string(),
-            role: self.role.clone(),
-            content: new_content,
-        }
-    }
 
-    pub fn remove_from_content(&self, text: &str) -> Self {
-        let new_content = self.content.replace(text, "");
-        let new_content = new_content.trim();
-        Self {
-            id: self.id.to_string(),
-            role: self.role.clone(),
-            content: new_content.to_string(),
-        }
-    }
 }
 
 pub fn contains_system_prompt(messages: &Vec<Message>) -> bool {
