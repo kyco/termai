@@ -92,6 +92,18 @@ pub fn session_add_messages<SR: SessionRepository, MR: MessageRepository>(
     Ok(())
 }
 
+pub fn session_by_id<SR: SessionRepository, MR: MessageRepository>(
+    session_repo: &SR,
+    message_repository: &MR,
+    id: &str,
+) -> Result<Session> {
+    let session_entity = session_repo.fetch_session_by_id(id)
+        .map_err(|e| anyhow::anyhow!("Failed to fetch session by id: {:?}", e))?;
+    let session = Session::from(&session_entity);
+    let session_with_msgs = session_with_messages(message_repository, &session);
+    Ok(session_with_msgs)
+}
+
 fn session_with_messages<MR: MessageRepository>(
     message_repository: &MR,
     session: &Session,

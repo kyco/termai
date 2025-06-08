@@ -1,1 +1,1 @@
-pub(crate) mod role;
+pub mod role;

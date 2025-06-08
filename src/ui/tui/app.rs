@@ -1,0 +1,462 @@
+use crate::session::model::session::Session;
+use crate::llm::common::model::role::Role;
+use tui_textarea::TextArea;
+use ratatui::layout::Rect;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FocusedArea {
+    SessionList,
+    Chat,
+    Input,
+    Settings,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum InputMode {
+    Viewing,
+    Editing,
+}
+
+pub struct App {
+    pub focused_area: FocusedArea,
+    pub input_mode: InputMode,
+    pub sessions: Vec<Session>,
+    pub current_session_index: usize,
+    pub input_area: TextArea<'static>,
+    pub should_quit: bool,
+    pub is_loading: bool,
+    pub error_message: Option<String>,
+    pub scroll_offset: usize,
+    pub session_scroll_offset: usize,
+    // Settings view state
+    pub settings_selected_index: usize,
+    pub settings_editing_key: Option<String>,
+    pub settings_input_area: TextArea<'static>,
+    pub show_settings: bool,
+    pub show_help: bool,
+    // Area tracking for mouse interactions
+    pub session_list_area: Rect,
+    pub chat_area: Rect,
+    pub input_area_rect: Rect,
+    pub settings_area: Rect,
+    // Session refresh tracking
+    pub session_needs_refresh: bool,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        let mut input_area = TextArea::default();
+        input_area.set_placeholder_text("Type your message here...");
+        
+        let mut settings_input_area = TextArea::default();
+        settings_input_area.set_placeholder_text("Enter new value...");
+        
+        Self {
+            focused_area: FocusedArea::SessionList,
+            input_mode: InputMode::Viewing,
+            sessions: vec![Session::new_temporary()],
+            current_session_index: 0,
+            input_area,
+            should_quit: false,
+            is_loading: false,
+            error_message: None,
+            scroll_offset: 0,
+            session_scroll_offset: 0,
+            settings_selected_index: 0,
+            settings_editing_key: None,
+            settings_input_area,
+            show_settings: false,
+            show_help: false,
+            session_list_area: Rect::default(),
+            chat_area: Rect::default(),
+            input_area_rect: Rect::default(),
+            settings_area: Rect::default(),
+            session_needs_refresh: false,
+        }
+    }
+}
+
+impl App {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn current_session(&self) -> Option<&Session> {
+        self.sessions.get(self.current_session_index)
+    }
+
+    pub fn current_session_mut(&mut self) -> Option<&mut Session> {
+        self.sessions.get_mut(self.current_session_index)
+    }
+
+    pub fn add_message_to_current_session(&mut self, content: String, role: Role) {
+        if let Some(session) = self.current_session_mut() {
+            session.add_raw_message(content, role);
+        }
+    }
+
+    pub fn set_sessions(&mut self, sessions: Vec<Session>) {
+        self.sessions = sessions;
+        if self.current_session_index >= self.sessions.len() {
+            self.current_session_index = 0;
+        }
+    }
+
+
+    pub fn switch_to_session_by_id(&mut self, session_id: &str) -> bool {
+        // Find the session with the matching ID
+        for (index, session) in self.sessions.iter().enumerate() {
+            if session.id == session_id {
+                if index != self.current_session_index {
+                    self.current_session_index = index;
+                    self.scroll_offset = 0;
+                    self.session_needs_refresh = true;
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn refresh_current_session<SR: crate::session::repository::SessionRepository, MR: crate::session::repository::MessageRepository>(
+        &mut self,
+        session_repo: &SR,
+        message_repo: &MR,
+    ) {
+        if let Some(current_session) = self.current_session() {
+            let session_id = current_session.id.clone();
+            match crate::session::service::sessions_service::session_by_id(session_repo, message_repo, &session_id) {
+                Ok(updated_session) => {
+                    if let Some(session_slot) = self.sessions.get_mut(self.current_session_index) {
+                        *session_slot = updated_session;
+                    }
+                }
+                Err(_) => {
+                    // If we can't fetch the session, keep the current one
+                }
+            }
+        }
+        self.session_needs_refresh = false;
+    }
+
+    pub fn next_session(&mut self) {
+        if !self.sessions.is_empty() {
+            let new_index = (self.current_session_index + 1) % self.sessions.len();
+            if new_index != self.current_session_index {
+                self.current_session_index = new_index;
+                self.scroll_offset = 0;
+                self.session_needs_refresh = true;
+            }
+        }
+    }
+
+    pub fn previous_session(&mut self) {
+        if !self.sessions.is_empty() {
+            let new_index = if self.current_session_index == 0 {
+                self.sessions.len() - 1
+            } else {
+                self.current_session_index - 1
+            };
+            if new_index != self.current_session_index {
+                self.current_session_index = new_index;
+                self.scroll_offset = 0;
+                self.session_needs_refresh = true;
+            }
+        }
+    }
+
+    pub fn create_new_session(&mut self) {
+        let new_session = Session::new_temporary();
+        self.sessions.insert(0, new_session);
+        self.current_session_index = 0;
+        self.scroll_offset = 0;
+        self.session_scroll_offset = 0;
+        self.focused_area = FocusedArea::Input;
+        self.input_mode = InputMode::Editing;
+    }
+
+    pub fn scroll_up(&mut self) {
+        if self.scroll_offset > 0 {
+            self.scroll_offset -= 1;
+        }
+    }
+
+    pub fn scroll_down(&mut self) {
+        // Simply increment scroll offset - clamping will be handled by UI
+        self.scroll_offset += 1;
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        // Set scroll to a large value - clamping will bring it to the actual bottom
+        self.scroll_offset = usize::MAX;
+    }
+
+
+    pub fn clamp_scroll_to_content_lines(&mut self, content_lines: usize, available_height: usize) {
+        if content_lines > 0 {
+            // If content fits on screen, don't allow scrolling
+            if content_lines <= available_height {
+                self.scroll_offset = 0;
+            } else {
+                // Calculate the maximum useful scroll position
+                // This ensures we can always see content and can reach the bottom
+                let max_scroll = content_lines.saturating_sub(available_height);
+                self.scroll_offset = self.scroll_offset.min(max_scroll);
+            }
+        } else {
+            self.scroll_offset = 0;
+        }
+    }
+
+    pub fn session_scroll_up(&mut self) {
+        if self.session_scroll_offset > 0 {
+            self.session_scroll_offset -= 1;
+        }
+    }
+
+    pub fn session_scroll_down(&mut self) {
+        if self.session_scroll_offset + 1 < self.sessions.len() {
+            self.session_scroll_offset += 1;
+        }
+    }
+
+    pub fn get_input_text(&self) -> String {
+        self.input_area.lines().join("\n")
+    }
+
+    pub fn clear_input(&mut self) {
+        self.input_area = TextArea::default();
+        self.input_area.set_placeholder_text("Type your message here...");
+    }
+
+    pub fn set_loading(&mut self, loading: bool) {
+        self.is_loading = loading;
+    }
+
+    pub fn set_error(&mut self, error: Option<String>) {
+        self.error_message = error;
+    }
+
+    pub fn quit(&mut self) {
+        self.should_quit = true;
+    }
+
+    pub fn cycle_focus(&mut self) {
+        self.focused_area = match self.focused_area {
+            FocusedArea::SessionList => FocusedArea::Chat,
+            FocusedArea::Chat => FocusedArea::Input,
+            FocusedArea::Input => if self.show_settings { FocusedArea::Settings } else { FocusedArea::SessionList },
+            FocusedArea::Settings => FocusedArea::SessionList,
+        };
+        // Reset input mode when leaving input area
+        if !matches!(self.focused_area, FocusedArea::Input) {
+            self.input_mode = InputMode::Viewing;
+        }
+    }
+
+    pub fn handle_directional_input(&mut self, direction: Direction) {
+        match self.focused_area {
+            FocusedArea::SessionList => {
+                match direction {
+                    Direction::Up => self.previous_session(), // Move up in visual list (to newer session)
+                    Direction::Down => self.next_session(), // Move down in visual list (to older session)
+                    Direction::Right => {
+                        // Select current session and move to chat
+                        self.focused_area = FocusedArea::Chat;
+                        self.scroll_offset = 0;
+                    }
+                    Direction::Left => {
+                        // Could implement session deletion or other actions
+                    }
+                }
+            }
+            FocusedArea::Chat => {
+                match direction {
+                    Direction::Up => self.scroll_up(),
+                    Direction::Down => self.scroll_down(),
+                    Direction::Left => self.focused_area = FocusedArea::SessionList,
+                    Direction::Right => self.focused_area = FocusedArea::Input,
+                }
+            }
+            FocusedArea::Input => {
+                // Directional keys in input area only work when not editing
+                if matches!(self.input_mode, InputMode::Viewing) {
+                    match direction {
+                        Direction::Up => self.focused_area = FocusedArea::Chat,
+                        Direction::Down => {
+                            // Could scroll to bottom of chat or other action
+                        }
+                        Direction::Left => self.focused_area = FocusedArea::Chat,
+                        Direction::Right => {
+                            // Could implement other actions
+                        }
+                    }
+                }
+            }
+            FocusedArea::Settings => {
+                // Only handle navigation when not editing a setting
+                if self.settings_editing_key.is_none() {
+                    match direction {
+                        Direction::Up => self.settings_previous_item(4), // We have 4 settings
+                        Direction::Down => self.settings_next_item(4),
+                        Direction::Left => self.focused_area = FocusedArea::SessionList,
+                        Direction::Right => {
+                            // Could implement other actions
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn enter_input_edit_mode(&mut self) {
+        if matches!(self.focused_area, FocusedArea::Input) {
+            self.input_mode = InputMode::Editing;
+        }
+    }
+
+    pub fn exit_input_edit_mode(&mut self) {
+        self.input_mode = InputMode::Viewing;
+    }
+
+    pub fn is_input_editing(&self) -> bool {
+        (matches!(self.focused_area, FocusedArea::Input) && matches!(self.input_mode, InputMode::Editing)) ||
+        (matches!(self.focused_area, FocusedArea::Settings) && self.settings_editing_key.is_some())
+    }
+
+    pub fn update_areas(&mut self, session_list: Rect, chat: Rect, input: Rect) {
+        self.session_list_area = session_list;
+        self.chat_area = chat;
+        self.input_area_rect = input;
+    }
+
+    pub fn handle_mouse_click(&mut self, x: u16, y: u16) {
+        // Check if click is in session list area
+        if self.session_list_area.x <= x 
+            && x < self.session_list_area.x + self.session_list_area.width
+            && self.session_list_area.y <= y 
+            && y < self.session_list_area.y + self.session_list_area.height {
+            
+            // Calculate which session was clicked (accounting for borders)
+            let relative_y = y.saturating_sub(self.session_list_area.y + 1); // +1 for top border
+            let displayed_index = relative_y as usize + self.session_scroll_offset;
+            
+            // Convert from displayed index to actual session index
+            if displayed_index < self.sessions.len() {
+                let actual_session_index = displayed_index;
+                // Use session ID to ensure we're selecting the right session
+                if let Some(session) = self.sessions.get(actual_session_index) {
+                    let session_id = session.id.clone();
+                    self.switch_to_session_by_id(&session_id);
+                }
+            }
+        }
+        // Check if click is in input area
+        else if self.input_area_rect.x <= x 
+            && x < self.input_area_rect.x + self.input_area_rect.width
+            && self.input_area_rect.y <= y 
+            && y < self.input_area_rect.y + self.input_area_rect.height {
+            
+            self.focused_area = FocusedArea::Input;
+        }
+        // Check if click is in chat area
+        else if self.chat_area.x <= x 
+            && x < self.chat_area.x + self.chat_area.width
+            && self.chat_area.y <= y 
+            && y < self.chat_area.y + self.chat_area.height {
+            
+            self.focused_area = FocusedArea::Chat;
+        }
+    }
+
+    pub fn handle_mouse_scroll(&mut self, x: u16, y: u16, direction: ScrollDirection) {
+        // Check if scroll is in session list area
+        if self.session_list_area.x <= x 
+            && x < self.session_list_area.x + self.session_list_area.width
+            && self.session_list_area.y <= y 
+            && y < self.session_list_area.y + self.session_list_area.height {
+            
+            match direction {
+                ScrollDirection::Up => self.session_scroll_up(),
+                ScrollDirection::Down => self.session_scroll_down(),
+            }
+        }
+        // Check if scroll is in chat area
+        else if self.chat_area.x <= x 
+            && x < self.chat_area.x + self.chat_area.width
+            && self.chat_area.y <= y 
+            && y < self.chat_area.y + self.chat_area.height {
+            
+            match direction {
+                ScrollDirection::Up => self.scroll_up(),
+                ScrollDirection::Down => self.scroll_down(),
+            }
+        }
+    }
+
+    pub fn toggle_settings(&mut self) {
+        self.show_settings = !self.show_settings;
+        if self.show_settings {
+            self.focused_area = FocusedArea::Settings;
+        } else if matches!(self.focused_area, FocusedArea::Settings) {
+            self.focused_area = FocusedArea::SessionList;
+        }
+    }
+
+    pub fn settings_next_item(&mut self, max_items: usize) {
+        if max_items > 0 {
+            self.settings_selected_index = (self.settings_selected_index + 1) % max_items;
+        }
+    }
+
+    pub fn settings_previous_item(&mut self, max_items: usize) {
+        if max_items > 0 {
+            self.settings_selected_index = if self.settings_selected_index == 0 {
+                max_items - 1
+            } else {
+                self.settings_selected_index - 1
+            };
+        }
+    }
+
+    pub fn start_editing_setting(&mut self, key: String, current_value: String) {
+        self.settings_editing_key = Some(key);
+        self.settings_input_area = TextArea::default();
+        self.settings_input_area.set_placeholder_text("Enter new value...");
+        // Pre-populate with current value if not sensitive
+        if !current_value.starts_with("*") {
+            self.settings_input_area.insert_str(current_value);
+        }
+        self.input_mode = InputMode::Editing;
+    }
+
+    pub fn cancel_settings_edit(&mut self) {
+        self.settings_editing_key = None;
+        self.settings_input_area = TextArea::default();
+        self.settings_input_area.set_placeholder_text("Enter new value...");
+        self.input_mode = InputMode::Viewing;
+    }
+
+    pub fn get_settings_input_text(&self) -> String {
+        self.settings_input_area.lines().join("\n")
+    }
+
+
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScrollDirection {
+    Up,
+    Down,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+} 

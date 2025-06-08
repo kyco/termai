@@ -66,6 +66,26 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    if args.print_config {
+        return print_config(&repo);
+    }
+
+    if args.is_print_session() {
+        return print_session(&repo, &repo, &args);
+    }
+
+    if args.is_ui() {
+        return ui::tui::runner::run_tui(&repo, &repo, &repo).await;
+    }
+
+    // Check if we should use CLI mode (when input is provided)
+    let has_input = args.data.is_some() || !io::stdin().is_terminal();
+    
+    if !has_input {
+        // No input provided, start UI by default
+        return ui::tui::runner::run_tui(&repo, &repo, &repo).await;
+    }
+
     let mut session = if args.is_session() {
         if let Some(name) = &args.session {
             sessions_service::session(&repo, &repo, name)?
@@ -75,10 +95,6 @@ async fn main() -> Result<()> {
     } else {
         Session::new_temporary()
     };
-
-    if args.print_config {
-        return print_config(&repo);
-    }
 
     let local_context = extract_content(&args.directory, &args.directories, &args.exclude);
     let input = extract_input_or_quit(&args);
@@ -114,6 +130,35 @@ fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
             println!("failed to fetch config");
             Ok(())
         }
+    }
+}
+
+fn print_session<SR: SessionRepository, MR: MessageRepository>(
+    session_repository: &SR,
+    message_repository: &MR,
+    args: &Args,
+) -> Result<()> {
+    if let Some(session_name) = &args.print_session {
+        match sessions_service::session(session_repository, message_repository, session_name) {
+            Ok(session) => {
+                let output_messages = session
+                    .messages
+                    .iter()
+                    .filter(|message| message.role != Role::System)
+                    .map(|message| message.to_output_message())
+                    .collect::<Vec<Message>>();
+                
+                outputter::print(output_messages);
+                Ok(())
+            }
+            Err(_) => {
+                println!("Session '{}' not found", session_name);
+                Ok(())
+            }
+        }
+    } else {
+        println!("No session name provided");
+        Ok(())
     }
 }
 

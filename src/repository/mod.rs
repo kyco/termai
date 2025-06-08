@@ -1,1 +1,1 @@
-pub(crate) mod db;
+pub mod db;
