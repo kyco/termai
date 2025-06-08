@@ -139,21 +139,51 @@ where
                                             terminal.draw(|f| ui::draw(f, &mut app, Some(repo)))?;
                                             
                                             // Now do the API call
-                                            if let Some(session) = app.current_session_mut() {
-                                                match chat::send_message_async(
+                                            let chat_result = if let Some(session) = app.current_session_mut() {
+                                                let was_temporary = session.temporary;
+                                                let result = chat::send_message_async(
                                                     repo,
                                                     session_repository,
                                                     message_repository,
                                                     session,
                                                     message,
-                                                ).await {
-                                                    Ok(_) => {
-                                                        app.set_error(None);
-                                                        app.scroll_to_bottom(); // Auto-scroll to show AI response
+                                                ).await;
+                                                
+                                                // Check if we need to convert temporary session
+                                                let should_convert = was_temporary && session.messages.len() >= 2;
+                                                (result, should_convert)
+                                            } else {
+                                                (Err(anyhow::anyhow!("No current session")), false)
+                                            };
+                                            
+                                            match chat_result.0 {
+                                                Ok(_) => {
+                                                    app.set_error(None);
+                                                    app.scroll_to_bottom(); // Auto-scroll to show AI response
+                                                    
+                                                    // If this was a temporary session, convert it to permanent
+                                                    if chat_result.1 {
+                                                        if let Some(session) = app.current_session_mut() {
+                                                            match chat::convert_temporary_session_to_permanent(
+                                                                repo,
+                                                                session_repository,
+                                                                message_repository,
+                                                                session,
+                                                            ).await {
+                                                                Ok(_) => {
+                                                                    // Session has been converted to permanent with new title
+                                                                    // The UI will update on next draw
+                                                                }
+                                                                Err(e) => {
+                                                                    // If title generation fails, just log it but don't show error to user
+                                                                    eprintln!("Failed to generate session title: {}", e);
+                                                                }
+                                                            }
+                                                        }
                                                     }
-                                                    Err(e) => {
-                                                        app.set_error(Some(format!("Error: {}", e)));
-                                                    }
+                                                }
+                                                Err(e) => {
+                                                    app.set_error(Some(format!("Error: {}", e)));
                                                 }
                                             }
                                             

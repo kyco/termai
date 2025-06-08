@@ -233,8 +233,8 @@ impl App {
         match self.focused_area {
             FocusedArea::SessionList => {
                 match direction {
-                    Direction::Up => self.previous_session(),
-                    Direction::Down => self.next_session(),
+                    Direction::Up => self.next_session(),
+                    Direction::Down => self.previous_session(),
                     Direction::Right => {
                         // Select current session and move to chat
                         self.focused_area = FocusedArea::Chat;
