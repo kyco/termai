@@ -35,6 +35,7 @@ pub struct App {
     pub settings_editing_key: Option<String>,
     pub settings_input_area: TextArea<'static>,
     pub show_settings: bool,
+    pub show_help: bool,
     // Area tracking for mouse interactions
     pub session_list_area: Rect,
     pub chat_area: Rect,
@@ -65,6 +66,7 @@ impl Default for App {
             settings_editing_key: None,
             settings_input_area,
             show_settings: false,
+            show_help: false,
             session_list_area: Rect::default(),
             chat_area: Rect::default(),
             input_area_rect: Rect::default(),
@@ -414,6 +416,10 @@ impl App {
     pub fn clear_settings_input(&mut self) {
         self.settings_input_area = TextArea::default();
         self.settings_input_area.set_placeholder_text("Enter new value...");
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
     }
 }
 

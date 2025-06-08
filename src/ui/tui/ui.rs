@@ -56,6 +56,11 @@ pub fn draw<R: crate::config::repository::ConfigRepository>(f: &mut Frame, app: 
     if let Some(ref error) = app.error_message {
         draw_error_popup(f, error);
     }
+
+    // Draw help modal if needed
+    if app.show_help {
+        draw_help_modal(f);
+    }
 }
 
 fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
@@ -443,8 +448,8 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled(": Edit ", Style::default().fg(Color::Gray)),
                 Span::styled("Ctrl+S", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
                 Span::styled(": Close Settings ", Style::default().fg(Color::Gray)),
-                Span::styled("Esc", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(": Cancel Edit", Style::default().fg(Color::Gray)),
+                Span::styled("?", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(": Help", Style::default().fg(Color::Gray)),
             ]),
         ]
     } else {
@@ -454,15 +459,13 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled(current_focus, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
                 Span::styled(" | ", Style::default().fg(Color::DarkGray)),
                 Span::styled("Tab", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(": Cycle Focus ", Style::default().fg(Color::Gray)),
+                Span::styled(": Cycle ", Style::default().fg(Color::Gray)),
                 Span::styled("↑↓←→", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
                 Span::styled(": Navigate ", Style::default().fg(Color::Gray)),
-                Span::styled("Enter", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(": Edit/Send ", Style::default().fg(Color::Gray)),
                 Span::styled("Ctrl+N", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
                 Span::styled(": New Session ", Style::default().fg(Color::Gray)),
-                Span::styled("Ctrl+S", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(": Settings ", Style::default().fg(Color::Gray)),
+                Span::styled("?", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(": Help", Style::default().fg(Color::Gray)),
             ]),
         ]
     };
@@ -574,6 +577,95 @@ fn format_message(message: &crate::session::model::message::Message) -> Text {
 
     lines.push(Line::from(""));
     Text::from(lines)
+}
+
+fn draw_help_modal(f: &mut Frame) {
+    let area = centered_rect(70, 80, f.area());
+    f.render_widget(Clear, area);
+    
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Help - TermAI Shortcuts")
+        .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let help_text = Text::from(vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Navigation:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Tab", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("        - Cycle focus between Sessions → Chat → Input", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  ↑↓←→", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("       - Navigate within focused area", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Enter", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("      - Edit input (when focused) or send message", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("        - Exit edit mode or dismiss dialogs", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Sessions:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+N", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("     - Create new session", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Settings & Help:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+S", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("     - Toggle settings view", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  ?", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("          - Show this help dialog", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Mouse Support:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Click", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("      - Focus area or select session", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Scroll", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("     - Navigate through content", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Exit:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+C", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("     - Quit application", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Alt+Q", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("      - Quit application", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Press ? or Esc to close this help", Style::default().fg(Color::Gray)),
+        ]),
+    ]);
+
+    let paragraph = Paragraph::new(help_text)
+        .alignment(Alignment::Left)
+        .block(block)
+        .wrap(Wrap { trim: true });
+
+    f.render_widget(paragraph, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

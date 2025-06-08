@@ -193,7 +193,9 @@ where
                                 }
                             }
                             KeyAction::ExitEditMode => {
-                                if app.error_message.is_some() {
+                                if app.show_help {
+                                    app.toggle_help();
+                                } else if app.error_message.is_some() {
                                     app.set_error(None);
                                 } else if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_some() {
                                     app.cancel_settings_edit();
@@ -215,6 +217,9 @@ where
                             }
                             KeyAction::ToggleSettings => {
                                 app.toggle_settings();
+                            }
+                            KeyAction::ToggleHelp => {
+                                app.toggle_help();
                             }
                         }
                     } else {
