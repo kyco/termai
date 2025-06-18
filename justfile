@@ -7,6 +7,9 @@ run args:
 test:
 	cargo test
 
+test-quiet:
+	cargo test --quiet
+
 clean:
 	cargo clean
 
