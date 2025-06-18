@@ -78,7 +78,7 @@ impl Drop for EventHandler {
     }
 }
 
-pub fn handle_key_event(key_event: KeyEvent) -> Option<KeyAction> {
+pub fn handle_key_event(key_event: KeyEvent, is_input_editing: bool, focused_area: &crate::ui::tui::app::FocusedArea) -> Option<KeyAction> {
     match key_event.code {
         KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::ALT) => {
             Some(KeyAction::Quit)
@@ -92,9 +92,18 @@ pub fn handle_key_event(key_event: KeyEvent) -> Option<KeyAction> {
         KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
             Some(KeyAction::ToggleSettings)
         }
-        KeyCode::Char('?') => Some(KeyAction::ToggleHelp),
+        KeyCode::Char('?') if !is_input_editing => Some(KeyAction::ToggleHelp),
+        KeyCode::Char('v') if !is_input_editing => Some(KeyAction::EnterVisualMode),
+        KeyCode::Char('V') if !is_input_editing => Some(KeyAction::EnterVisualLineMode),
+        KeyCode::Char('y') if !is_input_editing => Some(KeyAction::YankSelection),
         KeyCode::Tab => Some(KeyAction::CycleFocus),
-        KeyCode::Enter => Some(KeyAction::EnterEditMode),
+        KeyCode::Enter => {
+            if matches!(focused_area, crate::ui::tui::app::FocusedArea::SessionList) && !is_input_editing {
+                Some(KeyAction::SelectSession)
+            } else {
+                Some(KeyAction::EnterEditMode)
+            }
+        },
         KeyCode::Esc => Some(KeyAction::ExitEditMode),
         KeyCode::Up => Some(KeyAction::DirectionalMove(Direction::Up)),
         KeyCode::Down => Some(KeyAction::DirectionalMove(Direction::Down)),
@@ -114,6 +123,10 @@ pub enum KeyAction {
     NewSession,
     ToggleSettings,
     ToggleHelp,
+    EnterVisualMode,
+    EnterVisualLineMode,
+    YankSelection,
+    SelectSession,
 }
 
 #[derive(Debug, Clone, PartialEq)]

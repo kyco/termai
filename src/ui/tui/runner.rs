@@ -81,7 +81,7 @@ where
         if let Some(event) = events.next().await {
             match event {
                 AppEvent::Key(key_event) => {
-                    if let Some(action) = handle_key_event(key_event) {
+                    if let Some(action) = handle_key_event(key_event, app.is_input_editing(), &app.focused_area) {
                         match action {
                             KeyAction::Quit => app.quit(),
                             KeyAction::CycleFocus => {
@@ -90,7 +90,7 @@ where
                             KeyAction::EnterEditMode => {
                                 if matches!(app.focused_area, FocusedArea::Input) && matches!(app.input_mode, InputMode::Viewing) {
                                     app.enter_input_edit_mode();
-                                } else if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_none() {
+                                } else if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_none() && !app.settings_provider_selecting {
                                     // Start editing the selected setting
                                     let settings_items = vec![
                                         ("Chat GPT API Key", "chat_gpt_api_key"),
@@ -99,19 +99,33 @@ where
                                         ("Redactions", "redacted"),
                                     ];
                                     if let Some((_, key)) = settings_items.get(app.settings_selected_index) {
-                                        let current_value = get_setting_actual_value(repo, key);
-                                        app.start_editing_setting(key.to_string(), current_value);
+                                        if key == &"provider_key" {
+                                            // Special handling for provider selection
+                                            app.start_provider_selection_with_current(repo);
+                                        } else {
+                                            let current_value = get_setting_actual_value(repo, key);
+                                            app.start_editing_setting(key.to_string(), current_value);
+                                        }
                                     }
                                 } else if app.is_input_editing() {
                                     if matches!(app.focused_area, FocusedArea::Settings) {
-                                        // Save settings value
-                                        let new_value = app.get_settings_input_text().trim().to_string();
-                                        if let Some(key) = &app.settings_editing_key.clone() {
-                                            if let Err(e) = config_service::write_config(repo, key, &new_value) {
-                                                app.set_error(Some(format!("Failed to save setting: {}", e)));
+                                        if app.settings_provider_selecting {
+                                            // Save provider selection
+                                            let selected_provider = app.get_selected_provider();
+                                            if let Err(e) = config_service::write_config(repo, "provider_key", selected_provider) {
+                                                app.set_error(Some(format!("Failed to save provider: {}", e)));
                                             }
+                                            app.cancel_provider_selection();
+                                        } else {
+                                            // Save settings value
+                                            let new_value = app.get_settings_input_text().trim().to_string();
+                                            if let Some(key) = &app.settings_editing_key.clone() {
+                                                if let Err(e) = config_service::write_config(repo, key, &new_value) {
+                                                    app.set_error(Some(format!("Failed to save setting: {}", e)));
+                                                }
+                                            }
+                                            app.cancel_settings_edit();
                                         }
-                                        app.cancel_settings_edit();
                                     } else {
                                         // Send message when Enter is pressed while editing
                                         let message = app.get_input_text().trim().to_string();
@@ -184,8 +198,14 @@ where
                                     app.toggle_help();
                                 } else if app.error_message.is_some() {
                                     app.set_error(None);
-                                } else if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_some() {
-                                    app.cancel_settings_edit();
+                                } else if app.is_in_visual_mode() {
+                                    app.exit_visual_mode();
+                                } else if matches!(app.focused_area, FocusedArea::Settings) && (app.settings_editing_key.is_some() || app.settings_provider_selecting) {
+                                    if app.settings_provider_selecting {
+                                        app.cancel_provider_selection();
+                                    } else {
+                                        app.cancel_settings_edit();
+                                    }
                                 } else {
                                     app.exit_input_edit_mode();
                                 }
@@ -197,7 +217,19 @@ where
                                     crate::ui::tui::events::Direction::Left => Direction::Left,
                                     crate::ui::tui::events::Direction::Right => Direction::Right,
                                 };
-                                app.handle_directional_input(app_direction);
+                                
+                                if app.is_in_visual_mode() {
+                                    app.move_cursor(app_direction);
+                                } else if app.settings_provider_selecting {
+                                    // Handle provider selection navigation
+                                    match app_direction {
+                                        Direction::Up => app.provider_selection_previous(),
+                                        Direction::Down => app.provider_selection_next(),
+                                        _ => {} // Ignore left/right in provider selection
+                                    }
+                                } else {
+                                    app.handle_directional_input(app_direction);
+                                }
                             }
                             KeyAction::NewSession => {
                                 app.create_new_session();
@@ -208,13 +240,42 @@ where
                             KeyAction::ToggleHelp => {
                                 app.toggle_help();
                             }
+                            KeyAction::EnterVisualMode => {
+                                app.enter_visual_mode();
+                            }
+                            KeyAction::EnterVisualLineMode => {
+                                if app.is_in_visual_mode() {
+                                    // Switch to visual line mode from visual mode
+                                    app.enter_visual_line_mode();
+                                } else {
+                                    // Enter visual line mode directly
+                                    app.enter_visual_line_mode();
+                                }
+                            }
+                            KeyAction::YankSelection => {
+                                if app.is_in_visual_mode() {
+                                    match app.copy_selection_to_clipboard() {
+                                        Ok(_) => {
+                                            app.exit_visual_mode();
+                                            // Could show a success message briefly
+                                        }
+                                        Err(e) => {
+                                            app.set_error(Some(format!("Copy failed: {}", e)));
+                                        }
+                                    }
+                                }
+                            }
+                            KeyAction::SelectSession => {
+                                app.select_current_session();
+                            }
                         }
                     } else {
                         // Handle other key events for input when editing
                         if app.is_input_editing() {
                             if matches!(app.focused_area, FocusedArea::Settings) && app.settings_editing_key.is_some() {
                                 app.settings_input_area.input(Input::from(key_event));
-                            } else {
+                            } else if !app.settings_provider_selecting {
+                                // Only handle text input if not in provider selection mode
                                 app.input_area.input(Input::from(key_event));
                             }
                         }

@@ -359,6 +359,12 @@ impl App {
         }
     }
 
+    pub fn select_current_session(&mut self) {
+        // Focus on the chat area for the currently selected session
+        self.focused_area = FocusedArea::Chat;
+        self.scroll_offset = 0; // Reset scroll to show the beginning of the conversation
+    }
+
     pub fn handle_directional_input(&mut self, direction: Direction) {
         match self.focused_area {
             FocusedArea::SessionList => {
@@ -367,8 +373,7 @@ impl App {
                     Direction::Down => self.next_session(), // Move down in visual list (to older session)
                     Direction::Right => {
                         // Select current session and move to chat
-                        self.focused_area = FocusedArea::Chat;
-                        self.scroll_offset = 0;
+                        self.select_current_session();
                     }
                     Direction::Left => {
                         // Could implement session deletion or other actions
@@ -1000,5 +1005,30 @@ mod tests {
         // Try to switch to non-existent session
         assert!(!app.switch_to_session_by_id("nonexistent"));
         assert_eq!(app.current_session_index, 1); // Should remain unchanged
+    }
+
+    #[test]
+    fn test_session_selection_with_enter() {
+        let mut app = App::new();
+        
+        // Set up sessions
+        let session1 = Session::new_temporary();
+        let session2 = Session::new_temporary();
+        app.set_sessions(vec![session1, session2]);
+        
+        // Start in session list
+        app.focused_area = FocusedArea::SessionList;
+        app.current_session_index = 1;
+        app.scroll_offset = 10; // Set some scroll offset
+        
+        // Select current session
+        app.select_current_session();
+        
+        // Should now be focused on chat area
+        assert_eq!(app.focused_area, FocusedArea::Chat);
+        // Scroll should be reset to beginning
+        assert_eq!(app.scroll_offset, 0);
+        // Session index should remain the same
+        assert_eq!(app.current_session_index, 1);
     }
 } 
