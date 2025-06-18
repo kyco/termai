@@ -626,22 +626,6 @@ fn draw_error_popup(f: &mut Frame, error: &str) {
     f.render_widget(paragraph, area);
 }
 
-fn format_messages_without_selection(messages: &[&crate::session::model::message::Message]) -> Text<'static> {
-    let mut lines = Vec::new();
-    
-    for (i, message) in messages.iter().enumerate() {
-        if i > 0 {
-            lines.push(Line::from(""));
-        }
-        
-        let formatted_message = format_message(message);
-        for line in formatted_message.lines {
-            lines.push(line);
-        }
-    }
-    
-    Text::from(lines)
-}
 
 fn format_messages_with_markdown(messages: &[&crate::session::model::message::Message], app: &mut crate::ui::tui::app::App) -> Text<'static> {
     let mut lines = Vec::new();
@@ -871,44 +855,6 @@ fn create_line_with_selection(
     Line::from(spans)
 }
 
-fn format_message(message: &crate::session::model::message::Message) -> Text<'static> {
-    let role_style = match message.role {
-        Role::User => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-        Role::Assistant => Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
-        Role::System => Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-    };
-
-    let role_prefix = match message.role {
-        Role::User => "👤 You:",
-        Role::Assistant => "🤖 AI:",
-        Role::System => "⚙️  System:",
-    };
-
-    let mut lines = vec![
-        Line::from(vec![
-            Span::styled(role_prefix.to_string(), role_style),
-        ]),
-    ];
-
-    // Split message content into lines and format
-    for line in message.content.lines() {
-        if line.trim().starts_with("```") {
-            // Code block delimiter
-            lines.push(Line::from(vec![
-                Span::styled(line.to_string(), Style::default().fg(Color::Yellow)),
-            ]));
-        } else if line.trim().is_empty() {
-            lines.push(Line::from(""));
-        } else {
-            lines.push(Line::from(vec![
-                Span::styled(line.to_string(), Style::default().fg(Color::White)),
-            ]));
-        }
-    }
-
-    lines.push(Line::from(""));
-    Text::from(lines)
-}
 
 fn draw_help_modal(f: &mut Frame) {
     let area = centered_rect(70, 80, f.area());

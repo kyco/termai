@@ -146,11 +146,13 @@ impl App {
     }
 
     /// Check if there are any sessions available
+    #[cfg(test)]
     pub fn has_sessions(&self) -> bool {
         !self.sessions.is_empty()
     }
 
     /// Get the total number of sessions
+    #[cfg(test)]
     pub fn session_count(&self) -> usize {
         self.sessions.len()
     }
@@ -194,6 +196,7 @@ impl App {
     }
 
     /// Safely remove a session by ID, handling index adjustments
+    #[cfg(test)]
     pub fn remove_session(&mut self, session_id: &str) -> bool {
         if let Some(index) = self.sessions.iter().position(|s| s.id == session_id) {
             self.sessions.remove(index);
@@ -555,10 +558,6 @@ impl App {
         self.settings_input_area.lines().join("\n")
     }
 
-    pub fn start_provider_selection(&mut self) {
-        self.settings_provider_selecting = true;
-        self.input_mode = InputMode::Editing;
-    }
 
     pub fn start_provider_selection_with_current<R: crate::config::repository::ConfigRepository>(&mut self, repo: &R) {
         self.settings_provider_selecting = true;

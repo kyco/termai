@@ -236,7 +236,7 @@ impl LanguageDetector {
         }
         
         // Check for common patterns
-        if trimmed.contains("function ") && trimmed.contains("=>") {
+        if trimmed.contains("function ") && (trimmed.contains("=>") || trimmed.contains("{")) {
             return Some("javascript".to_string());
         }
         

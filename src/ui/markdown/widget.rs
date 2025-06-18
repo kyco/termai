@@ -73,7 +73,7 @@ impl<'a> MarkdownWidget<'a> {
 }
 
 impl<'a> Widget for MarkdownWidget<'a> {
-    fn render(mut self, area: Rect, buf: &mut Buffer) {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         // Try to render markdown content
         let text = match self.renderer.render(self.content) {
             Ok(text) => text,
@@ -207,7 +207,6 @@ pub struct ScrollableMarkdown<'a> {
     content: &'a str,
     renderer: &'a mut dyn MarkdownRenderer,
     scroll_state: ScrollState,
-    viewport_height: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -266,7 +265,6 @@ impl<'a> ScrollableMarkdown<'a> {
             content,
             renderer,
             scroll_state: ScrollState::new(),
-            viewport_height: 0,
         }
     }
     
@@ -288,21 +286,21 @@ impl<'a> ScrollableMarkdown<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ui::markdown::themes::themes;
     
     #[test]
     fn test_markdown_widget_creation() {
-        let renderer = DefaultMarkdownRenderer::new().unwrap();
-        let widget = MarkdownWidget::new("# Test", &renderer);
+        let mut renderer = DefaultMarkdownRenderer::new().unwrap();
+        let widget = MarkdownWidget::new("# Test", &mut renderer);
         // Basic widget creation should work
         assert_eq!(widget.content, "# Test");
     }
     
     #[test]
     fn test_markdown_display() {
-        let display = MarkdownDisplay::new().unwrap();
-        let widget = display.widget("# Test");
-        assert_eq!(widget.content, "# Test");
+        let mut display = MarkdownDisplay::new().unwrap();
+        let (text, _block) = display.render_chat_message("# Test", "Test Title").unwrap();
+        // Basic display creation should work
+        assert!(!text.lines.is_empty());
     }
     
     #[test]

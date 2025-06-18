@@ -246,21 +246,28 @@ mod tests {
     // Fix the last two tests similarly                                                                                                                                                                            
     #[test]
     fn test_extract_content_with_relative_path_removes_dot_slash() {
-        // Arrange unchanged                                                                                                                                                                                       
+        let original_dir = env::current_dir().expect("Failed to get current directory");
+        
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let file_path = temp_dir.path().join("test.txt");
         {
             let mut file = File::create(&file_path).expect("Failed to create test.txt");
             write!(file, "Relative file").expect("Failed to write to test.txt");
         }
-        let original_dir = env::current_dir().expect("Failed to get current directory");
+        
+        // Change to temp directory, run test, restore immediately
         env::set_current_dir(temp_dir.path()).expect("Failed to change current directory");
-
-        // Act - add empty dirs array                                                                                                                                                                              
         let result = extract_content(&Some("./".to_owned()), &[], &[]);
+        
+        // Restore directory before temp_dir is dropped
+        if original_dir.exists() {
+            env::set_current_dir(&original_dir).ok();
+        } else {
+            // Fallback to a safe directory if original doesn't exist
+            env::set_current_dir("/tmp").ok();
+        }
+        
         let files = result.expect("Expected Some(files) when using a relative path");
-
-        env::set_current_dir(original_dir).expect("Failed to restore current directory");
 
         // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);

@@ -2,6 +2,7 @@ use std::fmt;
 
 /// Errors that can occur during markdown rendering
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum MarkdownError {
     /// Error parsing markdown content
     ParseError(String),

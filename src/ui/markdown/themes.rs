@@ -174,6 +174,7 @@ pub mod themes {
     }
     
     /// Monokai theme
+    #[allow(dead_code)]
     pub fn monokai() -> DefaultTheme {
         let mut styles = HashMap::new();
         
@@ -195,6 +196,7 @@ pub mod themes {
     }
     
     /// Solarized Dark theme
+    #[allow(dead_code)]
     pub fn solarized_dark() -> DefaultTheme {
         let mut styles = HashMap::new();
         
@@ -216,6 +218,7 @@ pub mod themes {
     }
     
     /// High contrast theme for accessibility
+    #[allow(dead_code)]
     pub fn high_contrast() -> DefaultTheme {
         let mut styles = HashMap::new();
         
@@ -237,6 +240,7 @@ pub mod themes {
     }
     
     /// Get all available themes
+    #[allow(dead_code)]
     pub fn all_themes() -> Vec<Box<dyn MarkdownTheme>> {
         vec![
             Box::new(github_dark()),
@@ -247,6 +251,7 @@ pub mod themes {
     }
     
     /// Get theme by name
+    #[allow(dead_code)]
     pub fn get_theme(name: &str) -> Option<Box<dyn MarkdownTheme>> {
         match name.to_lowercase().as_str() {
             "github_dark" | "github-dark" => Some(Box::new(github_dark())),
