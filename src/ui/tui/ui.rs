@@ -2,7 +2,7 @@ use crate::ui::tui::app::{App, FocusedArea, InputMode};
 use crate::config::service::config_service;
 use crate::llm::common::model::role::Role;
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{
@@ -103,14 +103,24 @@ fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
         "Sessions"
     };
 
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .border_style(border_style);
+
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    // Add subtle padding for the list content
+    let padded_area = Rect {
+        x: inner_area.x + 1,
+        y: inner_area.y,
+        width: inner_area.width.saturating_sub(1),
+        height: inner_area.height,
+    };
+
     let sessions_list = List::new(sessions)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(title)
-                .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-                .border_style(border_style),
-        )
         .highlight_style(
             Style::default()
                 .bg(Color::DarkGray)
@@ -121,10 +131,10 @@ fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
     let reversed_index = app.current_session_index;
     list_state.select(Some(reversed_index));
 
-    f.render_stateful_widget(sessions_list, area, &mut list_state);
+    f.render_stateful_widget(sessions_list, padded_area, &mut list_state);
 
     // Draw scrollbar for sessions if needed
-    if app.sessions.len() > area.height as usize - 2 {
+    if app.sessions.len() > padded_area.height as usize {
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
@@ -133,10 +143,7 @@ fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
             .position(app.session_scroll_offset);
         f.render_stateful_widget(
             scrollbar,
-            area.inner(Margin {
-                vertical: 1,
-                horizontal: 0,
-            }),
+            padded_area,
             &mut scrollbar_state,
         );
     }
@@ -144,20 +151,43 @@ fn draw_session_list(f: &mut Frame, app: &App, area: Rect) {
 
 fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
     let is_focused = matches!(app.focused_area, FocusedArea::Chat);
+    let is_visual_mode = app.is_in_visual_mode();
     
     // Create the UI area first
+    let title = if is_visual_mode {
+        match app.selection_mode {
+            crate::ui::tui::app::SelectionMode::Visual => "Chat (VISUAL MODE - move to select, V for line mode, y to copy, Esc to exit)",
+            crate::ui::tui::app::SelectionMode::VisualLine => "Chat (VISUAL LINE MODE - move to select lines, y to copy, Esc to exit)",
+            _ => "Chat"
+        }
+    } else {
+        "Chat"
+    };
+    
     let block = Block::default()
         .borders(Borders::ALL)
-        .title("Chat") // Simplified title for now
+        .title(title)
         .title_style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
         .border_style(if is_focused {
-            Style::default().fg(Color::Yellow)
+            if is_visual_mode {
+                Style::default().fg(Color::Magenta)
+            } else {
+                Style::default().fg(Color::Yellow)
+            }
         } else {
             Style::default().fg(Color::Blue)
         });
 
     let inner_area = block.inner(area);
     f.render_widget(block, area);
+
+    // Add subtle padding for better visual spacing
+    let padded_area = Rect {
+        x: inner_area.x + 1,
+        y: inner_area.y + 1,
+        width: inner_area.width.saturating_sub(2),
+        height: inner_area.height.saturating_sub(2),
+    };
 
     // Get session messages first, completely separate from any borrowing
     let messages = app.current_session()
@@ -170,17 +200,20 @@ fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
         .collect();
     
     if !filtered_messages.is_empty() {
-        // Create all chat content as a single Text widget
-        let mut chat_content = Text::default();
-        for (i, message) in filtered_messages.iter().enumerate() {
-            if i > 0 {
-                chat_content.extend(Text::from("\n"));
-            }
-            chat_content.extend(format_message(message));
+        // Update chat content cache if needed for selection
+        if is_visual_mode && app.chat_content_lines.is_empty() {
+            app.update_chat_content_cache();
         }
         
+        // Create all chat content as a single Text widget with selection highlighting
+        let chat_content = if is_visual_mode {
+            format_messages_with_selection(&filtered_messages, app)
+        } else {
+            format_messages_without_selection(&filtered_messages)
+        };
+        
         // Calculate actual rendered height considering text wrapping
-        let available_width = inner_area.width as usize;
+        let available_width = padded_area.width as usize;
         let mut total_wrapped_lines = 0;
         
         for line in &chat_content.lines {
@@ -198,7 +231,7 @@ fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         
-        let available_height = inner_area.height as usize;
+        let available_height = padded_area.height as usize;
         
         // Clamp scroll position based on actual wrapped content height
         app.clamp_scroll_to_content_lines(total_wrapped_lines, available_height);
@@ -207,7 +240,7 @@ fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
         let paragraph = Paragraph::new(chat_content)
             .wrap(Wrap { trim: true })
             .scroll((app.scroll_offset as u16, 0));
-        f.render_widget(paragraph, inner_area);
+        f.render_widget(paragraph, padded_area);
 
         // Draw scrollbar if needed (based on actual wrapped content lines)
         if total_wrapped_lines > available_height {
@@ -220,7 +253,7 @@ fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
                 .position(app.scroll_offset.min(max_scroll));
             f.render_stateful_widget(
                 scrollbar,
-                inner_area,
+                padded_area,
                 &mut scrollbar_state,
             );
         }
@@ -245,7 +278,7 @@ fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
         let paragraph = Paragraph::new(welcome_text)
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: true });
-        f.render_widget(paragraph, inner_area);
+        f.render_widget(paragraph, padded_area);
     }
 }
 
@@ -282,8 +315,16 @@ fn draw_input_area(f: &mut Frame, app: &App, area: Rect) {
     let inner_area = block.inner(area);
     f.render_widget(block, area);
 
+    // Add subtle horizontal padding for input
+    let padded_area = Rect {
+        x: inner_area.x + 1,
+        y: inner_area.y,
+        width: inner_area.width.saturating_sub(2),
+        height: inner_area.height,
+    };
+
     // Render the text area
-    f.render_widget(&app.input_area, inner_area);
+    f.render_widget(&app.input_area, padded_area);
 }
 
 fn draw_settings_view<R: crate::config::repository::ConfigRepository>(f: &mut Frame, app: &mut App, area: Rect, config_repo: Option<&R>) {
@@ -342,7 +383,11 @@ fn draw_settings_view<R: crate::config::repository::ConfigRepository>(f: &mut Fr
                 "Config not available".to_string()
             };
 
-            let display_text = format!("{}: {}", display_name, value);
+            let display_text = if *key == "provider_key" && app.settings_provider_selecting && i == app.settings_selected_index {
+                format!("{}: [Select Provider]", display_name)
+            } else {
+                format!("{}: {}", display_name, value)
+            };
             ListItem::new(display_text).style(style)
         })
         .collect();
@@ -361,8 +406,8 @@ fn draw_settings_view<R: crate::config::repository::ConfigRepository>(f: &mut Fr
                 .add_modifier(Modifier::BOLD),
         );
 
-    // If editing a setting, split the area to show input
-    if app.settings_editing_key.is_some() {
+    // If editing a setting or selecting provider, split the area to show input/selection
+    if app.settings_editing_key.is_some() || app.settings_provider_selecting {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(5)])
@@ -372,8 +417,12 @@ fn draw_settings_view<R: crate::config::repository::ConfigRepository>(f: &mut Fr
         list_state.select(Some(app.settings_selected_index));
         f.render_stateful_widget(settings_list, chunks[0], &mut list_state);
 
-        // Draw input area for editing
-        draw_settings_input_area(f, app, chunks[1]);
+        // Draw input area for editing or provider selection
+        if app.settings_provider_selecting {
+            draw_provider_selection_area(f, app, chunks[1]);
+        } else {
+            draw_settings_input_area(f, app, chunks[1]);
+        }
         
         // Update app areas for mouse interaction
         app.settings_area = chunks[0];
@@ -385,6 +434,44 @@ fn draw_settings_view<R: crate::config::repository::ConfigRepository>(f: &mut Fr
         // Update app areas for mouse interaction
         app.settings_area = area;
     }
+}
+
+fn draw_provider_selection_area(f: &mut Frame, app: &App, area: Rect) {
+    let border_style = Style::default().fg(Color::Green);
+
+    let providers = vec!["OpenAI", "Claude"];
+    let provider_items: Vec<ListItem> = providers
+        .iter()
+        .enumerate()
+        .map(|(i, provider)| {
+            let style = if i == app.settings_provider_selected_index {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            ListItem::new(*provider).style(style)
+        })
+        .collect();
+
+    let provider_list = List::new(provider_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Select Provider (↑↓ to navigate, Enter to select, Esc to cancel)")
+                .title_style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD))
+                .border_style(border_style),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        );
+
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(app.settings_provider_selected_index));
+    f.render_stateful_widget(provider_list, area, &mut list_state);
 }
 
 fn draw_settings_input_area(f: &mut Frame, app: &App, area: Rect) {
@@ -539,7 +626,175 @@ fn draw_error_popup(f: &mut Frame, error: &str) {
     f.render_widget(paragraph, area);
 }
 
-fn format_message(message: &crate::session::model::message::Message) -> Text {
+fn format_messages_without_selection(messages: &[&crate::session::model::message::Message]) -> Text<'static> {
+    let mut lines = Vec::new();
+    
+    for (i, message) in messages.iter().enumerate() {
+        if i > 0 {
+            lines.push(Line::from(""));
+        }
+        
+        let formatted_message = format_message(message);
+        for line in formatted_message.lines {
+            lines.push(line);
+        }
+    }
+    
+    Text::from(lines)
+}
+
+fn format_messages_with_selection(messages: &[&crate::session::model::message::Message], app: &crate::ui::tui::app::App) -> Text<'static> {
+    let mut lines = Vec::new();
+    let mut current_line = 0;
+    
+    let selection = app.selection.as_ref();
+    let cursor_pos = &app.cursor_position;
+    
+    // Get selection bounds if exists
+    let selection_bounds = selection.map(|sel| {
+        let start = &sel.start;
+        let end = &sel.end;
+        if start.line < end.line || (start.line == end.line && start.column <= end.column) {
+            (start, end)
+        } else {
+            (end, start)
+        }
+    });
+    
+    for (msg_idx, message) in messages.iter().enumerate() {
+        if msg_idx > 0 {
+            lines.push(Line::from(""));
+            current_line += 1;
+        }
+        
+        // Add role prefix line
+        let role_style = match message.role {
+            Role::User => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Role::Assistant => Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            Role::System => Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        };
+        let role_prefix = match message.role {
+            Role::User => "👤 You:",
+            Role::Assistant => "🤖 AI:",
+            Role::System => "⚙️  System:",
+        };
+        
+        lines.push(create_line_with_selection(role_prefix, current_line, cursor_pos, selection_bounds, role_style, true));
+        current_line += 1;
+        
+        // Add message content lines
+        for content_line in message.content.lines() {
+            let base_style = if content_line.trim().starts_with("```") {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
+            lines.push(create_line_with_selection(content_line, current_line, cursor_pos, selection_bounds, base_style, true));
+            current_line += 1;
+        }
+        
+        lines.push(Line::from(""));
+        current_line += 1;
+    }
+    
+    Text::from(lines)
+}
+
+fn create_line_with_selection(
+    text: &str,
+    line_idx: usize,
+    cursor_pos: &crate::ui::tui::app::CursorPosition,
+    selection_bounds: Option<(&crate::ui::tui::app::CursorPosition, &crate::ui::tui::app::CursorPosition)>,
+    base_style: Style,
+    is_visual_mode: bool,
+) -> Line<'static> {
+    
+    let chars: Vec<char> = text.chars().collect();
+    let mut spans = Vec::new();
+    
+    // Build spans character by character to handle cursor positioning properly
+    let mut char_idx = 0;
+    
+    while char_idx <= chars.len() {
+        let is_cursor_pos = is_visual_mode && line_idx == cursor_pos.line && char_idx == cursor_pos.column;
+        let is_selected = if let Some((start, end)) = selection_bounds {
+            let (start, end) = if start.line < end.line || (start.line == end.line && start.column <= end.column) {
+                (start, end)
+            } else {
+                (end, start)
+            };
+            
+            if line_idx == start.line && line_idx == end.line {
+                // Single line selection
+                char_idx >= start.column && char_idx < end.column
+            } else if line_idx == start.line {
+                // First line of multi-line selection
+                char_idx >= start.column
+            } else if line_idx == end.line {
+                // Last line of multi-line selection
+                char_idx < end.column
+            } else if line_idx > start.line && line_idx < end.line {
+                // Middle line of multi-line selection
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        
+        if is_cursor_pos {
+            // Render cursor with high visibility - always show cursor even if text is selected
+            if char_idx < chars.len() {
+                // Highlight the character under the cursor with bright yellow background
+                let char_at_cursor = chars[char_idx];
+                let cursor_style = if is_selected {
+                    // Cursor on selected text: use magenta background to distinguish from selection
+                    Style::default().fg(Color::White).bg(Color::Magenta).add_modifier(Modifier::BOLD)
+                } else {
+                    // Cursor on normal text: use yellow background
+                    Style::default().fg(Color::Black).bg(Color::Yellow).add_modifier(Modifier::BOLD)
+                };
+                spans.push(Span::styled(char_at_cursor.to_string(), cursor_style));
+            } else {
+                // Cursor at end of line - show block cursor
+                spans.push(Span::styled(
+                    "█",
+                    Style::default().fg(Color::Yellow).bg(Color::Black).add_modifier(Modifier::BOLD)
+                ));
+            }
+        } else if char_idx < chars.len() {
+            // Regular character
+            let char_at_pos = chars[char_idx];
+            let style = if is_selected {
+                base_style.bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+            } else {
+                base_style
+            };
+            spans.push(Span::styled(char_at_pos.to_string(), style));
+        }
+        
+        char_idx += 1;
+    }
+    
+    // If no spans were created (empty line), add at least an empty span
+    if spans.is_empty() {
+        if is_visual_mode && line_idx == cursor_pos.line && cursor_pos.column == 0 {
+            // Show cursor on empty line
+            spans.push(Span::styled(
+                "█",
+                Style::default().fg(Color::Yellow).bg(Color::Black).add_modifier(Modifier::BOLD)
+            ));
+        } else {
+            spans.push(Span::styled("", base_style));
+        }
+    }
+    
+    Line::from(spans)
+}
+
+fn format_message(message: &crate::session::model::message::Message) -> Text<'static> {
     let role_style = match message.role {
         Role::User => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
         Role::Assistant => Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
@@ -554,7 +809,7 @@ fn format_message(message: &crate::session::model::message::Message) -> Text {
 
     let mut lines = vec![
         Line::from(vec![
-            Span::styled(role_prefix, role_style),
+            Span::styled(role_prefix.to_string(), role_style),
         ]),
     ];
 
@@ -563,13 +818,13 @@ fn format_message(message: &crate::session::model::message::Message) -> Text {
         if line.trim().starts_with("```") {
             // Code block delimiter
             lines.push(Line::from(vec![
-                Span::styled(line, Style::default().fg(Color::Yellow)),
+                Span::styled(line.to_string(), Style::default().fg(Color::Yellow)),
             ]));
         } else if line.trim().is_empty() {
             lines.push(Line::from(""));
         } else {
             lines.push(Line::from(vec![
-                Span::styled(line, Style::default().fg(Color::White)),
+                Span::styled(line.to_string(), Style::default().fg(Color::White)),
             ]));
         }
     }
@@ -628,6 +883,30 @@ fn draw_help_modal(f: &mut Frame) {
         Line::from(vec![
             Span::styled("  ?", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled("          - Show this help dialog", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Text Selection (vim-style):", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("  v", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("          - Enter visual mode (cursor only, move to start selecting)", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  V", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("          - Enter visual line mode (select full lines)", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  ↑↓←→", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("       - Move cursor and extend selection (in visual mode)", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  y", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("          - Copy selected text to clipboard (in visual mode)", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled("        - Exit visual mode", Style::default().fg(Color::White)),
         ]),
         Line::from(""),
         Line::from(vec![
