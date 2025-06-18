@@ -1,5 +1,6 @@
 use crate::session::model::session::Session;
 use crate::llm::common::model::role::Role;
+use crate::ui::markdown::MarkdownDisplay;
 use tui_textarea::TextArea;
 use ratatui::layout::Rect;
 
@@ -67,6 +68,8 @@ pub struct App {
     pub cursor_position: CursorPosition,
     pub selection: Option<TextSelection>,
     pub chat_content_lines: Vec<String>, // Cache for selection operations
+    // Markdown rendering
+    pub markdown_display: Option<MarkdownDisplay>,
 }
 
 impl Default for App {
@@ -104,6 +107,7 @@ impl Default for App {
             cursor_position: CursorPosition { line: 0, column: 0 },
             selection: None,
             chat_content_lines: Vec::new(),
+            markdown_display: MarkdownDisplay::new().ok(),
         }
     }
 }

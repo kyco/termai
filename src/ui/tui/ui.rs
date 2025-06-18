@@ -209,7 +209,7 @@ fn draw_chat_area(f: &mut Frame, app: &mut App, area: Rect) {
         let chat_content = if is_visual_mode {
             format_messages_with_selection(&filtered_messages, app)
         } else {
-            format_messages_without_selection(&filtered_messages)
+            format_messages_with_markdown(&filtered_messages, app)
         };
         
         // Calculate actual rendered height considering text wrapping
@@ -643,7 +643,84 @@ fn format_messages_without_selection(messages: &[&crate::session::model::message
     Text::from(lines)
 }
 
-fn format_messages_with_selection(messages: &[&crate::session::model::message::Message], app: &crate::ui::tui::app::App) -> Text<'static> {
+fn format_messages_with_markdown(messages: &[&crate::session::model::message::Message], app: &mut crate::ui::tui::app::App) -> Text<'static> {
+    let mut lines = Vec::new();
+    
+    for (i, message) in messages.iter().enumerate() {
+        if i > 0 {
+            lines.push(Line::from(""));
+        }
+        
+        // Add role header
+        let role_style = match message.role {
+            Role::User => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Role::Assistant => Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            Role::System => Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        };
+
+        let role_prefix = match message.role {
+            Role::User => "👤 You:",
+            Role::Assistant => "🤖 AI:",
+            Role::System => "⚙️  System:",
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(role_prefix.to_string(), role_style),
+        ]));
+        
+        // Try to render message content with markdown
+        if let Some(ref mut markdown_display) = app.markdown_display {
+            match markdown_display.render_to_text(&message.content) {
+                Ok(rendered_text) => {
+                    // Add the markdown-rendered content
+                    for line in rendered_text.lines {
+                        lines.push(line);
+                    }
+                }
+                Err(_) => {
+                    // Fallback to basic formatting on error
+                    let fallback_text = format_message_content_basic(&message.content);
+                    for line in fallback_text.lines {
+                        lines.push(line);
+                    }
+                }
+            }
+        } else {
+            // No markdown renderer available, use basic formatting
+            let fallback_text = format_message_content_basic(&message.content);
+            for line in fallback_text.lines {
+                lines.push(line);
+            }
+        }
+        
+        lines.push(Line::from(""));
+    }
+    
+    Text::from(lines)
+}
+
+fn format_message_content_basic(content: &str) -> Text<'static> {
+    let mut lines = Vec::new();
+    
+    for line in content.lines() {
+        if line.trim().starts_with("```") {
+            // Code block delimiter
+            lines.push(Line::from(vec![
+                Span::styled(line.to_string(), Style::default().fg(Color::Yellow)),
+            ]));
+        } else if line.trim().is_empty() {
+            lines.push(Line::from(""));
+        } else {
+            lines.push(Line::from(vec![
+                Span::styled(line.to_string(), Style::default().fg(Color::White)),
+            ]));
+        }
+    }
+    
+    Text::from(lines)
+}
+
+fn format_messages_with_selection(messages: &[&crate::session::model::message::Message], app: &mut crate::ui::tui::app::App) -> Text<'static> {
     let mut lines = Vec::new();
     let mut current_line = 0;
     

@@ -20,7 +20,6 @@ serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json"] }
 colored = "3.0.0"
-syntect = "5.0"
 dirs = "6.0.0"
 regex = "1.11.0"
 chrono = "0.4.39"
@@ -30,6 +29,12 @@ ratatui = "0.28.1"
 crossterm = "0.28.1"
 tui-textarea = "0.6.1"
 unicode-width = "0.1.14"
+arboard = "3.4.1"
+
+# Markdown rendering dependencies
+pulldown-cmark = "0.9"
+syntect = "5.1"
+lru = "0.12"
 
 [dependencies.uuid]
 version = "1.11.0"
