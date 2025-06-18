@@ -362,7 +362,7 @@ impl App {
     pub fn select_current_session(&mut self) {
         // Focus on the chat area for the currently selected session
         self.focused_area = FocusedArea::Chat;
-        self.scroll_offset = 0; // Reset scroll to show the beginning of the conversation
+        self.scroll_to_bottom(); // Scroll to bottom to show most recent messages, like a chat app
     }
 
     pub fn handle_directional_input(&mut self, direction: Direction) {
@@ -1026,8 +1026,8 @@ mod tests {
         
         // Should now be focused on chat area
         assert_eq!(app.focused_area, FocusedArea::Chat);
-        // Scroll should be reset to beginning
-        assert_eq!(app.scroll_offset, 0);
+        // Scroll should be set to bottom (usize::MAX gets clamped by UI)
+        assert_eq!(app.scroll_offset, usize::MAX);
         // Session index should remain the same
         assert_eq!(app.current_session_index, 1);
     }
