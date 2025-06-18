@@ -3,7 +3,7 @@ use crate::llm::common::model::role::Role;
 use crate::output::message;
 use crate::session::entity::message_entity::MessageEntity;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     pub id: String,
     pub role: Role,
