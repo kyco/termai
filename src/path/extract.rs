@@ -246,46 +246,65 @@ mod tests {
     // Fix the last two tests similarly                                                                                                                                                                            
     #[test]
     fn test_extract_content_with_relative_path_removes_dot_slash() {
+        struct DirGuard {
+            original_dir: PathBuf,
+        }
+        
+        impl Drop for DirGuard {
+            fn drop(&mut self) {
+                let _ = env::set_current_dir(&self.original_dir);
+            }
+        }
+        
         let original_dir = env::current_dir().expect("Failed to get current directory");
+        let _guard = DirGuard { original_dir: original_dir.clone() };
         
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-        let file_path = temp_dir.path().join("test.txt");
+        let temp_path = temp_dir.path();
+        
+        // Create test file
+        let file_path = temp_path.join("test.txt");
         {
             let mut file = File::create(&file_path).expect("Failed to create test.txt");
             write!(file, "Relative file").expect("Failed to write to test.txt");
         }
         
-        // Change to temp directory, run test, restore immediately
-        env::set_current_dir(temp_dir.path()).expect("Failed to change current directory");
+        // Change to temp directory and run test
+        env::set_current_dir(temp_path).expect("Failed to change current directory");
         let result = extract_content(&Some("./".to_owned()), &[], &[]);
         
-        // Restore directory before temp_dir is dropped
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).ok();
-        } else {
-            // Fallback to a safe directory if original doesn't exist
-            env::set_current_dir("/tmp").ok();
-        }
-        
         let files = result.expect("Expected Some(files) when using a relative path");
-
-        // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);
+        
         assert!(
             files_map.contains_key("test.txt"),
-            "Expected 'test.txt' to be present in the extracted files."
+            "Expected 'test.txt' to be present in the extracted files. Found: {:?}",
+            files_map.keys().collect::<Vec<_>>()
         );
+        
+        // Explicit restoration before temp_dir is dropped
+        env::set_current_dir(&original_dir).expect("Failed to restore current directory");
     }
 
     #[test]
     fn test_extract_content_excludes_hidden_directory() {
-        // Arrange unchanged                                                                                                                                                                                       
+        struct DirGuard {
+            original_dir: PathBuf,
+        }
+        
+        impl Drop for DirGuard {
+            fn drop(&mut self) {
+                let _ = env::set_current_dir(&self.original_dir);
+            }
+        }
+        
+        let original_dir = env::current_dir().expect("Failed to get current directory");
+        let _guard = DirGuard { original_dir: original_dir.clone() };
+        
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path();
-        let original_dir = env::current_dir().expect("Failed to get current directory");
-        env::set_current_dir(temp_path).expect("Failed to change current directory");
 
-        // Create hidden directory and files                                                                                                                                                                       
+        // Create hidden directory and files
         let hidden_dir = temp_path.join(".hidden");
         fs::create_dir(&hidden_dir).expect("Failed to create hidden dir");
         let hidden_file_path = hidden_dir.join("secret.txt");
@@ -302,13 +321,11 @@ mod tests {
             write!(public_file, "Visible content").expect("Failed to write to public.txt");
         }
 
-        // Act - add empty dirs array                                                                                                                                                                              
+        // Change to temp directory and run test
+        env::set_current_dir(temp_path).expect("Failed to change current directory");
         let result = extract_content(&Some("./".to_owned()), &[], &[]);
+        
         let files = result.expect("Expected Some(files) for relative extraction");
-
-        env::set_current_dir(original_dir).expect("Failed to restore current directory");
-
-        // Assert unchanged                                                                                                                                                                                        
         let files_map = files_to_map(&files);
         assert!(
             files_map.contains_key("public.txt"),

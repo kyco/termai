@@ -10,6 +10,9 @@ test:
 test-quiet:
 	cargo test --quiet
 
+test-coverage:
+	cargo tarpaulin --skip-clean --fail-under 0 --out Stdout
+
 clean:
 	cargo clean
 
