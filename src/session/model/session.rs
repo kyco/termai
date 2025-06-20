@@ -10,7 +10,7 @@ use crate::session::model::message::Message;
 use chrono::{Duration, NaiveDateTime, Utc};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Session {
     pub id: String,
     pub name: String,

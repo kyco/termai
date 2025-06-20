@@ -85,6 +85,51 @@ fn test_thinking_timer() {
     assert!(!running.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+#[test]
+fn test_large_message_storage() {
+    // Test if SQLite can handle very large messages without truncation
+    use tempfile::TempDir;
+    
+    // Create a temporary database
+    let temp_dir = TempDir::new().unwrap();
+    let db_path = temp_dir.path().join("test.db");
+    let conn = Connection::open(&db_path).unwrap();
+    
+    // Create the messages table like termai does
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS messages (
+            id TEXT NOT NULL PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL
+        )",
+        [],
+    ).unwrap();
+    
+    // Create a very large message (1MB of text)
+    let large_content = "A".repeat(1_000_000); // 1 million characters
+    let session_id = "test_session_large_msg";
+    
+    // Store the message
+    let result = conn.execute(
+        "INSERT INTO messages (id, session_id, role, content) VALUES (?1, ?2, ?3, ?4)",
+        ["large_msg_test", session_id, "Assistant", &large_content],
+    );
+    assert!(result.is_ok(), "Failed to save large message");
+    
+    // Retrieve the message
+    let mut stmt = conn.prepare("SELECT content FROM messages WHERE session_id = ?1").unwrap();
+    let mut rows = stmt.query_map([session_id], |row| {
+        Ok(row.get::<_, String>(0)?)
+    }).unwrap();
+    
+    let retrieved_content = rows.next().unwrap().unwrap();
+    assert_eq!(retrieved_content.len(), large_content.len(), 
+               "Message content length should be preserved");
+    assert_eq!(retrieved_content, large_content, 
+               "Message content should be exactly the same");
+}
+
 // Helper function to get table names from database
 fn get_tables(conn: &Connection) -> Vec<String> {
     let mut stmt = conn

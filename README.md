@@ -1,22 +1,20 @@
 # TermAI
 
-> A powerful, privacy-focused AI assistant for your terminal
+> A terminal AI assistant
 
-TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic
-Claude APIs (now with Claude Opus 4 support) with a focus on privacy, speed, and developer productivity.
+TermAI is a command-line AI assistant built in Rust. It provides an interactive terminal interface for conversations with OpenAI and Anthropic Claude models, with support for session management, local file context, and privacy features.
 
-![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet) ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
 
 ## ✨ Features
 
-- **Multi-Provider Support**: Works with both OpenAI and Claude APIs
-- **Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
-- **Local Context Understanding**: Analyze your code and files for more relevant responses
-- **Session Management**: Save and restore conversations for later reference
-- **Privacy-Focused**: Redact sensitive information before sending to APIs
-- **Developer-Optimized**: Perfect for generating code, explaining concepts, and assisting with daily dev tasks
-- **Fully Terminal-Based**: No web interfaces or external dependencies needed
-- **Fast Response Times**: Asynchronous processing with progress indicators
+- **Terminal Interface**: Interactive chat interface with session management and navigation
+- **Multiple LLM Providers**: Supports OpenAI and Anthropic Claude APIs
+- **Session Management**: Save and restore conversations with auto-generated titles
+- **Local File Context**: Include local files and directories in conversations
+- **Privacy Controls**: Redact sensitive information before API calls
+- **Dual Modes**: Terminal UI for interactive use, CLI mode for scripting
+- **Configuration Management**: Store API keys and settings locally
 
 ## 🚀 Installation
 
@@ -64,7 +62,31 @@ termai --provider claude  # or openapi
 
 ## 📖 Usage
 
-### Basic Queries
+### Terminal Interface
+
+The default mode provides an interactive terminal interface:
+
+```
+termai
+```
+
+You can also explicitly specify the UI mode:
+
+```
+termai --ui
+```
+
+**Controls:**
+- `Tab`: Cycle through areas (Sessions → Chat → Input)
+- `↑↓←→`: Navigate within focused area
+- `Enter`: Edit input (when focused) or send message
+- `Esc`: Exit edit mode
+- `Ctrl+N`: Create new session
+- `Mouse`: Click to focus, scroll to navigate
+
+### Command Line Mode
+
+Provide input directly for CLI mode:
 
 ```
 # Ask a simple question
@@ -72,6 +94,9 @@ termai "What is the capital of France?"
 
 # Get coding advice
 termai "How do I implement binary search in Rust?"
+
+# Use with pipes for processing command output
+git status | termai "Explain what these git changes mean"
 ```
 
 ### Using Local Context
@@ -162,11 +187,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔮 Future Plans
 
-- Stream responses for faster feedback
-- Auto-completion plugins for common shells
-- Voice input/output support
+- Response streaming
+- Shell completion plugins
 - Additional LLM providers
-- Custom fine-tuned models
+- Customization options
 
 ---                                                                                                                                                                                                                
 

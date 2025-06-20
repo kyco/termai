@@ -1,1 +1,1 @@
-pub(crate) mod config_entity;
+pub mod config_entity;
