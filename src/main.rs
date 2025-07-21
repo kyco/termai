@@ -4,6 +4,7 @@ mod config;
 mod llm;
 mod output;
 mod path;
+mod personality;
 mod redactions;
 mod repository;
 mod session;
@@ -22,6 +23,7 @@ use crate::session::repository::{MessageRepository, SessionRepository};
 use crate::session::service::sessions_service;
 use crate::session::service::sessions_service::session_add_messages;
 use crate::ui::timer::ThinkingTimer;
+use crate::personality::PersonalityEnhancement;
 use anyhow::Result;
 use clap::Parser;
 use config::{model::keys::ConfigKeys, service::config_service};
@@ -188,11 +190,19 @@ async fn request_response_from_ai<
         .expect("could not write new messages to repo");
 
     session.unredact();
-    let output_messages = session
+    
+    let personality = PersonalityEnhancement::new();
+    let mut output_messages = session
         .messages
         .iter()
         .filter(|message| message.role != Role::System)
-        .map(|message| message.to_output_message())
+        .map(|message| {
+            let mut output_message = message.to_output_message();
+            if message.role == Role::Assistant {
+                output_message.content = personality.enhance_response(input, &output_message.content);
+            }
+            output_message
+        })
         .collect::<Vec<Message>>();
 
     outputter::print(output_messages);
