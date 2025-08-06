@@ -30,18 +30,28 @@ impl ThinkingTimer {
 
             while running.load(Ordering::SeqCst) {
                 let elapsed = start.elapsed();
-                print!(
-                    "\r{} Thinking... {:02}:{:02}",
-                    spinner_chars[spinner_idx],
-                    elapsed.as_secs() / 60,
-                    elapsed.as_secs() % 60
-                );
+                let secs = elapsed.as_secs();
+                
+                if secs < 60 {
+                    print!("\r\x1b[36m{} 🤔 AI is thinking ({}.{}s)\x1b[0m", 
+                        spinner_chars[spinner_idx],
+                        secs, 
+                        elapsed.subsec_millis() / 100
+                    );
+                } else {
+                    print!("\r\x1b[36m{} 🤔 AI is thinking ({:02}:{:02})\x1b[0m", 
+                        spinner_chars[spinner_idx],
+                        secs / 60,
+                        secs % 60
+                    );
+                }
                 io::stdout().flush().unwrap();
 
                 spinner_idx = (spinner_idx + 1) % spinner_chars.len();
-                thread::sleep(Duration::from_millis(100));
+                thread::sleep(Duration::from_millis(150));
             }
-            print!("\r                                       \r");
+            // Clear the thinking line completely and move cursor to start of line
+            print!("\r\x1b[2K\r");
             io::stdout().flush().unwrap();
         });
 
@@ -50,6 +60,15 @@ impl ThinkingTimer {
 
     pub fn stop(&mut self) {
         self.running.store(false, Ordering::SeqCst);
+        
+        // Wait for the thread to finish and clean up
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
+        
+        // Extra cleanup to ensure line is cleared
+        print!("\r\x1b[2K");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
     }
 }
 

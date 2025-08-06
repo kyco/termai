@@ -1,4 +1,5 @@
 mod args;
+mod chat;
 mod common;
 mod config;
 mod llm;
@@ -11,6 +12,7 @@ mod setup;
 mod ui;
 
 use crate::args::{Args, Commands, ConfigAction, RedactAction, SessionAction, Provider};
+use crate::chat::InteractiveSession;
 use crate::setup::SetupWizard;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::provider_config::write_provider_key;
@@ -110,17 +112,35 @@ async fn main() -> Result<()> {
         &args.get_chat_directories(),
         &args.get_chat_exclude(),
     );
-    let input = extract_input_or_quit(&args);
-    request_response_from_ai(
-        &repo,
-        &repo,
-        &repo,
-        &input,
-        &mut session,
-        args.get_chat_system_prompt(),
-        &local_context,
-    )
-    .await
+
+    // Check if we have direct input for one-shot mode or should start interactive mode
+    let input_data = get_input_from_args_or_stdin(&args);
+    
+    if let Some(input) = input_data {
+        // One-shot mode: process single command and exit
+        request_response_from_ai(
+            &repo,
+            &repo,
+            &repo,
+            &input,
+            &mut session,
+            args.get_chat_system_prompt(),
+            &local_context,
+        )
+        .await
+    } else {
+        // Interactive mode: start chat session
+        let context_files = local_context.unwrap_or_default();
+        let mut interactive_session = InteractiveSession::new(
+            &repo,
+            &repo,
+            &repo,
+            session,
+            context_files,
+        )?;
+        
+        interactive_session.run().await
+    }
 }
 
 fn handle_config_command<R: ConfigRepository>(repo: &R, action: &ConfigAction, _args: &Args) -> Result<()> {
@@ -307,25 +327,30 @@ async fn request_response_from_ai<
     Ok(())
 }
 
-fn extract_input_or_quit(args: &Args) -> String {
+fn get_input_from_args_or_stdin(args: &Args) -> Option<String> {
     let mut input = String::new();
+    
+    // Check for command line input
     if let Some(ref data_arg) = args.get_chat_data() {
         input.push_str(data_arg);
     }
+    
+    // Check for piped input
     if !io::stdin().is_terminal() {
         let mut buffer = String::new();
-        io::stdin()
-            .read_to_string(&mut buffer)
-            .expect("Failed to read from stdin");
-        if !input.is_empty() {
-            input.push('\n');
-            input.push('\n');
+        if let Ok(_) = io::stdin().read_to_string(&mut buffer) {
+            if !input.is_empty() {
+                input.push('\n');
+                input.push('\n');
+            }
+            input.push_str(buffer.trim());
         }
-        input.push_str(buffer.trim());
     }
+    
+    // Return input if we have any, otherwise None for interactive mode
     if input.is_empty() {
-        eprintln!("No input provided. Use positional arguments or pipe data.");
-        std::process::exit(1);
+        None
+    } else {
+        Some(input)
     }
-    input
 }
