@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use regex::Regex;
+use std::collections::HashMap;
 
 pub fn unredact(mapped_redactions: &HashMap<String, String>, content: &str) -> String {
     mapped_redactions

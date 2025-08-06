@@ -20,16 +20,16 @@ impl ChatCommand {
     /// Parse a line of input to determine if it's a slash command
     pub fn parse(input: &str) -> Option<Self> {
         let input = input.trim();
-        
+
         if !input.starts_with('/') {
             return None;
         }
-        
+
         let parts: Vec<&str> = input[1..].split_whitespace().collect();
         if parts.is_empty() {
             return None;
         }
-        
+
         match parts[0].to_lowercase().as_str() {
             "help" | "h" => Some(ChatCommand::Help),
             "save" | "s" => {
@@ -69,7 +69,7 @@ impl ChatCommand {
             _ => None,
         }
     }
-    
+
     /// Get help text for a specific command
     #[allow(dead_code)]
     pub fn help_text(&self) -> &'static str {
@@ -85,19 +85,25 @@ impl ChatCommand {
             ChatCommand::RemoveContext(_) => "Remove file or directory from context",
         }
     }
-    
+
     /// Get all available commands for help display
     pub fn all_commands() -> Vec<(&'static str, &'static str)> {
         vec![
             ("/help, /h", "Show this help message"),
-            ("/save [name], /s", "Save current session with optional name"),
+            (
+                "/save [name], /s",
+                "Save current session with optional name",
+            ),
             ("/context, /ctx", "Show current context information"),
             ("/clear, /c", "Clear conversation history"),
             ("/exit, /quit, /q", "Exit chat mode"),
             ("/retry, /r", "Regenerate the last AI response"),
             ("/branch [name], /b", "Create a new conversation branch"),
             ("/add <path>", "Add file or directory to context"),
-            ("/remove <path>, /rm", "Remove file or directory from context"),
+            (
+                "/remove <path>, /rm",
+                "Remove file or directory from context",
+            ),
         ]
     }
 }
@@ -129,14 +135,20 @@ mod tests {
         assert_eq!(ChatCommand::parse("/help"), Some(ChatCommand::Help));
         assert_eq!(ChatCommand::parse("/h"), Some(ChatCommand::Help));
         assert_eq!(ChatCommand::parse("/save"), Some(ChatCommand::Save(None)));
-        assert_eq!(ChatCommand::parse("/save my_session"), Some(ChatCommand::Save(Some("my_session".to_string()))));
+        assert_eq!(
+            ChatCommand::parse("/save my_session"),
+            Some(ChatCommand::Save(Some("my_session".to_string())))
+        );
         assert_eq!(ChatCommand::parse("/context"), Some(ChatCommand::Context));
         assert_eq!(ChatCommand::parse("/clear"), Some(ChatCommand::Clear));
         assert_eq!(ChatCommand::parse("/exit"), Some(ChatCommand::Exit));
         assert_eq!(ChatCommand::parse("/quit"), Some(ChatCommand::Exit));
         assert_eq!(ChatCommand::parse("/retry"), Some(ChatCommand::Retry));
-        assert_eq!(ChatCommand::parse("/add src/main.rs"), Some(ChatCommand::AddContext("src/main.rs".to_string())));
-        
+        assert_eq!(
+            ChatCommand::parse("/add src/main.rs"),
+            Some(ChatCommand::AddContext("src/main.rs".to_string()))
+        );
+
         // Test non-commands
         assert_eq!(ChatCommand::parse("hello world"), None);
         assert_eq!(ChatCommand::parse("not a command"), None);
@@ -149,7 +161,7 @@ mod tests {
             InputType::Command(ChatCommand::Help) => (),
             _ => panic!("Expected Help command"),
         }
-        
+
         match InputType::classify("Hello, how are you?") {
             InputType::Message(msg) => assert_eq!(msg, "Hello, how are you?"),
             _ => panic!("Expected regular message"),

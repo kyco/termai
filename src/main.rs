@@ -2,6 +2,7 @@ mod args;
 mod chat;
 mod common;
 mod config;
+mod context;
 mod llm;
 mod output;
 mod path;
@@ -11,20 +12,20 @@ mod session;
 mod setup;
 mod ui;
 
-use crate::args::{Args, Commands, ConfigAction, RedactAction, SessionAction, Provider};
+use crate::args::{Args, Commands, ConfigAction, Provider, RedactAction, SessionAction};
 use crate::chat::InteractiveSession;
-use crate::setup::SetupWizard;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::provider_config::write_provider_key;
 use crate::config::service::{claude_config, open_ai_config, redacted_config};
 use crate::llm::common::model::role::Role;
-use crate::path::extract::extract_content;
+use crate::path::extract::{extract_content, extract_content_with_smart_fallback};
 use crate::path::model::Files;
 use crate::session::model::message::{contains_system_prompt, messages_with_system_prompt};
 use crate::session::model::session::Session;
 use crate::session::repository::{MessageRepository, SessionRepository};
 use crate::session::service::sessions_service;
 use crate::session::service::sessions_service::session_add_messages;
+use crate::setup::SetupWizard;
 use crate::ui::timer::ThinkingTimer;
 use anyhow::Result;
 use clap::Parser;
@@ -107,15 +108,47 @@ async fn main() -> Result<()> {
         Session::new_temporary()
     };
 
-    let local_context = extract_content(
-        &args.get_chat_directory(),
-        &args.get_chat_directories(),
-        &args.get_chat_exclude(),
-    );
+    let local_context = if let Some(Commands::Chat {
+        smart_context,
+        context_query,
+        preview_context,
+        chunked_analysis,
+        chunk_strategy,
+        max_context_tokens,
+        ..
+    }) = &args.command
+    {
+        if *smart_context {
+            extract_content_with_smart_fallback(
+                &args.get_chat_directory(),
+                &args.get_chat_directories(),
+                &args.get_chat_exclude(),
+                true,
+                context_query.as_deref(),
+                *preview_context,
+                *chunked_analysis,
+                Some(chunk_strategy.as_str()),
+                *max_context_tokens,
+            )
+            .await
+        } else {
+            extract_content(
+                &args.get_chat_directory(),
+                &args.get_chat_directories(),
+                &args.get_chat_exclude(),
+            )
+        }
+    } else {
+        extract_content(
+            &args.get_chat_directory(),
+            &args.get_chat_directories(),
+            &args.get_chat_exclude(),
+        )
+    };
 
     // Check if we have direct input for one-shot mode or should start interactive mode
     let input_data = get_input_from_args_or_stdin(&args);
-    
+
     if let Some(input) = input_data {
         // One-shot mode: process single command and exit
         request_response_from_ai(
@@ -131,19 +164,18 @@ async fn main() -> Result<()> {
     } else {
         // Interactive mode: start chat session
         let context_files = local_context.unwrap_or_default();
-        let mut interactive_session = InteractiveSession::new(
-            &repo,
-            &repo,
-            &repo,
-            session,
-            context_files,
-        )?;
-        
+        let mut interactive_session =
+            InteractiveSession::new(&repo, &repo, &repo, session, context_files)?;
+
         interactive_session.run().await
     }
 }
 
-fn handle_config_command<R: ConfigRepository>(repo: &R, action: &ConfigAction, _args: &Args) -> Result<()> {
+fn handle_config_command<R: ConfigRepository>(
+    repo: &R,
+    action: &ConfigAction,
+    _args: &Args,
+) -> Result<()> {
     match action {
         ConfigAction::Show => print_config(repo),
         ConfigAction::SetOpenai { api_key } => {
@@ -157,7 +189,11 @@ fn handle_config_command<R: ConfigRepository>(repo: &R, action: &ConfigAction, _
             Ok(())
         }
         ConfigAction::SetProvider { provider } => {
-            config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), provider.to_str())?;
+            config_service::write_config(
+                repo,
+                &ConfigKeys::ProviderKey.to_key(),
+                provider.to_str(),
+            )?;
             println!("Default provider set to {}", provider.to_str());
             Ok(())
         }
@@ -169,7 +205,11 @@ fn handle_config_command<R: ConfigRepository>(repo: &R, action: &ConfigAction, _
     }
 }
 
-fn handle_redact_command<R: ConfigRepository>(repo: &R, action: &RedactAction, _args: &Args) -> Result<()> {
+fn handle_redact_command<R: ConfigRepository>(
+    repo: &R,
+    action: &RedactAction,
+    _args: &Args,
+) -> Result<()> {
     // Create a temporary Args struct with the appropriate field set for the redaction function
     let mut temp_args = Args {
         command: None,
@@ -187,19 +227,23 @@ fn handle_redact_command<R: ConfigRepository>(repo: &R, action: &RedactAction, _
         exclude: vec![],
         provider: None,
         directories: vec![],
+        smart_context: false,
+        max_context_tokens: None,
+        preview_context: false,
+        chunked_analysis: false,
     };
 
     match action {
         RedactAction::Add { pattern } => {
             temp_args.redact_add = Some(pattern.clone());
             redacted_config::redaction(repo, &temp_args)?;
-            println!("Added redaction pattern: {}", pattern);
+            println!("Added redaction pattern: {pattern}");
             Ok(())
         }
         RedactAction::Remove { pattern } => {
             temp_args.redact_remove = Some(pattern.clone());
             redacted_config::redaction(repo, &temp_args)?;
-            println!("Removed redaction pattern: {}", pattern);
+            println!("Removed redaction pattern: {pattern}");
             Ok(())
         }
         RedactAction::List => {
@@ -210,7 +254,10 @@ fn handle_redact_command<R: ConfigRepository>(repo: &R, action: &RedactAction, _
     }
 }
 
-fn handle_sessions_command<R: ConfigRepository + SessionRepository + MessageRepository>(repo: &R, action: &SessionAction) -> Result<()> {
+fn handle_sessions_command<R: ConfigRepository + SessionRepository + MessageRepository>(
+    repo: &R,
+    action: &SessionAction,
+) -> Result<()> {
     match action {
         SessionAction::List => {
             sessions_service::fetch_all_sessions(repo, repo)?;
@@ -223,8 +270,7 @@ fn db_path() -> PathBuf {
     let home_dir = dirs::home_dir().expect("Failed to get home directory");
     let default_dir = home_dir.join(".config/termai");
     create_dir_all(&default_dir).expect("Failed to create default directory");
-    let db_path = default_dir.join("app.db");
-    db_path
+    default_dir.join("app.db")
 }
 
 fn print_config<R: ConfigRepository>(repo: &R) -> Result<()> {
@@ -277,7 +323,7 @@ async fn request_response_from_ai<
                 .map(|file| {
                     let file_path = file.path.clone();
                     let file_content = file.content.clone();
-                    format!("{}\n```\n{}```", file_path, file_content)
+                    format!("{file_path}\n```\n{file_content}```")
                 })
                 .collect();
             format!("{}\n{}", input, local_context.join("\n"))
@@ -294,14 +340,14 @@ async fn request_response_from_ai<
     match provider {
         Provider::Claude => {
             if let Err(err) = claude::service::chat::chat(&provider_api_key.value, session).await {
-                println!("{:#?}", err);
+                println!("{err:#?}");
                 timer.stop();
                 return Err(err);
             }
         }
         Provider::Openapi => {
             if let Err(err) = openai::service::chat::chat(&provider_api_key.value, session).await {
-                println!("{:#?}", err);
+                println!("{err:#?}");
                 timer.stop();
                 return Err(err);
             }
@@ -329,16 +375,16 @@ async fn request_response_from_ai<
 
 fn get_input_from_args_or_stdin(args: &Args) -> Option<String> {
     let mut input = String::new();
-    
+
     // Check for command line input
     if let Some(ref data_arg) = args.get_chat_data() {
         input.push_str(data_arg);
     }
-    
+
     // Check for piped input
     if !io::stdin().is_terminal() {
         let mut buffer = String::new();
-        if let Ok(_) = io::stdin().read_to_string(&mut buffer) {
+        if io::stdin().read_to_string(&mut buffer).is_ok() {
             if !input.is_empty() {
                 input.push('\n');
                 input.push('\n');
@@ -346,7 +392,7 @@ fn get_input_from_args_or_stdin(args: &Args) -> Option<String> {
             input.push_str(buffer.trim());
         }
     }
-    
+
     // Return input if we have any, otherwise None for interactive mode
     if input.is_empty() {
         None

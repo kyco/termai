@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use super::super::wizard::SetupWizard;
     use super::super::validator::ApiKeyValidator;
+    use super::super::wizard::SetupWizard;
+    use crate::config::entity::config_entity::ConfigEntity;
     use crate::config::model::keys::ConfigKeys;
     use crate::config::repository::ConfigRepository;
-    use crate::config::entity::config_entity::ConfigEntity;
     use anyhow::Result;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
@@ -41,7 +41,9 @@ mod tests {
 
         pub fn get_data(&self) -> HashMap<String, String> {
             let data = self.data.lock().unwrap();
-            data.iter().map(|(k, v)| (k.clone(), v.value.clone())).collect()
+            data.iter()
+                .map(|(k, v)| (k.clone(), v.value.clone()))
+                .collect()
         }
     }
 
@@ -63,7 +65,7 @@ mod tests {
         fn add_config(&self, key: &str, value: &str) -> Result<(), Self::Error> {
             let mut data = self.data.lock().unwrap();
             let mut next_id = self.next_id.lock().unwrap();
-            
+
             let entity = ConfigEntity::new_with_id(*next_id, key, value);
             data.insert(key.to_string(), entity);
             *next_id += 1;
@@ -82,14 +84,17 @@ mod tests {
     fn test_setup_wizard_creation() {
         let wizard = SetupWizard::new();
         // Just verify we can create the wizard without panicking
-        assert_eq!(std::mem::size_of_val(&wizard), std::mem::size_of::<SetupWizard>());
+        assert_eq!(
+            std::mem::size_of_val(&wizard),
+            std::mem::size_of::<SetupWizard>()
+        );
     }
 
     #[test]
     fn test_check_existing_config_empty() {
         let repo = MockConfigRepository::new();
         let _wizard = SetupWizard::new();
-        
+
         // With no existing configuration, should be empty
         assert!(repo.get_data().is_empty());
     }
@@ -98,37 +103,45 @@ mod tests {
     fn test_check_existing_config_with_data() {
         let mut initial_data = HashMap::new();
         initial_data.insert(ConfigKeys::ClaudeApiKey.to_key(), "test-key".to_string());
-        
+
         let repo = MockConfigRepository::with_data(initial_data);
         let _wizard = SetupWizard::new();
-        
+
         // Verify the data was set
-        assert!(repo.get_data().contains_key(&ConfigKeys::ClaudeApiKey.to_key()));
+        assert!(repo
+            .get_data()
+            .contains_key(&ConfigKeys::ClaudeApiKey.to_key()));
     }
 
     #[test]
     fn test_reset_configuration() -> Result<()> {
         let mut initial_data = HashMap::new();
-        initial_data.insert(ConfigKeys::ClaudeApiKey.to_key(), "test-claude-key".to_string());
-        initial_data.insert(ConfigKeys::ChatGptApiKey.to_key(), "test-openai-key".to_string());
+        initial_data.insert(
+            ConfigKeys::ClaudeApiKey.to_key(),
+            "test-claude-key".to_string(),
+        );
+        initial_data.insert(
+            ConfigKeys::ChatGptApiKey.to_key(),
+            "test-openai-key".to_string(),
+        );
         initial_data.insert(ConfigKeys::ProviderKey.to_key(), "claude".to_string());
-        
+
         let repo = MockConfigRepository::with_data(initial_data);
-        
+
         // Verify data exists before reset
         assert!(repo.get_data().len() == 3);
-        
+
         // Test the config clearing logic (simulating reset_configuration internals)
         let keys_to_clear = vec![
             ConfigKeys::ClaudeApiKey.to_key(),
             ConfigKeys::ChatGptApiKey.to_key(),
             ConfigKeys::ProviderKey.to_key(),
         ];
-        
+
         for key in keys_to_clear {
             repo.add_config(&key, "")?;
         }
-        
+
         // Verify keys were cleared (set to empty string)
         for key in [
             ConfigKeys::ClaudeApiKey.to_key(),
@@ -137,33 +150,33 @@ mod tests {
         ] {
             assert_eq!(repo.fetch_by_key(&key)?.value, "");
         }
-        
+
         Ok(())
     }
 
-    #[test] 
+    #[test]
     fn test_config_repository_operations() -> Result<()> {
         let repo = MockConfigRepository::new();
-        
+
         // Test adding config
         repo.add_config("test_key", "test_value")?;
-        
+
         // Test fetching by key
         let config = repo.fetch_by_key("test_key")?;
         assert_eq!(config.key, "test_key");
         assert_eq!(config.value, "test_value");
-        
+
         // Test updating config
         if let Some(id) = config.id {
             repo.update_config(id, "test_key", "updated_value")?;
             let updated_config = repo.fetch_by_key("test_key")?;
             assert_eq!(updated_config.value, "updated_value");
         }
-        
+
         // Test fetch all configs
         let all_configs = repo.fetch_all_configs()?;
         assert_eq!(all_configs.len(), 1);
-        
+
         Ok(())
     }
 
@@ -207,7 +220,7 @@ mod tests {
     #[test]
     fn test_provider_enum_descriptions() {
         use super::super::wizard::Provider;
-        
+
         assert_eq!(
             Provider::Claude.description(),
             "Claude (Anthropic) - Best for analysis & coding"
@@ -216,10 +229,7 @@ mod tests {
             Provider::OpenAI.description(),
             "OpenAI - Versatile general purpose"
         );
-        assert_eq!(
-            Provider::Both.description(),
-            "Both providers (recommended)"
-        );
+        assert_eq!(Provider::Both.description(), "Both providers (recommended)");
     }
 
     // Integration tests that would require more setup

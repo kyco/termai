@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
-use rustyline::{Config, Editor, Helper, error::ReadlineError, history::FileHistory};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
-use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
-use rustyline::validate::{Validator, MatchingBracketValidator};
+use rustyline::hint::{Hinter, HistoryHinter};
+use rustyline::validate::{MatchingBracketValidator, Validator};
+use rustyline::{error::ReadlineError, history::FileHistory, Config, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::collections::HashSet;
 
@@ -21,15 +21,14 @@ impl ChatHelper {
         let mut commands = HashSet::new();
         // Add all slash commands for tab completion
         let command_list = vec![
-            "/help", "/h", "/save", "/s", "/context", "/ctx", 
-            "/clear", "/c", "/exit", "/quit", "/q", "/retry", "/r",
-            "/branch", "/b", "/add", "/remove", "/rm"
+            "/help", "/h", "/save", "/s", "/context", "/ctx", "/clear", "/c", "/exit", "/quit",
+            "/q", "/retry", "/r", "/branch", "/b", "/add", "/remove", "/rm",
         ];
-        
+
         for cmd in command_list {
             commands.insert(cmd.to_string());
         }
-        
+
         Self {
             completer: FilenameCompleter::new(),
             highlighter: MatchingBracketHighlighter::new(),
@@ -53,17 +52,18 @@ impl Completer for ChatHelper {
         if line.starts_with('/') {
             let input = &line[1..pos];
             let mut matches = Vec::new();
-            
+
             for command in &self.commands {
-                if command[1..].starts_with(input) {  // Skip the '/' prefix
+                if command[1..].starts_with(input) {
+                    // Skip the '/' prefix
                     matches.push(Pair {
                         display: command.clone(),
                         replacement: command.clone(),
                     });
                 }
             }
-            
-            Ok((1, matches))  // Start replacement from position 1 (after '/')
+
+            Ok((1, matches)) // Start replacement from position 1 (after '/')
         } else {
             // Fall back to filename completion for regular messages
             self.completer.complete(line, pos, _ctx)
@@ -88,12 +88,12 @@ impl Highlighter for ChatHelper {
         if default {
             Borrowed(prompt)
         } else {
-            Owned(format!("\x1b[1;32m{}\x1b[0m", prompt))  // Green bold
+            Owned(format!("\x1b[1;32m{}\x1b[0m", prompt)) // Green bold
         }
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        Owned(format!("\x1b[2m{}\x1b[0m", hint))  // Dimmed
+        Owned(format!("\x1b[2m{}\x1b[0m", hint)) // Dimmed
     }
 
     fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
@@ -103,13 +103,14 @@ impl Highlighter for ChatHelper {
                 let command = &line[..space_pos];
                 let rest = &line[space_pos..];
                 if self.commands.contains(command) {
-                    return Owned(format!("\x1b[1;36m{}\x1b[0m{}", command, rest));  // Cyan bold
+                    return Owned(format!("\x1b[1;36m{}\x1b[0m{}", command, rest));
+                    // Cyan bold
                 }
             } else if self.commands.contains(line) {
-                return Owned(format!("\x1b[1;36m{}\x1b[0m", line));  // Cyan bold
+                return Owned(format!("\x1b[1;36m{}\x1b[0m", line)); // Cyan bold
             }
         }
-        
+
         self.highlighter.highlight(line, pos)
     }
 
@@ -146,20 +147,20 @@ impl ChatRepl {
             .completion_type(rustyline::CompletionType::List)
             .edit_mode(rustyline::EditMode::Emacs)
             .build();
-        
+
         let helper = ChatHelper::new();
         let mut editor = Editor::with_config(config)?;
         editor.set_helper(Some(helper));
-        
+
         // Load history if it exists
         let _ = editor.load_history(".termai_history");
-        
+
         Ok(Self {
             editor,
-            prompt: "❯ ".to_string(),  // Restore the prompt
+            prompt: "❯ ".to_string(), // Restore the prompt
         })
     }
-    
+
     /// Read a line of input from the user
     pub fn read_line(&mut self) -> Result<String> {
         match self.editor.readline(&self.prompt) {
@@ -182,31 +183,32 @@ impl ChatRepl {
             Err(err) => Err(anyhow!("Readline error: {}", err)),
         }
     }
-    
+
     /// Update the prompt (e.g., to show context or status)
     #[allow(dead_code)]
     pub fn set_prompt(&mut self, prompt: String) {
         self.prompt = prompt;
     }
-    
+
     /// Get the current prompt
     #[allow(dead_code)]
     pub fn get_prompt(&self) -> &str {
         &self.prompt
     }
-    
+
     /// Save command history
     pub fn save_history(&mut self) -> Result<()> {
-        self.editor.save_history(".termai_history")
+        self.editor
+            .save_history(".termai_history")
             .map_err(|e| anyhow!("Failed to save history: {}", e))?;
         Ok(())
     }
-    
+
     /// Clear the screen
     pub fn clear_screen(&mut self) {
-        print!("\x1B[2J\x1B[1;1H");  // ANSI escape codes to clear screen
+        print!("\x1B[2J\x1B[1;1H"); // ANSI escape codes to clear screen
     }
-    
+
     /// Print a message without interfering with input
     pub fn print_message(&self, message: &str) {
         println!("{}", message);
@@ -236,14 +238,14 @@ mod tests {
         let helper = ChatHelper::new();
         let history = rustyline::history::FileHistory::new();
         let ctx = rustyline::Context::new(&history);
-        
+
         // Test slash command completion
         let result = helper.complete("/he", 3, &ctx);
         assert!(result.is_ok());
         let (start, matches) = result.unwrap();
         assert_eq!(start, 1);
         assert!(!matches.is_empty());
-        
+
         // Find /help in matches
         let help_match = matches.iter().find(|pair| pair.replacement == "/help");
         assert!(help_match.is_some());
@@ -253,11 +255,11 @@ mod tests {
     fn test_repl_creation() {
         let repl = ChatRepl::new();
         assert!(repl.is_ok());
-        
+
         let repl = repl.unwrap();
         assert_eq!(repl.prompt, "❯ ");
     }
-    
+
     #[test]
     fn test_prompt_modification() {
         let mut repl = ChatRepl::new().unwrap();

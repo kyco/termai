@@ -4,4 +4,3 @@ pub struct Message {
     pub role: Role,
     pub message: String,
 }
-

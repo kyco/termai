@@ -3,8 +3,10 @@ use crate::session::entity::message_entity::MessageEntity;
 use chrono::NaiveDateTime;
 use std::fmt::Debug;
 
-pub(crate) mod session_repository;
 pub(crate) mod message_repository;
+pub(crate) mod session_repository;
+#[allow(dead_code)]
+pub(crate) mod smart_context_repository;
 
 pub trait SessionRepository
 where
@@ -37,6 +39,9 @@ where
 {
     type Error;
 
-    fn fetch_messages_for_session(&self, session_id: &str) -> Result<Vec<MessageEntity>, Self::Error>;
+    fn fetch_messages_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<MessageEntity>, Self::Error>;
     fn add_message_to_session(&self, message: &MessageEntity) -> Result<(), Self::Error>;
 }

@@ -1,0 +1,129 @@
+# TermAI Smart Context Discovery Configuration
+# Copy this file to .termai.toml in your project root and customize as needed
+
+[context]
+# Maximum tokens to use per request (adjust based on your model's context window)
+max_tokens = 4000
+
+# File patterns to include in analysis (glob patterns supported)
+include = [
+    "src/**/*.rs",           # Rust source files
+    "tests/**/*.rs",         # Rust test files
+    "examples/**/*.rs",      # Rust examples
+    "Cargo.toml",           # Rust package manifest
+    "README.md",            # Project documentation
+    "src/**/*.js",          # JavaScript files
+    "src/**/*.ts",          # TypeScript files
+    "src/**/*.jsx",         # React JSX files
+    "src/**/*.tsx",         # React TSX files
+    "src/**/*.py",          # Python source files
+    "**/*.go",              # Go source files
+    "**/*.java",            # Java source files
+    "**/*.kt",              # Kotlin source files
+    "package.json",         # Node.js package manifest
+    "tsconfig.json",        # TypeScript configuration
+    "pyproject.toml",       # Python project configuration
+    "setup.py",             # Python setup script
+    "requirements.txt",     # Python dependencies
+    "go.mod",               # Go modules
+    "go.sum",               # Go dependencies
+    "build.gradle",         # Gradle build file
+    "build.gradle.kts",     # Kotlin Gradle build file
+    "pom.xml",              # Maven build file
+]
+
+# File patterns to exclude from analysis (glob patterns supported)
+exclude = [
+    "target/**",            # Rust build artifacts
+    "node_modules/**",      # Node.js dependencies
+    "dist/**",              # Distribution/build outputs
+    "build/**",             # Build outputs
+    "**/.git/**",           # Git internals
+    "**/*.log",             # Log files
+    "**/*.tmp",             # Temporary files
+    "**/*.bak",             # Backup files
+    ".env",                 # Environment files (may contain secrets)
+    ".env.*",               # Environment variants
+    "**/*.lock",            # Lock files (usually large and not useful for context)
+    "**/coverage/**",       # Test coverage reports
+    "**/.nyc_output/**",    # NYC coverage tool output
+    "**/.pytest_cache/**", # Pytest cache
+    "**/venv/**",           # Python virtual environments
+    "**/__pycache__/**",    # Python bytecode cache
+    "**/*.pyc",             # Python compiled files
+    "**/*.pyo",             # Python optimized files
+    ".vscode/**",           # VS Code settings
+    ".idea/**",             # IntelliJ IDEA settings
+    "**/*.exe",             # Executables
+    "**/*.dll",             # Windows libraries
+    "**/*.so",              # Unix shared libraries
+    "**/*.dylib",           # macOS dynamic libraries
+    "**/*.jar",             # Java archives
+    "**/*.war",             # Web archives
+    "**/*.ear",             # Enterprise archives
+    "**/*.zip",             # Zip archives
+    "**/*.tar",             # Tar archives
+    "**/*.gz",              # Gzip files
+    "**/*.7z",              # 7-Zip archives
+    "**/*.rar",             # RAR archives
+    "**/*.jpg",             # Image files
+    "**/*.jpeg",            # JPEG images
+    "**/*.png",             # PNG images
+    "**/*.gif",             # GIF images
+    "**/*.bmp",             # Bitmap images
+    "**/*.svg",             # SVG images (unless specifically needed)
+    "**/*.pdf",             # PDF documents
+    "**/*.mp3",             # Audio files
+    "**/*.mp4",             # Video files
+    "**/*.avi",             # Video files
+    "**/*.mov",             # Video files
+]
+
+# High-priority file patterns (these get boosted relevance scores)
+priority_patterns = [
+    "main.rs",              # Rust main entry point
+    "lib.rs",               # Rust library entry point  
+    "mod.rs",               # Rust module definitions
+    "index.js",             # JavaScript entry point
+    "index.ts",             # TypeScript entry point
+    "main.js",              # JavaScript main file
+    "main.ts",              # TypeScript main file
+    "app.js",               # Application entry point
+    "app.ts",               # TypeScript application entry point
+    "server.js",            # Server entry point
+    "server.ts",            # TypeScript server entry point
+    "main.py",              # Python main file
+    "__init__.py",          # Python package initializer
+    "app.py",               # Python Flask/FastAPI entry point
+    "manage.py",            # Django management script
+    "main.go",              # Go main entry point
+    "Main.java",            # Java main class
+    "Application.java",     # Java Spring Boot application
+    "Main.kt",              # Kotlin main entry point
+    "Application.kt",       # Kotlin application entry point
+]
+
+# Enable caching of analysis results for faster subsequent runs
+enable_cache = true
+
+[project]
+# Override automatic project type detection (optional)
+# Supported types: "rust", "javascript", "typescript", "python", "go", "java", "kotlin", "git", "generic"
+type = "rust"
+
+# Override automatic entry point detection (optional)
+entry_points = [
+    "src/main.rs",
+    "src/lib.rs"
+]
+
+# Custom context templates for common workflows (future feature)
+# [context.templates]
+# refactor = { include = ["src/**/*.rs"], focus = "code_structure" }
+# security = { include = ["src/**/*.rs", "Cargo.toml"], focus = "security_patterns" }
+# performance = { include = ["src/**/*.rs"], focus = "performance_patterns" }
+
+# Team-specific settings (future feature)
+# [team]
+# shared_patterns = true
+# template_repository = "https://github.com/your-org/termai-templates"

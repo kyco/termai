@@ -28,14 +28,21 @@ mod tests {
         let result = redaction_map(input);
 
         // Assert
-        assert!(result.is_empty(), "Expected an empty map when provided an empty vector.");
+        assert!(
+            result.is_empty(),
+            "Expected an empty map when provided an empty vector."
+        );
     }
 
     // Test that each redaction key is assigned a valid UUID.
     #[test]
     fn test_redaction_map_valid_uuid_values() {
         // Arrange: vector with several redaction keys.
-        let keys = vec!["ssn".to_string(), "credit_card".to_string(), "email".to_string()];
+        let keys = vec![
+            "ssn".to_string(),
+            "credit_card".to_string(),
+            "email".to_string(),
+        ];
 
         // Act
         let result = redaction_map(keys.clone());

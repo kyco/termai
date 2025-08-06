@@ -32,8 +32,6 @@ impl Message {
     pub fn copy_with_id(&self, id: String) -> Self {
         Self { id, ..self.clone() }
     }
-
-
 }
 
 pub fn contains_system_prompt(messages: &Vec<Message>) -> bool {

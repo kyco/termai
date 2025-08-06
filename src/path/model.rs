@@ -1,5 +1,5 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Files {
     pub path: String,
-    pub content: String
+    pub content: String,
 }

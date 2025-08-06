@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 pub struct Args {
     #[command(subcommand)]
     pub command: Option<Commands>,
-    
+
     // Legacy support for backwards compatibility during transition
     #[arg(long, hide = true)]
     pub chat_gpt_api_key: Option<String>,
@@ -33,6 +33,22 @@ pub struct Args {
     pub provider: Option<Provider>,
     #[arg(short = 'd', long, value_delimiter = ',')]
     pub(crate) directories: Vec<String>,
+    
+    /// Enable smart context discovery (automatically finds relevant files)
+    #[arg(long)]
+    pub smart_context: bool,
+    
+    /// Maximum tokens for smart context (default: 4000) 
+    #[arg(long, requires = "smart_context")]
+    pub max_context_tokens: Option<usize>,
+    
+    /// Preview selected context before proceeding
+    #[arg(long, requires = "smart_context")]
+    pub preview_context: bool,
+    
+    /// Enable chunked analysis for large projects
+    #[arg(long, requires = "smart_context")]
+    pub chunked_analysis: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -72,6 +88,24 @@ pub enum Commands {
         /// Session name to use or create
         #[arg(long)]
         session: Option<String>,
+        /// Enable smart context discovery (automatically finds relevant files)
+        #[arg(long)]
+        smart_context: bool,
+        /// Query to guide smart context selection
+        #[arg(long, requires = "smart_context")]
+        context_query: Option<String>,
+        /// Maximum tokens for smart context (default: 4000)
+        #[arg(long, requires = "smart_context")]
+        max_context_tokens: Option<usize>,
+        /// Preview selected context before proceeding
+        #[arg(long, requires = "smart_context")]
+        preview_context: bool,
+        /// Enable chunked analysis for large projects (breaks into manageable pieces)
+        #[arg(long, requires = "smart_context")]
+        chunked_analysis: bool,
+        /// Chunking strategy: module, functional, token, hierarchical
+        #[arg(long, requires = "chunked_analysis", default_value = "hierarchical")]
+        chunk_strategy: String,
     },
 }
 
@@ -84,9 +118,9 @@ pub enum ConfigAction {
     /// Set Claude API key  
     SetClaude { api_key: String },
     /// Set default provider
-    SetProvider { 
+    SetProvider {
         #[arg(value_enum)]
-        provider: Provider 
+        provider: Provider,
     },
     /// Reset all configuration (clears API keys and settings)
     Reset,
@@ -102,7 +136,7 @@ pub enum RedactAction {
     List,
 }
 
-#[derive(Subcommand, Debug)] 
+#[derive(Subcommand, Debug)]
 pub enum SessionAction {
     /// List all sessions
     List,
@@ -132,23 +166,37 @@ impl Provider {
 
 impl Args {
     pub fn is_redaction(&self) -> bool {
-        matches!(self.command, Some(Commands::Redact { .. })) ||
-        self.redact_add.is_some() || self.redact_remove.is_some() || self.redact_list
+        matches!(self.command, Some(Commands::Redact { .. }))
+            || self.redact_add.is_some()
+            || self.redact_remove.is_some()
+            || self.redact_list
     }
 
     pub fn is_chat_gpt_api_key(&self) -> bool {
-        matches!(self.command, Some(Commands::Config { action: ConfigAction::SetOpenai { .. } })) ||
-        self.chat_gpt_api_key.is_some()
+        matches!(
+            self.command,
+            Some(Commands::Config {
+                action: ConfigAction::SetOpenai { .. }
+            })
+        ) || self.chat_gpt_api_key.is_some()
     }
 
     pub fn is_claude_api_key(&self) -> bool {
-        matches!(self.command, Some(Commands::Config { action: ConfigAction::SetClaude { .. } })) ||
-        self.claude_api_key.is_some()
+        matches!(
+            self.command,
+            Some(Commands::Config {
+                action: ConfigAction::SetClaude { .. }
+            })
+        ) || self.claude_api_key.is_some()
     }
 
     pub fn is_sessions_all(&self) -> bool {
-        matches!(self.command, Some(Commands::Sessions { action: SessionAction::List })) ||
-        self.sessions_all
+        matches!(
+            self.command,
+            Some(Commands::Sessions {
+                action: SessionAction::List
+            })
+        ) || self.sessions_all
     }
 
     pub fn is_session(&self) -> bool {
@@ -156,8 +204,12 @@ impl Args {
     }
 
     pub fn is_provider(&self) -> bool {
-        matches!(self.command, Some(Commands::Config { action: ConfigAction::SetProvider { .. } })) ||
-        self.provider.is_some()
+        matches!(
+            self.command,
+            Some(Commands::Config {
+                action: ConfigAction::SetProvider { .. }
+            })
+        ) || self.provider.is_some()
     }
 
     #[allow(dead_code)]
@@ -166,8 +218,12 @@ impl Args {
     }
 
     pub fn is_config_show(&self) -> bool {
-        matches!(self.command, Some(Commands::Config { action: ConfigAction::Show })) ||
-        self.print_config
+        matches!(
+            self.command,
+            Some(Commands::Config {
+                action: ConfigAction::Show
+            })
+        ) || self.print_config
     }
 
     #[allow(dead_code)]
@@ -218,6 +274,38 @@ impl Args {
         match &self.command {
             Some(Commands::Chat { session, .. }) => session.clone(),
             _ => self.session.clone(),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_smart_context(&self) -> bool {
+        match &self.command {
+            Some(Commands::Chat { smart_context, .. }) => *smart_context,
+            _ => self.smart_context,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_max_context_tokens(&self) -> Option<usize> {
+        match &self.command {
+            Some(Commands::Chat { max_context_tokens, .. }) => *max_context_tokens,
+            _ => self.max_context_tokens,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_preview_context(&self) -> bool {
+        match &self.command {
+            Some(Commands::Chat { preview_context, .. }) => *preview_context,
+            _ => self.preview_context,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_chunked_analysis(&self) -> bool {
+        match &self.command {
+            Some(Commands::Chat { chunked_analysis, .. }) => *chunked_analysis,
+            _ => self.chunked_analysis,
         }
     }
 }

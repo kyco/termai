@@ -27,4 +27,4 @@ pub async fn chat(
 
     let parsed_response = response.json::<ChatCompletionResponse>().await?;
     Ok((status, parsed_response))
-}  
+}

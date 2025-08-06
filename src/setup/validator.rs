@@ -51,12 +51,22 @@ impl ApiKeyValidator for ClaudeValidator {
         } else {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            
+
             match status.as_u16() {
-                401 => Err(anyhow!("Invalid API key. Please check your Claude API key.")),
-                403 => Err(anyhow!("API key not authorized. Please check your Claude account permissions.")),
-                429 => Err(anyhow!("Rate limit exceeded. Please try again in a moment.")),
-                _ => Err(anyhow!("API validation failed: {} - {}", status, error_text)),
+                401 => Err(anyhow!(
+                    "Invalid API key. Please check your Claude API key."
+                )),
+                403 => Err(anyhow!(
+                    "API key not authorized. Please check your Claude account permissions."
+                )),
+                429 => Err(anyhow!(
+                    "Rate limit exceeded. Please try again in a moment."
+                )),
+                _ => Err(anyhow!(
+                    "API validation failed: {} - {}",
+                    status,
+                    error_text
+                )),
             }
         }
     }
@@ -104,12 +114,22 @@ impl ApiKeyValidator for OpenAIValidator {
         } else {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            
+
             match status.as_u16() {
-                401 => Err(anyhow!("Invalid API key. Please check your OpenAI API key.")),
-                403 => Err(anyhow!("API key not authorized. Please check your OpenAI account permissions.")),
-                429 => Err(anyhow!("Rate limit exceeded. Please try again in a moment.")),
-                _ => Err(anyhow!("API validation failed: {} - {}", status, error_text)),
+                401 => Err(anyhow!(
+                    "Invalid API key. Please check your OpenAI API key."
+                )),
+                403 => Err(anyhow!(
+                    "API key not authorized. Please check your OpenAI account permissions."
+                )),
+                429 => Err(anyhow!(
+                    "Rate limit exceeded. Please try again in a moment."
+                )),
+                _ => Err(anyhow!(
+                    "API validation failed: {} - {}",
+                    status,
+                    error_text
+                )),
             }
         }
     }

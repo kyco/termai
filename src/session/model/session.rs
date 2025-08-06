@@ -7,6 +7,7 @@ use crate::redactions::redact::redact;
 use crate::redactions::revert::unredact;
 use crate::session::entity::session_entity::SessionEntity;
 use crate::session::model::message::Message;
+use crate::session::model::smart_context::SessionSmartContext;
 use chrono::{Duration, NaiveDateTime, Utc};
 use std::collections::HashMap;
 
@@ -19,6 +20,7 @@ pub struct Session {
     pub messages: Vec<Message>,
     pub temporary: bool,
     pub redaction_mapping: Option<HashMap<String, String>>,
+    pub smart_context: Option<SessionSmartContext>,
 }
 
 impl From<&SessionEntity> for Session {
@@ -31,6 +33,7 @@ impl From<&SessionEntity> for Session {
             messages: Vec::new(),
             temporary: false,
             redaction_mapping: None,
+            smart_context: None,
         }
     }
 }
@@ -47,6 +50,7 @@ impl Session {
             messages: Vec::new(),
             temporary: true,
             redaction_mapping: None,
+            smart_context: None,
         }
     }
 
@@ -59,6 +63,7 @@ impl Session {
             messages: messages.to_vec(),
             temporary: self.temporary,
             redaction_mapping: self.redaction_mapping.clone(),
+            smart_context: self.smart_context.clone(),
         }
     }
 
@@ -107,5 +112,75 @@ impl Session {
         }
 
         self.messages = unredacted;
+    }
+
+    /// Set smart context information for this session
+    #[allow(dead_code)]
+    pub fn set_smart_context(&mut self, smart_context: SessionSmartContext) {
+        self.smart_context = Some(smart_context);
+    }
+
+    /// Get smart context information if available
+    #[allow(dead_code)]
+    pub fn get_smart_context(&self) -> Option<&SessionSmartContext> {
+        self.smart_context.as_ref()
+    }
+
+    /// Clear smart context information
+    #[allow(dead_code)]
+    pub fn clear_smart_context(&mut self) {
+        self.smart_context = None;
+    }
+
+    /// Check if this session has valid smart context for a query
+    #[allow(dead_code)]
+    pub fn has_valid_smart_context(&self, query_hash: Option<&str>, config_hash: Option<&str>) -> bool {
+        match &self.smart_context {
+            Some(context) => context.is_valid_for_query(query_hash, config_hash),
+            None => false,
+        }
+    }
+
+    /// Get a display summary of the smart context
+    #[allow(dead_code)]
+    pub fn get_smart_context_summary(&self) -> Option<String> {
+        self.smart_context.as_ref().map(|ctx| ctx.get_summary())
+    }
+
+    /// Add a message with smart context metadata
+    #[allow(dead_code)]
+    pub fn add_message_with_smart_context(
+        &mut self, 
+        message: String, 
+        role: Role,
+        include_context_info: bool,
+    ) {
+        let mut final_message = message;
+        
+        // If this is a user message and we have smart context, optionally include context info
+        if matches!(role, Role::User) && include_context_info {
+            if let Some(context) = &self.smart_context {
+                let context_info = format!(
+                    "\n\n[Smart Context: {}]",
+                    context.get_summary()
+                );
+                final_message.push_str(&context_info);
+            }
+        }
+
+        self.add_raw_message(final_message, role);
+    }
+
+    /// Update smart context results (when context is re-run)
+    #[allow(dead_code)]
+    pub fn update_smart_context_results(
+        &mut self,
+        selected_files: Vec<String>,
+        total_tokens: Option<usize>,
+        query_hash: Option<String>,
+    ) {
+        if let Some(context) = &mut self.smart_context {
+            context.update_results(selected_files, total_tokens, query_hash);
+        }
     }
 }
