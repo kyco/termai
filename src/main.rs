@@ -7,9 +7,11 @@ mod path;
 mod redactions;
 mod repository;
 mod session;
+mod setup;
 mod ui;
 
-use crate::args::{Args, Provider};
+use crate::args::{Args, Commands, ConfigAction, RedactAction, SessionAction, Provider};
+use crate::setup::SetupWizard;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::provider_config::write_provider_key;
 use crate::config::service::{claude_config, open_ai_config, redacted_config};
@@ -41,6 +43,28 @@ async fn main() -> Result<()> {
     let db_path = db_path();
     let repo = SqliteRepository::new(db_path.to_str().unwrap())?;
 
+    // Handle subcommands
+    match &args.command {
+        Some(Commands::Setup) => {
+            let wizard = SetupWizard::new();
+            wizard.run(&repo).await?;
+            return Ok(());
+        }
+        Some(Commands::Config { action }) => {
+            return handle_config_command(&repo, action, &args);
+        }
+        Some(Commands::Redact { action }) => {
+            return handle_redact_command(&repo, action, &args);
+        }
+        Some(Commands::Sessions { action }) => {
+            return handle_sessions_command(&repo, action);
+        }
+        Some(Commands::Chat { .. }) | None => {
+            // Continue to chat handling below
+        }
+    }
+
+    // Legacy flag handling for backwards compatibility
     if args.is_chat_gpt_api_key() {
         open_ai_config::write_open_ai_key(&repo, &args)?;
         return Ok(());
@@ -66,8 +90,13 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    if args.is_config_show() {
+        return print_config(&repo);
+    }
+
+    // Handle chat functionality
     let mut session = if args.is_session() {
-        if let Some(name) = &args.session {
+        if let Some(name) = &args.get_chat_session() {
             sessions_service::session(&repo, &repo, name)?
         } else {
             Session::new_temporary()
@@ -76,11 +105,11 @@ async fn main() -> Result<()> {
         Session::new_temporary()
     };
 
-    if args.print_config {
-        return print_config(&repo);
-    }
-
-    let local_context = extract_content(&args.directory, &args.directories, &args.exclude);
+    let local_context = extract_content(
+        &args.get_chat_directory(),
+        &args.get_chat_directories(),
+        &args.get_chat_exclude(),
+    );
     let input = extract_input_or_quit(&args);
     request_response_from_ai(
         &repo,
@@ -88,10 +117,81 @@ async fn main() -> Result<()> {
         &repo,
         &input,
         &mut session,
-        args.system_prompt,
+        args.get_chat_system_prompt(),
         &local_context,
     )
     .await
+}
+
+fn handle_config_command<R: ConfigRepository>(repo: &R, action: &ConfigAction, _args: &Args) -> Result<()> {
+    match action {
+        ConfigAction::Show => print_config(repo),
+        ConfigAction::SetOpenai { api_key } => {
+            config_service::write_config(repo, &ConfigKeys::ChatGptApiKey.to_key(), api_key)?;
+            println!("OpenAI API key updated successfully");
+            Ok(())
+        }
+        ConfigAction::SetClaude { api_key } => {
+            config_service::write_config(repo, &ConfigKeys::ClaudeApiKey.to_key(), api_key)?;
+            println!("Claude API key updated successfully");
+            Ok(())
+        }
+        ConfigAction::SetProvider { provider } => {
+            config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), provider.to_str())?;
+            println!("Default provider set to {}", provider.to_str());
+            Ok(())
+        }
+    }
+}
+
+fn handle_redact_command<R: ConfigRepository>(repo: &R, action: &RedactAction, _args: &Args) -> Result<()> {
+    // Create a temporary Args struct with the appropriate field set for the redaction function
+    let mut temp_args = Args {
+        command: None,
+        chat_gpt_api_key: None,
+        claude_api_key: None,
+        system_prompt: None,
+        redact_add: None,
+        redact_remove: None,
+        redact_list: false,
+        print_config: false,
+        sessions_all: false,
+        session: None,
+        data: None,
+        directory: None,
+        exclude: vec![],
+        provider: None,
+        directories: vec![],
+    };
+
+    match action {
+        RedactAction::Add { pattern } => {
+            temp_args.redact_add = Some(pattern.clone());
+            redacted_config::redaction(repo, &temp_args)?;
+            println!("Added redaction pattern: {}", pattern);
+            Ok(())
+        }
+        RedactAction::Remove { pattern } => {
+            temp_args.redact_remove = Some(pattern.clone());
+            redacted_config::redaction(repo, &temp_args)?;
+            println!("Removed redaction pattern: {}", pattern);
+            Ok(())
+        }
+        RedactAction::List => {
+            temp_args.redact_list = true;
+            redacted_config::redaction(repo, &temp_args)?;
+            Ok(())
+        }
+    }
+}
+
+fn handle_sessions_command<R: ConfigRepository + SessionRepository + MessageRepository>(repo: &R, action: &SessionAction) -> Result<()> {
+    match action {
+        SessionAction::List => {
+            sessions_service::fetch_all_sessions(repo, repo)?;
+            Ok(())
+        }
+    }
 }
 
 fn db_path() -> PathBuf {
@@ -204,7 +304,7 @@ async fn request_response_from_ai<
 
 fn extract_input_or_quit(args: &Args) -> String {
     let mut input = String::new();
-    if let Some(ref data_arg) = args.data {
+    if let Some(ref data_arg) = args.get_chat_data() {
         input.push_str(data_arg);
     }
     if !io::stdin().is_terminal() {

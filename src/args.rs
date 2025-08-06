@@ -1,23 +1,27 @@
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct Args {
-    #[arg(long)]
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+    
+    // Legacy support for backwards compatibility during transition
+    #[arg(long, hide = true)]
     pub chat_gpt_api_key: Option<String>,
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub claude_api_key: Option<String>,
     #[arg(long)]
     pub system_prompt: Option<String>,
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub redact_add: Option<String>,
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub redact_remove: Option<String>,
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub redact_list: bool,
-    #[arg(short, long)]
+    #[arg(short, long, hide = true)]
     pub print_config: bool,
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub sessions_all: bool,
     #[arg(long)]
     pub session: Option<String>,
@@ -25,10 +29,81 @@ pub struct Args {
     pub(crate) directory: Option<String>,
     #[arg(short, long, value_delimiter = ',')]
     pub(crate) exclude: Vec<String>,
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, hide = true)]
     pub provider: Option<Provider>,
     #[arg(short = 'd', long, value_delimiter = ',')]
     pub(crate) directories: Vec<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Interactive setup wizard to configure TermAI
+    Setup,
+    /// Manage configuration settings
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+    /// Manage redaction patterns for privacy
+    Redact {
+        #[command(subcommand)]
+        action: RedactAction,
+    },
+    /// Manage chat sessions
+    Sessions {
+        #[command(subcommand)]
+        action: SessionAction,
+    },
+    /// Start a chat session (default if no subcommand provided)
+    Chat {
+        /// Chat input
+        input: Option<String>,
+        /// Local directory to include as context
+        directory: Option<String>,
+        /// Multiple directories to include as context  
+        #[arg(short = 'd', long, value_delimiter = ',')]
+        directories: Vec<String>,
+        /// Patterns to exclude from context
+        #[arg(short, long, value_delimiter = ',')]
+        exclude: Vec<String>,
+        /// System prompt to use for this session
+        #[arg(long)]
+        system_prompt: Option<String>,
+        /// Session name to use or create
+        #[arg(long)]
+        session: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ConfigAction {
+    /// Show current configuration
+    Show,
+    /// Set OpenAI API key
+    SetOpenai { api_key: String },
+    /// Set Claude API key  
+    SetClaude { api_key: String },
+    /// Set default provider
+    SetProvider { 
+        #[arg(value_enum)]
+        provider: Provider 
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum RedactAction {
+    /// Add a new redaction pattern
+    Add { pattern: String },
+    /// Remove a redaction pattern
+    Remove { pattern: String },
+    /// List all redaction patterns
+    List,
+}
+
+#[derive(Subcommand, Debug)] 
+pub enum SessionAction {
+    /// List all sessions
+    List,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, ValueEnum)]
@@ -55,18 +130,22 @@ impl Provider {
 
 impl Args {
     pub fn is_redaction(&self) -> bool {
+        matches!(self.command, Some(Commands::Redact { .. })) ||
         self.redact_add.is_some() || self.redact_remove.is_some() || self.redact_list
     }
 
     pub fn is_chat_gpt_api_key(&self) -> bool {
+        matches!(self.command, Some(Commands::Config { action: ConfigAction::SetOpenai { .. } })) ||
         self.chat_gpt_api_key.is_some()
     }
 
     pub fn is_claude_api_key(&self) -> bool {
+        matches!(self.command, Some(Commands::Config { action: ConfigAction::SetClaude { .. } })) ||
         self.claude_api_key.is_some()
     }
 
     pub fn is_sessions_all(&self) -> bool {
+        matches!(self.command, Some(Commands::Sessions { action: SessionAction::List })) ||
         self.sessions_all
     }
 
@@ -75,6 +154,68 @@ impl Args {
     }
 
     pub fn is_provider(&self) -> bool {
+        matches!(self.command, Some(Commands::Config { action: ConfigAction::SetProvider { .. } })) ||
         self.provider.is_some()
+    }
+
+    #[allow(dead_code)]
+    pub fn is_setup(&self) -> bool {
+        matches!(self.command, Some(Commands::Setup))
+    }
+
+    pub fn is_config_show(&self) -> bool {
+        matches!(self.command, Some(Commands::Config { action: ConfigAction::Show })) ||
+        self.print_config
+    }
+
+    #[allow(dead_code)]
+    pub fn should_handle_chat(&self) -> bool {
+        match &self.command {
+            Some(Commands::Chat { .. }) => true,
+            None => true, // Default to chat if no subcommand
+            _ => false,
+        }
+    }
+
+    pub fn get_chat_data(&self) -> Option<String> {
+        match &self.command {
+            Some(Commands::Chat { input, .. }) => input.clone(),
+            _ => self.data.clone(),
+        }
+    }
+
+    pub fn get_chat_directory(&self) -> Option<String> {
+        match &self.command {
+            Some(Commands::Chat { directory, .. }) => directory.clone(),
+            _ => self.directory.clone(),
+        }
+    }
+
+    pub fn get_chat_directories(&self) -> Vec<String> {
+        match &self.command {
+            Some(Commands::Chat { directories, .. }) => directories.clone(),
+            _ => self.directories.clone(),
+        }
+    }
+
+    pub fn get_chat_exclude(&self) -> Vec<String> {
+        match &self.command {
+            Some(Commands::Chat { exclude, .. }) => exclude.clone(),
+            _ => self.exclude.clone(),
+        }
+    }
+
+    pub fn get_chat_system_prompt(&self) -> Option<String> {
+        match &self.command {
+            Some(Commands::Chat { system_prompt, .. }) => system_prompt.clone(),
+            _ => self.system_prompt.clone(),
+        }
+    }
+
+    pub fn get_chat_session(&self) -> Option<String> {
+        match &self.command {
+            Some(Commands::Chat { session, .. }) => session.clone(),
+            _ => self.session.clone(),
+        }
     }
 }
