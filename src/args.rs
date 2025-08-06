@@ -88,6 +88,8 @@ pub enum ConfigAction {
         #[arg(value_enum)]
         provider: Provider 
     },
+    /// Reset all configuration (clears API keys and settings)
+    Reset,
 }
 
 #[derive(Subcommand, Debug)]

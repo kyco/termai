@@ -31,6 +31,30 @@ TermAI is a terminal-based AI assistant built in Rust that supports both OpenAI 
 - `cargo doc --open` - Generate and open documentation
 - `just doc` - Generate documentation via justfile
 
+## User Commands
+
+### Setup and Configuration
+- `cargo run --release -- setup` - Interactive setup wizard (recommended for first-time setup)
+- `cargo run --release -- config show` - Display current configuration
+- `cargo run --release -- config reset` - Clear all configuration
+- `cargo run --release -- config set-claude KEY` - Set Claude API key
+- `cargo run --release -- config set-openai KEY` - Set OpenAI API key
+- `cargo run --release -- config set-provider claude` - Set default provider
+
+### Chat and Usage
+- `cargo run --release -- "your question"` - Basic chat query
+- `cargo run --release -- chat "your question"` - Explicit chat command
+- `cargo run --release -- "question" ./path/to/file` - Chat with local file context
+
+### Session Management  
+- `cargo run --release -- sessions list` - List all saved sessions
+- `cargo run --release -- --session name "question"` - Use named session
+
+### Privacy and Redaction
+- `cargo run --release -- redact add "pattern"` - Add redaction pattern
+- `cargo run --release -- redact list` - List redaction patterns
+- `cargo run --release -- redact remove "pattern"` - Remove redaction pattern
+
 ## Architecture
 
 TermAI follows a layered architecture with clear separation of concerns:

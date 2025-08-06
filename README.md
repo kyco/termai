@@ -9,57 +9,75 @@ Claude APIs (now with Claude Opus 4 support) with a focus on privacy, speed, and
 
 ## ✨ Features
 
-- **Multi-Provider Support**: Works with both OpenAI and Claude APIs
-- **Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
-- **Local Context Understanding**: Analyze your code and files for more relevant responses
-- **Session Management**: Save and restore conversations for later reference
-- **Privacy-Focused**: Redact sensitive information before sending to APIs
-- **Developer-Optimized**: Perfect for generating code, explaining concepts, and assisting with daily dev tasks
-- **Fully Terminal-Based**: No web interfaces or external dependencies needed
-- **Fast Response Times**: Asynchronous processing with progress indicators
+- **🎯 Interactive Setup Wizard**: Get started in under 2 minutes with guided configuration
+- **🤖 Multi-Provider Support**: Works with both OpenAI and Claude APIs
+- **🚀 Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
+- **📁 Local Context Understanding**: Analyze your code and files for more relevant responses
+- **💬 Session Management**: Save and restore conversations for later reference
+- **🔒 Privacy-Focused**: Redact sensitive information before sending to APIs
+- **⚡ Developer-Optimized**: Perfect for generating code, explaining concepts, and assisting with daily dev tasks
+- **🖥️ Fully Terminal-Based**: No web interfaces or external dependencies needed
+- **🎨 Beautiful Interface**: Progress indicators, colors, and intuitive subcommands
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### Prerequisites
+### 1. Install TermAI
 
-- [Rust and Cargo](https://www.rust-lang.org/tools/install)
-- API key from OpenAI or Anthropic Claude
-
-### Install from Source
-
-### Clone the repository
-
-```                                                                                                                                                               
+```bash
+# Prerequisites: Rust and Cargo (https://www.rust-lang.org/tools/install)
 git clone https://github.com/kyco/termai.git
 cd termai
-```
-
-### Build and install
-
-```
 cargo install --path .
 ```
 
-## 🔧 Configuration
+### 2. Interactive Setup (⭐ Recommended)
 
-Set up TermAI with your API keys:
+Get started instantly with our **interactive setup wizard**:
 
-### Configure OpenAI API
-
-```                                                                                                                                                               
-termai --chat-gpt-api-key YOUR_OPENAI_API_KEY
+```bash
+termai setup
 ```
 
-### Or configure Claude API
+The setup wizard will guide you through:
+- **Provider Selection**: Choose Claude, OpenAI, or both
+- **API Key Configuration**: Enter your keys with live validation
+- **Default Provider**: Set your preferred AI assistant
 
+**✨ Takes less than 2 minutes and validates your API keys automatically!**
+
+### 3. Start Chatting
+
+```bash
+# Ask anything!
+termai "What is the capital of France?"
+
+# Use with local context
+termai "Create a README for this project" .
+
+# Work with your code
+termai "Explain this function" ./src/main.rs
 ```
-termai --claude-api-key YOUR_CLAUDE_API_KEY
+
+## 📋 Commands
+
+### Setup & Configuration
+
+```bash
+termai setup                    # 🌟 Interactive setup wizard
+termai config show             # View current configuration
+termai config reset            # Clear all settings
+termai config set-claude KEY   # Set Claude API key
+termai config set-openai KEY   # Set OpenAI API key
 ```
 
-### Set your preferred provider
+### Advanced Configuration (Manual)
 
-```                                                                                                                                                               
-termai --provider claude  # or openapi
+If you prefer manual configuration over the setup wizard:
+
+```bash
+termai --claude-api-key YOUR_CLAUDE_API_KEY    # Configure Claude
+termai --chat-gpt-api-key YOUR_OPENAI_API_KEY  # Configure OpenAI  
+termai --provider claude                       # Set default provider
 ```
 
 ## 📖 Usage
@@ -103,36 +121,20 @@ git show | termai "Explain what changes were made in this commit"
 
 ### Session Management
 
-### Start or continue a named session
-
-```
+```bash
+# Start or continue a named session
 termai --session my_project "Tell me about Rust's ownership model"
+
+# List all saved sessions
+termai sessions list
 ```
 
-### List all saved sessions
+### Privacy & Redaction
 
-```                                                                                                                                                               
-termai --sessions-all
-```
-
-### Privacy Features
-
-### Add text to be automatically redacted
-
-```
-termai --redact-add "supersecretpassword"
-```
-
-### List current redactions
-
-```                                                                                                                                                               
-termai --redact-list
-```
-
-### Remove a redaction
-
-```
-termai --redact-remove "supersecretpassword"
+```bash
+termai redact add "sensitive_data"     # Add text to redact
+termai redact list                     # List redaction patterns
+termai redact remove "sensitive_data"  # Remove a redaction pattern
 ```
 
 ## 🏗️ Architecture

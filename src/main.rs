@@ -141,6 +141,11 @@ fn handle_config_command<R: ConfigRepository>(repo: &R, action: &ConfigAction, _
             println!("Default provider set to {}", provider.to_str());
             Ok(())
         }
+        ConfigAction::Reset => {
+            let wizard = SetupWizard::new();
+            wizard.reset_configuration(repo)?;
+            Ok(())
+        }
     }
 }
 

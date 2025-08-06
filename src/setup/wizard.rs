@@ -42,6 +42,11 @@ impl SetupWizard {
     pub async fn run<R: ConfigRepository>(&self, repo: &R) -> Result<()> {
         self.show_welcome()?;
         
+        // Check for existing configuration
+        if !self.check_existing_config(repo)? {
+            return Ok(());
+        }
+        
         // Step 1: Provider Selection
         let provider = self.select_provider()?;
         
@@ -252,11 +257,124 @@ impl SetupWizard {
         println!("{}", "🎉 Setup Complete!".bright_green().bold());
         println!();
         println!("TermAI has been configured successfully. You can now:");
-        println!("• Start a chat session: {}", "termai chat".bright_cyan());
-        println!("• Ask a quick question: {}", "termai ask \"your question\"".bright_cyan());
+        println!("• Start a chat session: {}", "termai \"your question\"".bright_cyan());
         println!("• View your configuration: {}", "termai config show".bright_cyan());
+        println!("• Manage redactions: {}", "termai redact --help".bright_cyan());
+        println!("• List sessions: {}", "termai sessions list".bright_cyan());
         println!();
         println!("Need help? Run {} for more information.", "termai --help".bright_cyan());
+        println!();
+        println!("To re-run setup anytime: {}", "termai setup".bright_cyan());
+        println!("To reset configuration: {}", "termai config reset".bright_cyan());
+        println!();
+        
+        Ok(())
+    }
+
+    pub fn reset_configuration<R: ConfigRepository>(&self, repo: &R) -> Result<()> {
+        println!("{}", "🔄 Resetting TermAI Configuration".bright_yellow().bold());
+        println!();
+        
+        if !Confirm::with_theme(&self.theme)
+            .with_prompt("This will remove all API keys and settings. Continue?")
+            .default(false)
+            .interact()?
+        {
+            println!("Reset cancelled.");
+            return Ok(());
+        }
+        
+        // Clear all configuration keys
+        let keys_to_clear = vec![
+            ConfigKeys::ClaudeApiKey.to_key(),
+            ConfigKeys::ChatGptApiKey.to_key(), 
+            ConfigKeys::ProviderKey.to_key(),
+            ConfigKeys::Redacted.to_key(),
+        ];
+        
+        for key in keys_to_clear {
+            // Ignore errors if key doesn't exist
+            let _ = config_service::write_config(repo, &key, "");
+        }
+        
+        println!("{}", "✅ Configuration reset successfully!".green());
+        println!("Run {} to configure TermAI again.", "termai setup".bright_cyan());
+        
+        Ok(())
+    }
+
+    pub fn check_existing_config<R: ConfigRepository>(&self, repo: &R) -> Result<bool> {
+        // Check if any provider is already configured
+        let claude_exists = config_service::fetch_by_key(repo, &ConfigKeys::ClaudeApiKey.to_key()).is_ok();
+        let openai_exists = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key()).is_ok();
+        
+        if claude_exists || openai_exists {
+            println!("{}", "⚠️  Existing Configuration Detected".bright_yellow().bold());
+            println!();
+            println!("TermAI is already configured. What would you like to do?");
+            println!();
+            
+            let options = vec![
+                "Reconfigure (overwrite existing settings)",
+                "View current configuration", 
+                "Cancel setup",
+            ];
+            
+            let selection = Select::with_theme(&self.theme)
+                .with_prompt("Choose an option")
+                .items(&options)
+                .default(1) // Default to view config
+                .interact()?;
+                
+            match selection {
+                0 => {
+                    println!("Proceeding with reconfiguration...");
+                    return Ok(true); // Continue with setup
+                }
+                1 => {
+                    self.show_current_config(repo)?;
+                    return Ok(false); // Don't continue with setup
+                }
+                2 => {
+                    println!("Setup cancelled.");
+                    return Ok(false); // Don't continue with setup
+                }
+                _ => return Ok(false),
+            }
+        }
+        
+        Ok(true) // No existing config, proceed with setup
+    }
+    
+    fn show_current_config<R: ConfigRepository>(&self, repo: &R) -> Result<()> {
+        println!();
+        println!("{}", "📋 Current Configuration".bright_blue().bold());
+        println!();
+        
+        // Show provider
+        if let Ok(provider) = config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key()) {
+            println!("Default Provider: {}", provider.value.bright_cyan());
+        }
+        
+        // Show configured APIs (without revealing keys)
+        if config_service::fetch_by_key(repo, &ConfigKeys::ClaudeApiKey.to_key()).is_ok() {
+            println!("Claude API: {}", "✅ Configured".green());
+        } else {
+            println!("Claude API: {}", "❌ Not configured".red());
+        }
+        
+        if config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key()).is_ok() {
+            println!("OpenAI API: {}", "✅ Configured".green());
+        } else {
+            println!("OpenAI API: {}", "❌ Not configured".red());
+        }
+        
+        // Show redactions count
+        if let Ok(redactions) = config_service::fetch_by_key(repo, &ConfigKeys::Redacted.to_key()) {
+            let count = redactions.value.split(',').filter(|s| !s.is_empty()).count();
+            println!("Redaction patterns: {}", count);
+        }
+        
         println!();
         
         Ok(())

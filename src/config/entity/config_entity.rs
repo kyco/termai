@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct ConfigEntity {
     pub id: Option<i64>,
     pub key: String,
