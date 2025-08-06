@@ -21,16 +21,6 @@ impl SessionRepository for SqliteRepository {
         Ok(sessions)
     }
 
-    fn fetch_current_session(&self) -> Result<SessionEntity, Self::Error> {
-        let session = self.conn.query_row(
-            "SELECT id, name, expires_at, current FROM sessions WHERE current = 1",
-            params![],
-            row_to_session_entity(),
-        )?;
-
-        Ok(session)
-    }
-
     fn fetch_session_by_name(&self, name: &str) -> Result<SessionEntity, Self::Error> {
         let session = self.conn.query_row(
             "SELECT id, name, expires_at, current FROM sessions WHERE name = ?1",

@@ -6,19 +6,6 @@ use rusqlite::{params, Result, Row};
 impl MessageRepository for SqliteRepository {
     type Error = rusqlite::Error;
 
-    fn fetch_all_messages(&self) -> Result<Vec<MessageEntity>, Self::Error> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, session_id, role, content FROM messages")?;
-        let rows = stmt.query_map([], row_to_message_entity())?;
-
-        let mut messages = Vec::new();
-        for message in rows {
-            messages.push(message?);
-        }
-        Ok(messages)
-    }
-
     fn fetch_messages_for_session(
         &self,
         session_id: &str,

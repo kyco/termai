@@ -3,6 +3,9 @@ name = "termai"
 version = "0.1.0"
 edition = "2021"
 
+[lints.rust]
+warnings = "deny"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.33.0", features = ["bundled"] }

@@ -192,7 +192,10 @@ async fn request_response_from_ai<
         .messages
         .iter()
         .filter(|message| message.role != Role::System)
-        .map(|message| message.to_output_message())
+        .map(|message| Message {
+            role: message.role.clone(),
+            message: message.content.to_string(),
+        })
         .collect::<Vec<Message>>();
 
     outputter::print(output_messages);

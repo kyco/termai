@@ -3,6 +3,7 @@ use crate::llm::claude::model::usage::Usage;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct ChatCompletionResponse {
     pub content: Vec<ContentBlock>,
     pub id: String,

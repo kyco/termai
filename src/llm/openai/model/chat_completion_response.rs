@@ -3,6 +3,7 @@ use crate::llm::openai::model::usage::Usage;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct ChatCompletionResponse {
     pub id: Option<String>,
     pub object: Option<String>,

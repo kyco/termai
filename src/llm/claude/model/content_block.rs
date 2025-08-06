@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 pub enum ContentBlock {
     #[serde(rename = "text")]
     Text { text: String },
