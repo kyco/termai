@@ -30,7 +30,7 @@ impl ChatState {
     pub fn default() -> Self {
         Self::new(
             "claude".to_string(),
-            "claude-3-5-sonnet-20241022".to_string(),
+            "claude-sonnet-4-20250514".to_string(),
         )
     }
 
@@ -128,7 +128,7 @@ impl ChatState {
                 .collect(),
             "openai" => all_models
                 .into_iter()
-                .filter(|m| m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3"))
+                .filter(|m| m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") || m.starts_with("computer-use"))
                 .collect(),
             _ => Vec::new(),
         }
@@ -137,9 +137,9 @@ impl ChatState {
     /// Get default model for a provider
     fn get_default_model_for_provider(&self, provider: &str) -> String {
         match provider {
-            "claude" => "claude-3-5-sonnet-20241022".to_string(),
+            "claude" => "claude-sonnet-4-20250514".to_string(), // Claude Sonnet 4 is now the default
             "openai" => "gpt-5".to_string(), // GPT-5 is now the default
-            _ => "claude-3-5-sonnet-20241022".to_string(),
+            _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
 
@@ -147,7 +147,7 @@ impl ChatState {
     fn get_provider_for_model(&self, model: &str) -> String {
         if model.starts_with("claude") {
             "claude".to_string()
-        } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") {
+        } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") || model.starts_with("o4") || model.starts_with("computer-use") {
             "openai".to_string()
         } else {
             "unknown".to_string()
@@ -172,14 +172,54 @@ impl ChatState {
     /// Get a description for a model
     fn get_model_description(&self, model: &str) -> &'static str {
         match model {
+            // GPT-5 series
             "gpt-5" => "Most intelligent model, best for complex reasoning and coding",
             "gpt-5-mini" => "Cost-optimized reasoning, balances speed/cost/capability",
             "gpt-5-nano" => "High-throughput, simple instruction-following",
+            // o3 series (deep research)
+            "o3-deep-research" => "Most powerful deep research model",
+            "o4-mini-deep-research" => "Faster, more affordable deep research model",
+            "o3-pro" => "Version of o3 with more compute for better responses",
+            "o3" => "Most powerful reasoning model",
+            "o4-mini" => "Faster, more affordable reasoning model",
+            "o3-mini" => "Small model alternative to o3",
+            // GPT-4.1 series
+            "gpt-4.1" => "Excels at function calling and instruction following",
+            "gpt-4.1-mini" => "Balanced for intelligence, speed, and cost",
+            "gpt-4.1-nano" => "Fastest, most cost-effective GPT-4.1 model",
+            // GPT-4.5 series
+            "gpt-4.5-preview" => "Preview of GPT-4.5 capabilities (deprecated)",
+            // GPT-4o series
             "gpt-4o" => "High-intelligence flagship model for complex tasks",
             "gpt-4o-mini" => "Affordable and intelligent small model",
-            "claude-3-5-sonnet-20241022" => "Best overall model, excels at writing and complex tasks",
-            "claude-3-5-haiku-20241022" => "Fastest model, good for quick responses",
-            "claude-3-opus-20240229" => "Most powerful model for highly complex tasks",
+            "gpt-4o-search-preview" => "GPT model optimized for web search",
+            "gpt-4o-mini-search-preview" => "Fast, affordable small model for web search",
+            // o1 series (reasoning)
+            "o1-pro" => "Version of o1 with more compute for better responses",
+            "o1" => "Previous full o-series reasoning model",
+            "o1-mini" => "Small model alternative to o1 (deprecated)",
+            "o1-preview" => "Preview of first o-series reasoning model (deprecated)",
+            // Specialized models
+            "computer-use-preview" => "Specialized model for computer use tool",
+            // Legacy models
+            "gpt-4" => "Previous generation GPT-4 model",
+            "gpt-4-turbo" => "Faster version of GPT-4",
+            "gpt-3.5-turbo" => "Fast, cost-effective model for simple tasks",
+            // Claude 4 series models
+            "claude-opus-4-1-20250805" => "Latest Opus model with enhanced capabilities",
+            "claude-opus-4-20250514" => "Most powerful Claude model for highly complex tasks", 
+            "claude-sonnet-4-20250514" => "Best overall Claude model, excels at writing and complex tasks",
+            // Claude 3.7 series models
+            "claude-3-7-sonnet-20250219" => "Enhanced Sonnet model with improved performance",
+            "claude-3-7-sonnet-latest" => "Latest version of Claude 3.7 Sonnet",
+            // Claude 3.5 series models
+            "claude-3-5-sonnet-20241022" => "Excellent model for writing and complex tasks",
+            "claude-3-5-haiku-20241022" => "Fast model for quick responses",
+            "claude-3-5-haiku-latest" => "Latest version of Claude 3.5 Haiku",
+            // Claude 3 legacy models
+            "claude-3-opus-20240229" => "Previous generation powerful model for complex tasks",
+            "claude-3-sonnet-20240229" => "Balanced legacy model for general use",
+            "claude-3-haiku-20240307" => "Fast and efficient legacy model for simple tasks",
             _ => "AI language model"
         }
     }
@@ -205,7 +245,7 @@ mod tests {
     fn test_default_state() {
         let state = ChatState::default();
         assert_eq!(state.provider, "claude");
-        assert_eq!(state.model, "claude-3-5-sonnet-20241022");
+        assert_eq!(state.model, "claude-sonnet-4-20250514");
         assert!(!state.available_models.is_empty());
     }
 
@@ -237,9 +277,9 @@ mod tests {
         }
         
         // Switch to model from different provider - should automatically switch provider
-        let result = state.switch_model("claude-3-5-sonnet-20241022".to_string());
+        let result = state.switch_model("claude-sonnet-4-20250514".to_string());
         assert!(result.is_ok());
-        assert_eq!(state.model, "claude-3-5-sonnet-20241022");
+        assert_eq!(state.model, "claude-sonnet-4-20250514");
         assert_eq!(state.provider, "claude"); // Provider should automatically switch
     }
 

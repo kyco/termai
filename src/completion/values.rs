@@ -22,20 +22,53 @@ impl CompletionValues {
     /// Get available model names (static list of common models)
     pub fn model_names() -> Vec<String> {
         vec![
-            // Claude models
+            // Claude 4 series
+            "claude-opus-4-1-20250805".to_string(),
+            "claude-opus-4-20250514".to_string(),
+            "claude-sonnet-4-20250514".to_string(),
+            // Claude 3.7 series  
+            "claude-3-7-sonnet-20250219".to_string(),
+            "claude-3-7-sonnet-latest".to_string(),
+            // Claude 3.5 series
             "claude-3-5-sonnet-20241022".to_string(),
             "claude-3-5-haiku-20241022".to_string(),
+            "claude-3-5-haiku-latest".to_string(),
+            // Claude 3 legacy series
             "claude-3-opus-20240229".to_string(),
             "claude-3-sonnet-20240229".to_string(),
             "claude-3-haiku-20240307".to_string(),
-            // OpenAI models
+            // OpenAI GPT-5 series
             "gpt-5".to_string(),
             "gpt-5-mini".to_string(),
             "gpt-5-nano".to_string(),
-            "gpt-4".to_string(),
-            "gpt-4-turbo".to_string(),
+            // OpenAI o3 series (deep research)
+            "o3-deep-research".to_string(),
+            "o4-mini-deep-research".to_string(),
+            "o3-pro".to_string(),
+            "o3".to_string(),
+            "o4-mini".to_string(),
+            "o3-mini".to_string(),
+            // OpenAI GPT-4.1 series
+            "gpt-4.1".to_string(),
+            "gpt-4.1-mini".to_string(),
+            "gpt-4.1-nano".to_string(),
+            // OpenAI GPT-4.5 series
+            "gpt-4.5-preview".to_string(),
+            // OpenAI GPT-4o series (text-capable only)
+            "gpt-4o-mini-search-preview".to_string(),
+            "gpt-4o-search-preview".to_string(),
             "gpt-4o".to_string(),
             "gpt-4o-mini".to_string(),
+            // OpenAI o1 series (reasoning)
+            "o1-pro".to_string(),
+            "o1".to_string(),
+            "o1-mini".to_string(),
+            "o1-preview".to_string(),
+            // OpenAI specialized models (text-capable)
+            "computer-use-preview".to_string(),
+            // OpenAI legacy models
+            "gpt-4".to_string(),
+            "gpt-4-turbo".to_string(),
             "gpt-3.5-turbo".to_string(),
         ]
     }

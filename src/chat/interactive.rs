@@ -520,7 +520,7 @@ where
         // Get current model - use default for the provider
         let chat_state = ChatState::new(provider_str.to_string(), 
             match provider {
-                Provider::Claude => "claude-3-5-sonnet-20241022".to_string(),
+                Provider::Claude => "claude-sonnet-4-20250514".to_string(),
                 Provider::Openai => "gpt-5".to_string(),
             }
         );
