@@ -586,7 +586,13 @@ impl ProjectDetector for GitProjectDetector {
         let mut entry_points = Vec::new();
 
         // Common Git-related important files
-        for file in &[".gitignore", "README.md", "LICENSE", "CHANGELOG.md", ".github/workflows"] {
+        for file in &[
+            ".gitignore",
+            "README.md",
+            "LICENSE",
+            "CHANGELOG.md",
+            ".github/workflows",
+        ] {
             if path.join(file).exists() {
                 important_files.push(file.to_string());
             }
@@ -594,7 +600,8 @@ impl ProjectDetector for GitProjectDetector {
 
         // Get recently modified files using git
         if let Ok(recent_files) = self.get_recently_modified_files(path) {
-            for file in recent_files.into_iter().take(10) { // Limit to top 10 recent files
+            for file in recent_files.into_iter().take(10) {
+                // Limit to top 10 recent files
                 if !important_files.contains(&file) {
                     important_files.push(file);
                 }

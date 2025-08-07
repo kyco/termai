@@ -31,6 +31,7 @@ where
         current: bool,
     ) -> Result<(), Self::Error>;
     fn remove_current_from_all(&self) -> Result<(), Self::Error>;
+    fn delete_session(&self, session_id: &str) -> Result<(), Self::Error>;
 }
 
 pub trait MessageRepository

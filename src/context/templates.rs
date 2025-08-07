@@ -162,7 +162,8 @@ impl ContextTemplateLibrary {
     fn refactoring_template() -> ContextTemplate {
         ContextTemplate::new(
             "Code Refactoring".to_string(),
-            "Focus on code structure, design patterns, modularity, and code quality improvements".to_string(),
+            "Focus on code structure, design patterns, modularity, and code quality improvements"
+                .to_string(),
             vec![
                 "src/**/*.rs".to_string(),
                 "src/**/*.js".to_string(),
@@ -311,7 +312,8 @@ impl ContextTemplateLibrary {
     fn database_template() -> ContextTemplate {
         ContextTemplate::new(
             "Database & Data Layer".to_string(),
-            "Focus on database schemas, queries, ORM models, migrations, and data access patterns".to_string(),
+            "Focus on database schemas, queries, ORM models, migrations, and data access patterns"
+                .to_string(),
             vec![
                 "src/**/*.rs".to_string(),
                 "**/models/**".to_string(),
@@ -462,7 +464,8 @@ impl ContextTemplateLibrary {
     fn debugging_template() -> ContextTemplate {
         ContextTemplate::new(
             "Debugging & Troubleshooting".to_string(),
-            "Focus on error handling, logging, debugging utilities, and problem investigation".to_string(),
+            "Focus on error handling, logging, debugging utilities, and problem investigation"
+                .to_string(),
             vec![
                 "src/**/*.rs".to_string(),
                 "src/**/*.js".to_string(),
@@ -622,14 +625,14 @@ mod tests {
     #[test]
     fn test_template_library() {
         let templates = ContextTemplateLibrary::get_all_templates();
-        
+
         // Should have all expected templates
         assert!(templates.contains_key("security"));
         assert!(templates.contains_key("refactoring"));
         assert!(templates.contains_key("testing"));
         assert!(templates.contains_key("api"));
         assert!(templates.contains_key("database"));
-        
+
         // Test specific template
         let security_template = templates.get("security").unwrap();
         assert_eq!(security_template.name, "Security Analysis");
@@ -641,14 +644,14 @@ mod tests {
     fn test_template_application() {
         let mut config = crate::context::config::ContextConfig::default();
         let original_includes = config.context.include.clone();
-        
+
         let security_template = ContextTemplateLibrary::security_template();
         security_template.apply_to_config(&mut config);
-        
+
         // Should have merged includes
         assert!(config.context.include.len() >= original_includes.len());
         assert!(config.context.include.len() >= security_template.include_patterns.len());
-        
+
         // Should include security-specific patterns
         assert!(config.context.include.contains(&"**/auth*/**".to_string()));
     }
@@ -657,17 +660,19 @@ mod tests {
     fn test_get_specific_template() {
         let template = ContextTemplateLibrary::get_template("testing");
         assert!(template.is_some());
-        
+
         let testing_template = template.unwrap();
         assert_eq!(testing_template.name, "Testing & Quality Assurance");
-        assert!(testing_template.focus_areas.contains(&"Unit testing".to_string()));
+        assert!(testing_template
+            .focus_areas
+            .contains(&"Unit testing".to_string()));
     }
 
     #[test]
     fn test_list_templates() {
         let template_list = ContextTemplateLibrary::list_templates();
         assert!(!template_list.is_empty());
-        
+
         // Should contain expected templates
         let names: Vec<String> = template_list.iter().map(|(name, _)| name.clone()).collect();
         assert!(names.contains(&"security".to_string()));
@@ -678,7 +683,7 @@ mod tests {
     #[test]
     fn test_template_structure() {
         let template = ContextTemplateLibrary::api_template();
-        
+
         // Should have all required fields
         assert!(!template.name.is_empty());
         assert!(!template.description.is_empty());
@@ -693,14 +698,21 @@ mod tests {
     #[test]
     fn test_performance_template_specifics() {
         let template = ContextTemplateLibrary::performance_template();
-        
+
         // Should focus on performance-related patterns
         assert!(template.include_patterns.contains(&"**/*perf*".to_string()));
-        assert!(template.include_patterns.contains(&"**/*optimize*".to_string()));
+        assert!(template
+            .include_patterns
+            .contains(&"**/*optimize*".to_string()));
         assert!(template.priority_patterns.contains(&"*perf*".to_string()));
-        assert!(template.focus_areas.contains(&"Algorithm optimization".to_string()));
-        
+        assert!(template
+            .focus_areas
+            .contains(&"Algorithm optimization".to_string()));
+
         // Should have performance-related queries
-        assert!(template.suggested_queries.iter().any(|q| q.contains("performance") || q.contains("optimize")));
+        assert!(template
+            .suggested_queries
+            .iter()
+            .any(|q| q.contains("performance") || q.contains("optimize")));
     }
 }

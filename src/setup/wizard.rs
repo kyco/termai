@@ -60,7 +60,7 @@ impl SetupWizard {
             Provider::OpenAI => {
                 let api_key = self.get_openai_api_key().await?;
                 self.save_openai_config(repo, &api_key)?;
-                self.set_provider(repo, "openapi")?;
+                self.set_provider(repo, "openai")?;
             }
             Provider::Both => {
                 let claude_key = self.get_claude_api_key().await?;
@@ -252,7 +252,7 @@ impl SetupWizard {
 
         Ok(match selection {
             0 => "claude".to_string(),
-            1 => "openapi".to_string(),
+            1 => "openai".to_string(),
             _ => "claude".to_string(),
         })
     }
@@ -306,6 +306,7 @@ impl SetupWizard {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn reset_configuration<R: ConfigRepository>(&self, repo: &R) -> Result<()> {
         println!(
             "{}",

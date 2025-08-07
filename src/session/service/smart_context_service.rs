@@ -1,7 +1,7 @@
 use crate::context::SmartContext;
 use crate::session::model::smart_context::SessionSmartContext;
 use crate::session::repository::smart_context_repository::{
-    SmartContextRepository, create_smart_context_entity
+    create_smart_context_entity, SmartContextRepository,
 };
 use anyhow::Result;
 use std::collections::hash_map::DefaultHasher;
@@ -39,9 +39,10 @@ impl<R: SmartContextRepository> SmartContextService<R> {
             if let Ok(existing_context) = SessionSmartContext::from_entity(&existing_entity) {
                 // Check if existing context is still valid
                 if existing_context.is_valid_for_query(
-                    query_hash.as_ref().map(|s| s.as_str()), 
-                    None // TODO: Add config hash support
-                ) && existing_context.project_path == project_path.to_string_lossy() {
+                    query_hash.as_ref().map(|s| s.as_str()),
+                    None, // TODO: Add config hash support
+                ) && existing_context.project_path == project_path.to_string_lossy()
+                {
                     return Ok(existing_context);
                 }
             }
@@ -49,15 +50,16 @@ impl<R: SmartContextRepository> SmartContextService<R> {
 
         // Discover new context
         let context_files = smart_context.discover_context(project_path, query).await?;
-        
+
         // Convert to file paths and calculate total tokens
-        let selected_files: Vec<String> = context_files.iter()
-            .map(|f| f.path.clone())
-            .collect();
-        
-        let total_tokens = Some(context_files.iter()
-            .map(|f| smart_context.optimizer.count_tokens(&f.content))
-            .sum());
+        let selected_files: Vec<String> = context_files.iter().map(|f| f.path.clone()).collect();
+
+        let total_tokens = Some(
+            context_files
+                .iter()
+                .map(|f| smart_context.optimizer.count_tokens(&f.content))
+                .sum(),
+        );
 
         // Detect project type
         let project_info = smart_context.detect_project(project_path)?;
@@ -116,7 +118,7 @@ impl<R: SmartContextRepository> SmartContextService<R> {
     ) -> Result<()> {
         if let Some(mut entity) = self.repository.find_by_session_id(session_id)? {
             let query_hash = query.map(|q| self.hash_string(q));
-            
+
             entity.update(
                 serde_json::to_string(&selected_files)?,
                 total_tokens,
@@ -135,9 +137,14 @@ impl<R: SmartContextRepository> SmartContextService<R> {
     }
 
     /// Find sessions that used smart context for a specific project
-    pub fn find_sessions_for_project(&self, project_path: &Path) -> Result<Vec<SessionSmartContext>> {
-        let entities = self.repository.find_by_project_path(&project_path.to_string_lossy())?;
-        
+    pub fn find_sessions_for_project(
+        &self,
+        project_path: &Path,
+    ) -> Result<Vec<SessionSmartContext>> {
+        let entities = self
+            .repository
+            .find_by_project_path(&project_path.to_string_lossy())?;
+
         let mut contexts = Vec::new();
         for entity in entities {
             contexts.push(SessionSmartContext::from_entity(&entity)?);
@@ -173,24 +180,22 @@ impl<R: SmartContextRepository> SmartContextService<R> {
     /// Get context statistics for a project
     pub fn get_project_context_stats(&self, project_path: &Path) -> Result<ContextStats> {
         let contexts = self.find_sessions_for_project(project_path)?;
-        
+
         let total_sessions = contexts.len();
-        let chunked_sessions = contexts.iter()
-            .filter(|c| c.chunked_analysis)
-            .count();
-        
+        let chunked_sessions = contexts.iter().filter(|c| c.chunked_analysis).count();
+
         let avg_files = if total_sessions > 0 {
-            contexts.iter()
+            contexts
+                .iter()
                 .map(|c| c.selected_files.len())
-                .sum::<usize>() as f64 / total_sessions as f64
+                .sum::<usize>() as f64
+                / total_sessions as f64
         } else {
             0.0
         };
 
         let avg_tokens = if total_sessions > 0 {
-            let total_tokens: usize = contexts.iter()
-                .filter_map(|c| c.total_tokens)
-                .sum();
+            let total_tokens: usize = contexts.iter().filter_map(|c| c.total_tokens).sum();
             total_tokens as f64 / total_sessions as f64
         } else {
             0.0
@@ -267,9 +272,9 @@ mod tests {
     use crate::session::repository::smart_context_repository::SmartContextRepositoryImpl;
     #[allow(unused_imports)]
     use rusqlite::Connection;
+    use std::path::PathBuf;
     #[allow(unused_imports)]
     use tempfile::TempDir;
-    use std::path::PathBuf;
 
     // Mock repository for testing
     struct MockSmartContextRepository {
@@ -293,7 +298,8 @@ mod tests {
 
         fn find_by_session_id(&self, session_id: &str) -> Result<Option<SmartContextEntity>> {
             let entities = self.entities.lock().unwrap();
-            let found = entities.iter()
+            let found = entities
+                .iter()
                 .find(|e| e.session_id == session_id)
                 .cloned();
             Ok(found)
@@ -315,7 +321,8 @@ mod tests {
 
         fn find_by_project_path(&self, project_path: &str) -> Result<Vec<SmartContextEntity>> {
             let entities = self.entities.lock().unwrap();
-            let found = entities.iter()
+            let found = entities
+                .iter()
                 .filter(|e| e.project_path == project_path)
                 .cloned()
                 .collect();
@@ -344,9 +351,11 @@ mod tests {
         let service = SmartContextService::new(repo);
 
         let project_path = PathBuf::from("/test/project");
-        
+
         // No context exists initially
-        let is_valid = service.is_context_valid("session1", &project_path, Some("query")).unwrap();
+        let is_valid = service
+            .is_context_valid("session1", &project_path, Some("query"))
+            .unwrap();
         assert!(!is_valid);
     }
 
@@ -364,16 +373,16 @@ mod tests {
     fn test_project_context_stats_empty() {
         let repo = MockSmartContextRepository::new();
         let service = SmartContextService::new(repo);
-        
+
         let project_path = PathBuf::from("/empty/project");
         let stats = service.get_project_context_stats(&project_path).unwrap();
-        
+
         assert_eq!(stats.total_sessions, 0);
         assert_eq!(stats.chunked_sessions, 0);
         assert_eq!(stats.average_files, 0.0);
         assert_eq!(stats.average_tokens, 0.0);
         assert!(stats.project_types.is_empty());
-        
+
         let summary = stats.summary();
         assert!(summary.contains("No smart context sessions"));
     }

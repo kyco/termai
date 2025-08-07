@@ -10,6 +10,9 @@ impl SqliteRepository {
         create_table_messages(&conn)?;
         create_table_config(&conn)?;
         create_table_sessions(&conn)?;
+        create_table_conversation_branches(&conn)?;
+        create_table_branch_messages(&conn)?;
+        create_table_branch_metadata(&conn)?;
         migrate_messages_id_column(&conn)?;
         messages_add_session_id_column(&conn)?;
         messages_add_role_column(&conn)?;
@@ -162,6 +165,54 @@ fn sessions_rename_column_key_to_name(conn: &Connection) -> Result<()> {
     if has_key {
         conn.execute("ALTER TABLE sessions RENAME COLUMN key TO name", [])?;
     }
+    Ok(())
+}
+
+fn create_table_conversation_branches(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS conversation_branches (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            parent_branch_id TEXT,
+            branch_name TEXT,
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'active',
+            FOREIGN KEY (session_id) REFERENCES sessions (id),
+            FOREIGN KEY (parent_branch_id) REFERENCES conversation_branches (id)
+        )",
+        [],
+    )?;
+    Ok(())
+}
+
+fn create_table_branch_messages(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS branch_messages (
+            id TEXT PRIMARY KEY,
+            branch_id TEXT NOT NULL,
+            message_id TEXT NOT NULL,
+            sequence_number INTEGER NOT NULL,
+            FOREIGN KEY (branch_id) REFERENCES conversation_branches (id),
+            FOREIGN KEY (message_id) REFERENCES messages (id)
+        )",
+        [],
+    )?;
+    Ok(())
+}
+
+fn create_table_branch_metadata(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS branch_metadata (
+            branch_id TEXT NOT NULL,
+            key TEXT NOT NULL,
+            value TEXT NOT NULL,
+            PRIMARY KEY (branch_id, key),
+            FOREIGN KEY (branch_id) REFERENCES conversation_branches (id)
+        )",
+        [],
+    )?;
     Ok(())
 }
 

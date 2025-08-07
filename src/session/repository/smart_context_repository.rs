@@ -62,16 +62,26 @@ impl SmartContextRepositoryImpl {
     fn row_to_entity(row: &Row) -> Result<SmartContextEntity, rusqlite::Error> {
         let created_at_str: String = row.get("created_at")?;
         let updated_at_str: String = row.get("updated_at")?;
-        
-        let created_at = chrono::NaiveDateTime::parse_from_str(&created_at_str, "%Y-%m-%d %H:%M:%S%.f")
-            .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                0, rusqlite::types::Type::Text, Box::new(e)
-            ))?;
-        
-        let updated_at = chrono::NaiveDateTime::parse_from_str(&updated_at_str, "%Y-%m-%d %H:%M:%S%.f")
-            .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                0, rusqlite::types::Type::Text, Box::new(e)
-            ))?;
+
+        let created_at =
+            chrono::NaiveDateTime::parse_from_str(&created_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                .map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
+
+        let updated_at =
+            chrono::NaiveDateTime::parse_from_str(&updated_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                .map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
 
         Ok(SmartContextEntity {
             id: row.get("id")?,
@@ -124,7 +134,7 @@ impl SmartContextRepository for SmartContextRepositoryImpl {
 
     fn find_by_session_id(&self, session_id: &str) -> Result<Option<SmartContextEntity>> {
         let mut stmt = self.connection.prepare(
-            "SELECT * FROM smart_context WHERE session_id = ?1 ORDER BY updated_at DESC LIMIT 1"
+            "SELECT * FROM smart_context WHERE session_id = ?1 ORDER BY updated_at DESC LIMIT 1",
         )?;
 
         let mut rows = stmt.query_map(params![session_id], Self::row_to_entity)?;
@@ -168,7 +178,7 @@ impl SmartContextRepository for SmartContextRepositoryImpl {
 
     fn find_by_project_path(&self, project_path: &str) -> Result<Vec<SmartContextEntity>> {
         let mut stmt = self.connection.prepare(
-            "SELECT * FROM smart_context WHERE project_path = ?1 ORDER BY updated_at DESC"
+            "SELECT * FROM smart_context WHERE project_path = ?1 ORDER BY updated_at DESC",
         )?;
 
         let rows = stmt.query_map(params![project_path], Self::row_to_entity)?;
@@ -230,7 +240,7 @@ mod tests {
     #[test]
     fn test_create_and_find_smart_context() {
         let (_temp_db, repo) = create_test_repo();
-        
+
         let entity = create_smart_context_entity(
             "session123".to_string(),
             "/path/to/project".to_string(),
@@ -242,7 +252,8 @@ mod tests {
             Some(1500),
             Some("query_hash_123".to_string()),
             Some("config_hash_456".to_string()),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Create the entity
         repo.create_smart_context(&entity).unwrap();
@@ -250,7 +261,7 @@ mod tests {
         // Find it by session ID
         let found = repo.find_by_session_id("session123").unwrap();
         assert!(found.is_some());
-        
+
         let found_entity = found.unwrap();
         assert_eq!(found_entity.session_id, "session123");
         assert_eq!(found_entity.project_path, "/path/to/project");
@@ -263,7 +274,7 @@ mod tests {
     #[test]
     fn test_update_smart_context() {
         let (_temp_db, repo) = create_test_repo();
-        
+
         let mut entity = create_smart_context_entity(
             "session456".to_string(),
             "/path/to/project".to_string(),
@@ -275,7 +286,8 @@ mod tests {
             Some(800),
             Some("old_query_hash".to_string()),
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         repo.create_smart_context(&entity).unwrap();
 
@@ -292,7 +304,7 @@ mod tests {
         let found = repo.find_by_session_id("session456").unwrap().unwrap();
         assert_eq!(found.total_tokens, Some(1200));
         assert_eq!(found.query_hash, Some("new_query_hash".to_string()));
-        
+
         let selected_files: Vec<String> = serde_json::from_str(&found.selected_files).unwrap();
         assert_eq!(selected_files, vec!["index.js", "utils.js"]);
     }
@@ -300,7 +312,7 @@ mod tests {
     #[test]
     fn test_find_by_project_path() {
         let (_temp_db, repo) = create_test_repo();
-        
+
         // Create multiple entities for the same project path
         let entity1 = create_smart_context_entity(
             "session1".to_string(),
@@ -313,7 +325,8 @@ mod tests {
             Some(1000),
             None,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         let entity2 = create_smart_context_entity(
             "session2".to_string(),
@@ -326,7 +339,8 @@ mod tests {
             Some(2000),
             None,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         repo.create_smart_context(&entity1).unwrap();
         repo.create_smart_context(&entity2).unwrap();
@@ -334,7 +348,7 @@ mod tests {
         // Find by project path
         let found = repo.find_by_project_path("/shared/project").unwrap();
         assert_eq!(found.len(), 2);
-        
+
         // Should be ordered by updated_at DESC (most recent first)
         assert_eq!(found[0].session_id, "session2"); // More recent
         assert_eq!(found[1].session_id, "session1");
@@ -343,7 +357,7 @@ mod tests {
     #[test]
     fn test_delete_by_session_id() {
         let (_temp_db, repo) = create_test_repo();
-        
+
         let entity = create_smart_context_entity(
             "session_to_delete".to_string(),
             "/path/to/project".to_string(),
@@ -355,10 +369,11 @@ mod tests {
             Some(500),
             None,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         repo.create_smart_context(&entity).unwrap();
-        
+
         // Verify it exists
         let found = repo.find_by_session_id("session_to_delete").unwrap();
         assert!(found.is_some());

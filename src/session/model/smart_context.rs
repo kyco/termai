@@ -52,7 +52,7 @@ impl SessionSmartContext {
     #[allow(dead_code)]
     pub fn from_entity(entity: &SmartContextEntity) -> Result<Self> {
         let selected_files: Vec<String> = serde_json::from_str(&entity.selected_files)?;
-        
+
         Ok(Self {
             session_id: entity.session_id.clone(),
             project_path: entity.project_path.clone(),
@@ -105,7 +105,7 @@ impl SessionSmartContext {
         };
 
         format!(
-            "{} project: {} files{}{}", 
+            "{} project: {} files{}{}",
             self.project_type,
             self.selected_files.len(),
             token_info,
@@ -122,7 +122,7 @@ impl SessionSmartContext {
 
         let mut display = String::new();
         let files_to_show = std::cmp::min(self.selected_files.len(), max_files);
-        
+
         for (i, file) in self.selected_files.iter().enumerate().take(files_to_show) {
             if i > 0 {
                 display.push_str(", ");
@@ -136,7 +136,10 @@ impl SessionSmartContext {
         }
 
         if self.selected_files.len() > max_files {
-            display.push_str(&format!(" (+{} more)", self.selected_files.len() - max_files));
+            display.push_str(&format!(
+                " (+{} more)",
+                self.selected_files.len() - max_files
+            ));
         }
 
         display
@@ -147,16 +150,19 @@ impl SessionSmartContext {
     #[allow(dead_code)]
     pub fn to_context_metadata(&self) -> HashMap<String, String> {
         let mut metadata = HashMap::new();
-        
+
         metadata.insert("smart_context_enabled".to_string(), "true".to_string());
         metadata.insert("project_type".to_string(), self.project_type.clone());
         metadata.insert("project_path".to_string(), self.project_path.clone());
-        metadata.insert("selected_files_count".to_string(), self.selected_files.len().to_string());
-        
+        metadata.insert(
+            "selected_files_count".to_string(),
+            self.selected_files.len().to_string(),
+        );
+
         if let Some(tokens) = self.total_tokens {
             metadata.insert("total_tokens".to_string(), tokens.to_string());
         }
-        
+
         if self.chunked_analysis {
             metadata.insert("chunked_analysis".to_string(), "true".to_string());
             if let Some(strategy) = &self.chunk_strategy {
@@ -275,7 +281,10 @@ mod tests {
         );
 
         let summary_chunked = context_chunked.get_summary();
-        assert_eq!(summary_chunked, "javascript project: 1 files [2800/3000] (chunked: hierarchical)");
+        assert_eq!(
+            summary_chunked,
+            "javascript project: 1 files [2800/3000] (chunked: hierarchical)"
+        );
     }
 
     #[test]
@@ -307,7 +316,10 @@ mod tests {
 
         // Show all files
         let display_all = context.get_files_display(10);
-        assert_eq!(display_all, "main.rs, lib.rs, helper.rs, integration_test.rs, Cargo.toml");
+        assert_eq!(
+            display_all,
+            "main.rs, lib.rs, helper.rs, integration_test.rs, Cargo.toml"
+        );
     }
 
     #[test]
@@ -327,13 +339,19 @@ mod tests {
 
         let metadata = context.to_context_metadata();
 
-        assert_eq!(metadata.get("smart_context_enabled"), Some(&"true".to_string()));
+        assert_eq!(
+            metadata.get("smart_context_enabled"),
+            Some(&"true".to_string())
+        );
         assert_eq!(metadata.get("project_type"), Some(&"rust".to_string()));
         assert_eq!(metadata.get("selected_files_count"), Some(&"2".to_string()));
         assert_eq!(metadata.get("total_tokens"), Some(&"2000".to_string()));
         assert_eq!(metadata.get("chunked_analysis"), Some(&"true".to_string()));
-        assert_eq!(metadata.get("chunk_strategy"), Some(&"functional".to_string()));
-        
+        assert_eq!(
+            metadata.get("chunk_strategy"),
+            Some(&"functional".to_string())
+        );
+
         // Should have key files stored as JSON
         assert!(metadata.contains_key("key_files"));
     }

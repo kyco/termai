@@ -1,27 +1,28 @@
 /// Git commit message generation command handler
 use crate::args::CommitArgs;
-use crate::git::{repository::GitRepository, diff::DiffAnalyzer};
-use crate::repository::db::SqliteRepository;
 use crate::config::model::keys::ConfigKeys;
 use crate::config::service::config_service;
+use crate::git::{diff::DiffAnalyzer, repository::GitRepository};
 use crate::llm::claude::adapter::claude_adapter;
 use crate::llm::claude::model::chat_completion_request::ChatCompletionRequest;
 use crate::llm::claude::model::chat_message::ChatMessage;
+use crate::llm::common::model::role::Role;
 use crate::llm::openai::adapter::open_ai_adapter;
 use crate::llm::openai::model::chat_completion_request::ChatCompletionRequest as OpenAIRequest;
 use crate::llm::openai::model::chat_message::ChatMessage as OpenAIMessage;
-use crate::llm::common::model::role::Role;
-use anyhow::{Result, Context, bail};
+use crate::repository::db::SqliteRepository;
+use anyhow::{bail, Context, Result};
 use colored::*;
-use dialoguer::{Input, Select, Confirm};
+use dialoguer::{Confirm, Input, Select};
 
 /// Handle the commit subcommand
 pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -> Result<()> {
     println!("{}", "🔍 Analyzing Git repository...".bright_blue().bold());
 
     // Discover and analyze the Git repository
-    let git_repo = GitRepository::discover(".")
-        .context("❌ No Git repository found. Please run this command from within a Git repository.")?;
+    let git_repo = GitRepository::discover(".").context(
+        "❌ No Git repository found. Please run this command from within a Git repository.",
+    )?;
 
     // Check repository state
     if git_repo.is_merging() {
@@ -33,19 +34,29 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
     }
 
     // Get repository status
-    let status = git_repo.status()
+    let status = git_repo
+        .status()
         .context("Failed to get repository status")?;
 
     // Check for staged changes unless forced
     if !args.force && !status.has_staged_changes() {
         if args.add_all {
-            println!("{}", "📝 No staged changes found. The --add-all flag would stage all changes.".yellow());
-            println!("{}", "   Note: This is a placeholder - actual staging not implemented yet.".dimmed());
+            println!(
+                "{}",
+                "📝 No staged changes found. The --add-all flag would stage all changes.".yellow()
+            );
+            println!(
+                "{}",
+                "   Note: This is a placeholder - actual staging not implemented yet.".dimmed()
+            );
         } else {
             println!("{}", "❌ No staged changes found.".red().bold());
             println!();
             println!("{}", "💡 Suggestions:".bright_yellow().bold());
-            println!("   • Stage your changes first: {}", "git add <files>".cyan());
+            println!(
+                "   • Stage your changes first: {}",
+                "git add <files>".cyan()
+            );
             println!("   • Use {} to include all changes", "--add-all".cyan());
             println!("   • Use {} to generate a message anyway", "--force".cyan());
             return Ok(());
@@ -60,7 +71,8 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
 
     // Analyze staged changes
     let diff_analyzer = DiffAnalyzer::new(git_repo.inner());
-    let diff_summary = diff_analyzer.analyze_staged()
+    let diff_summary = diff_analyzer
+        .analyze_staged()
         .context("Failed to analyze staged changes")?;
 
     println!("\n{}", "📋 Change Analysis:".bright_blue().bold());
@@ -80,7 +92,10 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
 
     // Handle auto-commit or interactive approval
     if args.auto {
-        println!("\n{}", "🚀 Auto-committing with generated message...".bright_green());
+        println!(
+            "\n{}",
+            "🚀 Auto-committing with generated message...".bright_green()
+        );
         execute_commit(&git_repo, &commit_message).await?;
         println!("{}", "✅ Commit created successfully!".green().bold());
     } else {
@@ -117,13 +132,21 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
                         .with_initial_text(body)
                         .allow_empty(true)
                         .interact()?;
-                    if body_input.trim().is_empty() { None } else { Some(body_input) }
+                    if body_input.trim().is_empty() {
+                        None
+                    } else {
+                        Some(body_input)
+                    }
                 } else {
                     let body_input: String = Input::new()
                         .with_prompt("Add commit body (optional)")
                         .allow_empty(true)
                         .interact()?;
-                    if body_input.trim().is_empty() { None } else { Some(body_input) }
+                    if body_input.trim().is_empty() {
+                        None
+                    } else {
+                        Some(body_input)
+                    }
                 };
 
                 let edited_message = crate::git::commit::CommitMessage {
@@ -136,7 +159,8 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
                 if Confirm::new()
                     .with_prompt("Commit with edited message?")
                     .default(true)
-                    .interact()? {
+                    .interact()?
+                {
                     execute_commit(&git_repo, &edited_message).await?;
                     println!("{}", "✅ Commit created successfully!".green().bold());
                 }
@@ -144,9 +168,28 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
             2 => {
                 // Regenerate message
                 println!("{}", "🔄 Regenerating commit message...".bright_blue());
-                // This would normally regenerate with different parameters
-                // For now, we'll just show the same message
-                println!("{}", "💡 Message regeneration would happen here".dimmed());
+                let new_commit_message = generate_commit_message(&diff_summary, args, repo).await?;
+
+                println!(
+                    "\n{}",
+                    "💬 Regenerated Commit Message:".bright_green().bold()
+                );
+                println!("{}", "═══════════════════════════════".white().dimmed());
+                println!("{}", new_commit_message.subject.bright_white().bold());
+                if let Some(ref body) = new_commit_message.body {
+                    println!();
+                    println!("{}", body.white());
+                }
+                println!("{}", "═══════════════════════════════".white().dimmed());
+
+                if Confirm::new()
+                    .with_prompt("Accept regenerated message and commit?")
+                    .default(true)
+                    .interact()?
+                {
+                    execute_commit(&git_repo, &new_commit_message).await?;
+                    println!("{}", "✅ Commit created successfully!".green().bold());
+                }
             }
             3 => {
                 // Cancel
@@ -175,25 +218,27 @@ async fn generate_ai_commit_message(
 
     // Create detailed diff analysis for AI
     let diff_context = create_diff_context_for_ai(diff_summary);
-    
+
     // Create AI prompt for commit message generation
     let prompt = create_commit_message_prompt(diff_summary, args, &diff_context);
-    
+
     // Call appropriate AI service
     let ai_response = match provider.value.as_str() {
         "claude" => {
-            let api_key = config_service::fetch_with_env_fallback(repo, &ConfigKeys::ClaudeApiKey.to_key())
-                .context("Claude API key not configured")?;
+            let api_key =
+                config_service::fetch_with_env_fallback(repo, &ConfigKeys::ClaudeApiKey.to_key())
+                    .context("Claude API key not configured")?;
             generate_with_claude(&prompt, &api_key.value).await?
         }
         "openai" => {
-            let api_key = config_service::fetch_with_env_fallback(repo, &ConfigKeys::ChatGptApiKey.to_key())
-                .context("OpenAI API key not configured")?;
+            let api_key =
+                config_service::fetch_with_env_fallback(repo, &ConfigKeys::ChatGptApiKey.to_key())
+                    .context("OpenAI API key not configured")?;
             generate_with_openai(&prompt, &api_key.value).await?
         }
         _ => bail!("Unsupported provider: {}", provider.value),
     };
-    
+
     // Parse AI response into structured commit message
     parse_ai_commit_response(&ai_response, args)
 }
@@ -201,43 +246,47 @@ async fn generate_ai_commit_message(
 /// Create diff context for AI analysis
 fn create_diff_context_for_ai(diff_summary: &crate::git::diff::DiffSummary) -> String {
     let mut context = Vec::new();
-    
+
     context.push(format!("Files changed: {}", diff_summary.files_changed));
     context.push(format!("Total additions: {}", diff_summary.total_additions));
     context.push(format!("Total deletions: {}", diff_summary.total_deletions));
-    
+
     if !diff_summary.language_breakdown.is_empty() {
         context.push("\nLanguages modified:".to_string());
         for (lang, (additions, deletions)) in &diff_summary.language_breakdown {
             context.push(format!("  {}: +{} -{}", lang, additions, deletions));
         }
     }
-    
+
     context.push("\nFile changes:".to_string());
     for file in &diff_summary.files {
-        let path = file.new_path
+        let path = file
+            .new_path
             .as_ref()
             .or(file.old_path.as_ref())
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "unknown".to_string());
-            
+
         let change_symbol = match file.change_type {
-            crate::git::diff::ChangeType::Addition => "A",
-            crate::git::diff::ChangeType::Deletion => "D", 
-            crate::git::diff::ChangeType::Modification => "M",
-            crate::git::diff::ChangeType::Rename => "R",
-            crate::git::diff::ChangeType::Copy => "C",
+            crate::git::diff::ChangeType::Addition | crate::git::diff::ChangeType::Added => "A",
+            crate::git::diff::ChangeType::Deletion | crate::git::diff::ChangeType::Deleted => "D",
+            crate::git::diff::ChangeType::Modification | crate::git::diff::ChangeType::Modified => {
+                "M"
+            }
+            crate::git::diff::ChangeType::Rename | crate::git::diff::ChangeType::Renamed => "R",
+            crate::git::diff::ChangeType::Copy | crate::git::diff::ChangeType::Copied => "C",
         };
-        
-        context.push(format!("  {} {} (+{} -{}) {}", 
-            change_symbol, 
+
+        context.push(format!(
+            "  {} {} (+{} -{}) {}",
+            change_symbol,
             path,
             file.additions,
             file.deletions,
             file.language.as_ref().unwrap_or(&"unknown".to_string())
         ));
     }
-    
+
     context.join("\n")
 }
 
@@ -259,7 +308,7 @@ fn create_commit_message_prompt(
         "- Focus on the 'what' and 'why', not the 'how'".to_string(),
         "".to_string(),
     ];
-    
+
     // Add user preferences
     if let Some(ref msg_type) = args.message_type {
         prompt_parts.push(format!("Preferred commit type: {}", msg_type));
@@ -270,23 +319,23 @@ fn create_commit_message_prompt(
     if let Some(ref template) = args.template {
         prompt_parts.push(format!("Template to incorporate: {}", template));
     }
-    
+
     prompt_parts.push("".to_string());
     prompt_parts.push("Diff Analysis:".to_string());
     prompt_parts.push(diff_context.to_string());
-    
+
     prompt_parts.push("".to_string());
     prompt_parts.push("Generate a commit message with:".to_string());
     prompt_parts.push("SUBJECT: [conventional commit format subject line]".to_string());
     prompt_parts.push("BODY: [optional detailed explanation if needed]".to_string());
-    
+
     prompt_parts.join("\n")
 }
 
 /// Generate commit message using Claude
 async fn generate_with_claude(prompt: &str, api_key: &str) -> Result<String> {
     let request = ChatCompletionRequest {
-        model: "claude-sonnet-4-1-20250805".to_string(),
+        model: "claude-opus-4-1-20250805".to_string(),
         max_tokens: 1000,
         messages: vec![
             ChatMessage {
@@ -297,13 +346,15 @@ async fn generate_with_claude(prompt: &str, api_key: &str) -> Result<String> {
         system: Some("You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis.".to_string()),
         thinking: None,
     };
-    
+
     let (_, response) = claude_adapter::chat(&request, api_key).await?;
-    
+
     if let Some(content) = response.content.first() {
         match content {
-            crate::llm::claude::model::content_block::ContentBlock::Text { text } => Ok(text.clone()),
-            _ => bail!("Unexpected content block type from Claude")
+            crate::llm::claude::model::content_block::ContentBlock::Text { text } => {
+                Ok(text.clone())
+            }
+            _ => bail!("Unexpected content block type from Claude"),
         }
     } else {
         bail!("No response content from Claude")
@@ -313,22 +364,25 @@ async fn generate_with_claude(prompt: &str, api_key: &str) -> Result<String> {
 /// Generate commit message using OpenAI
 async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
     let request = OpenAIRequest {
-        model: "gpt-4o".to_string(),
+        model: "gpt-5".to_string(),
         messages: vec![
             OpenAIMessage {
                 role: Role::System.to_string(),
                 content: "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis.".to_string(),
             },
             OpenAIMessage {
-                role: Role::User.to_string(), 
+                role: Role::User.to_string(),
                 content: prompt.to_string(),
             }
         ],
-        reasoning_effort: crate::llm::openai::model::reasoning_effort::ReasoningEffort::Medium,
+        reasoning_effort: crate::llm::openai::model::reasoning_effort::ReasoningEffort::Minimal,
+        verbosity: None,
+        tools: None,
+        tool_choice: None,
     };
-    
+
     let response = open_ai_adapter::chat(&request, api_key).await?;
-    
+
     if let Some(choices) = response.choices {
         if let Some(choice) = choices.first() {
             Ok(choice.message.content.clone())
@@ -346,18 +400,20 @@ fn parse_ai_commit_response(
     args: &CommitArgs,
 ) -> Result<crate::git::commit::CommitMessage> {
     let lines: Vec<&str> = response.lines().collect();
-    
+
     // Extract subject and body from AI response
     let mut subject = None;
     let mut body_lines = Vec::new();
     let mut in_body = false;
-    
+
     for line in lines {
         if line.trim().starts_with("SUBJECT:") {
             subject = Some(line.trim_start_matches("SUBJECT:").trim().to_string());
         } else if line.trim().starts_with("BODY:") {
             let body_content = line.trim_start_matches("BODY:").trim();
-            if !body_content.is_empty() && body_content != "[optional detailed explanation if needed]" {
+            if !body_content.is_empty()
+                && body_content != "[optional detailed explanation if needed]"
+            {
                 body_lines.push(body_content.to_string());
             }
             in_body = true;
@@ -368,24 +424,24 @@ fn parse_ai_commit_response(
             subject = Some(line.trim().to_string());
         }
     }
-    
+
     // Extract type and scope from subject
     let subject = subject.unwrap_or_else(|| "chore: update files".to_string());
     let (message_type, scope) = parse_conventional_commit(&subject);
-    
+
     // Limit subject to 72 characters
     let subject = if subject.len() > 72 {
         format!("{}...", &subject[..69])
     } else {
         subject
     };
-    
+
     let body = if body_lines.is_empty() {
         None
     } else {
         Some(body_lines.join("\n"))
     };
-    
+
     Ok(crate::git::commit::CommitMessage {
         subject,
         body,
@@ -410,7 +466,7 @@ fn parse_conventional_commit(subject: &str) -> (String, Option<String>) {
             return (msg_type, None);
         }
     }
-    
+
     // Fallback
     ("feat".to_string(), None)
 }
@@ -427,9 +483,11 @@ async fn generate_commit_message(
         Err(e) => {
             println!("{}", format!("⚠️  AI generation failed: {}", e).yellow());
             println!("{}", "📝 Falling back to heuristic generation...".dimmed());
-            
+
             // Fallback to rule-based generation
-            let message_type = args.message_type.as_deref()
+            let message_type = args
+                .message_type
+                .as_deref()
                 .or_else(|| infer_message_type(diff_summary))
                 .unwrap_or("feat");
 
@@ -445,7 +503,11 @@ async fn generate_commit_message(
 
             Ok(crate::git::commit::CommitMessage {
                 subject: subject.chars().take(72).collect(), // Limit to 72 characters
-                body: if body.trim().is_empty() { None } else { Some(body) },
+                body: if body.trim().is_empty() {
+                    None
+                } else {
+                    Some(body)
+                },
                 message_type: message_type.to_string(),
                 scope: scope.map(|s| s.to_string()),
             })
@@ -456,16 +518,24 @@ async fn generate_commit_message(
 /// Infer commit message type from changes
 fn infer_message_type(diff_summary: &crate::git::diff::DiffSummary) -> Option<&'static str> {
     // Simple heuristics based on file changes
-    let has_new_files = diff_summary.files.iter().any(|f| f.change_type == crate::git::diff::ChangeType::Addition);
-    let has_deleted_files = diff_summary.files.iter().any(|f| f.change_type == crate::git::diff::ChangeType::Deletion);
+    let has_new_files = diff_summary
+        .files
+        .iter()
+        .any(|f| f.change_type == crate::git::diff::ChangeType::Addition);
+    let has_deleted_files = diff_summary
+        .files
+        .iter()
+        .any(|f| f.change_type == crate::git::diff::ChangeType::Deletion);
     let has_test_files = diff_summary.files.iter().any(|f| {
-        f.new_path.as_ref()
+        f.new_path
+            .as_ref()
             .or(f.old_path.as_ref())
             .map(|p| p.to_string_lossy().contains("test"))
             .unwrap_or(false)
     });
     let has_doc_files = diff_summary.files.iter().any(|f| {
-        f.new_path.as_ref()
+        f.new_path
+            .as_ref()
             .or(f.old_path.as_ref())
             .map(|p| {
                 let path_str = p.to_string_lossy();
@@ -501,7 +571,8 @@ fn generate_subject_from_changes(
 
     if diff_summary.files_changed == 1 {
         if let Some(file) = diff_summary.files.first() {
-            let file_name = file.new_path
+            let file_name = file
+                .new_path
                 .as_ref()
                 .or(file.old_path.as_ref())
                 .and_then(|p| p.file_name())
@@ -509,19 +580,20 @@ fn generate_subject_from_changes(
                 .unwrap_or("file");
 
             match file.change_type {
-                crate::git::diff::ChangeType::Addition => {
+                crate::git::diff::ChangeType::Addition | crate::git::diff::ChangeType::Added => {
                     format!("{}{}: add {}", message_type, scope_prefix, file_name)
                 }
-                crate::git::diff::ChangeType::Deletion => {
+                crate::git::diff::ChangeType::Deletion | crate::git::diff::ChangeType::Deleted => {
                     format!("{}{}: remove {}", message_type, scope_prefix, file_name)
                 }
-                crate::git::diff::ChangeType::Modification => {
+                crate::git::diff::ChangeType::Modification
+                | crate::git::diff::ChangeType::Modified => {
                     format!("{}{}: update {}", message_type, scope_prefix, file_name)
                 }
-                crate::git::diff::ChangeType::Rename => {
+                crate::git::diff::ChangeType::Rename | crate::git::diff::ChangeType::Renamed => {
                     format!("{}{}: rename {}", message_type, scope_prefix, file_name)
                 }
-                crate::git::diff::ChangeType::Copy => {
+                crate::git::diff::ChangeType::Copy | crate::git::diff::ChangeType::Copied => {
                     format!("{}{}: copy {}", message_type, scope_prefix, file_name)
                 }
             }
@@ -529,7 +601,10 @@ fn generate_subject_from_changes(
             format!("{}{}: update files", message_type, scope_prefix)
         }
     } else {
-        format!("{}{}: update {} files", message_type, scope_prefix, diff_summary.files_changed)
+        format!(
+            "{}{}: update {} files",
+            message_type, scope_prefix, diff_summary.files_changed
+        )
     }
 }
 
@@ -542,24 +617,50 @@ fn generate_body_from_changes(diff_summary: &crate::git::diff::DiffSummary) -> S
     let mut body_parts = Vec::new();
 
     // Summarize changes by type
-    let additions = diff_summary.files.iter().filter(|f| f.change_type == crate::git::diff::ChangeType::Addition).count();
-    let modifications = diff_summary.files.iter().filter(|f| f.change_type == crate::git::diff::ChangeType::Modification).count();
-    let deletions = diff_summary.files.iter().filter(|f| f.change_type == crate::git::diff::ChangeType::Deletion).count();
+    let additions = diff_summary
+        .files
+        .iter()
+        .filter(|f| f.change_type == crate::git::diff::ChangeType::Addition)
+        .count();
+    let modifications = diff_summary
+        .files
+        .iter()
+        .filter(|f| f.change_type == crate::git::diff::ChangeType::Modification)
+        .count();
+    let deletions = diff_summary
+        .files
+        .iter()
+        .filter(|f| f.change_type == crate::git::diff::ChangeType::Deletion)
+        .count();
 
     if additions > 0 {
-        body_parts.push(format!("- Add {} new file{}", additions, if additions == 1 { "" } else { "s" }));
+        body_parts.push(format!(
+            "- Add {} new file{}",
+            additions,
+            if additions == 1 { "" } else { "s" }
+        ));
     }
     if modifications > 0 {
-        body_parts.push(format!("- Update {} file{}", modifications, if modifications == 1 { "" } else { "s" }));
+        body_parts.push(format!(
+            "- Update {} file{}",
+            modifications,
+            if modifications == 1 { "" } else { "s" }
+        ));
     }
     if deletions > 0 {
-        body_parts.push(format!("- Remove {} file{}", deletions, if deletions == 1 { "" } else { "s" }));
+        body_parts.push(format!(
+            "- Remove {} file{}",
+            deletions,
+            if deletions == 1 { "" } else { "s" }
+        ));
     }
 
     // Add statistics
     if diff_summary.total_additions > 0 || diff_summary.total_deletions > 0 {
-        body_parts.push(format!("- {} insertions(+), {} deletions(-)", 
-            diff_summary.total_additions, diff_summary.total_deletions));
+        body_parts.push(format!(
+            "- {} insertions(+), {} deletions(-)",
+            diff_summary.total_additions, diff_summary.total_deletions
+        ));
     }
 
     body_parts.join("\n")
@@ -571,31 +672,31 @@ async fn execute_commit(
     commit_message: &crate::git::commit::CommitMessage,
 ) -> Result<()> {
     println!("{}", "🚀 Executing commit...".bright_blue());
-    
+
     // Get Git user configuration
-    let user_config = git_repo.user_config()
+    let user_config = git_repo
+        .user_config()
         .context("Failed to get Git user configuration")?;
-    
+
     // Create the full commit message
     let full_message = if let Some(ref body) = commit_message.body {
         format!("{}\n\n{}", commit_message.subject, body)
     } else {
         commit_message.subject.clone()
     };
-    
+
     // Get the repository's inner git2::Repository
     let repo = git_repo.inner();
-    
+
     // Get current index (staged changes)
-    let mut index = repo.index()
-        .context("Failed to get repository index")?;
-    
+    let mut index = repo.index().context("Failed to get repository index")?;
+
     // Write the index to create a tree
-    let tree_id = index.write_tree()
+    let tree_id = index
+        .write_tree()
         .context("Failed to write tree from index")?;
-    let tree = repo.find_tree(tree_id)
-        .context("Failed to find tree")?;
-    
+    let tree = repo.find_tree(tree_id).context("Failed to find tree")?;
+
     // Get the current HEAD commit (parent)
     let parent_commit = if let Ok(head) = repo.head() {
         if let Ok(commit) = head.peel_to_commit() {
@@ -606,35 +707,45 @@ async fn execute_commit(
     } else {
         None // First commit
     };
-    
+
     // Create signature for the commit
     let signature = git2::Signature::now(&user_config.name, &user_config.email)
         .context("Failed to create Git signature")?;
-    
+
     // Create the commit
     let parents = if let Some(ref parent) = parent_commit {
         vec![parent]
     } else {
         vec![]
     };
-    
-    let commit_id = repo.commit(
-        Some("HEAD"), // Update HEAD
-        &signature,   // Author
-        &signature,   // Committer 
-        &full_message, // Commit message
-        &tree,        // Tree
-        &parents      // Parents
-    ).context("Failed to create commit")?;
-    
+
+    let commit_id = repo
+        .commit(
+            Some("HEAD"),  // Update HEAD
+            &signature,    // Author
+            &signature,    // Committer
+            &full_message, // Commit message
+            &tree,         // Tree
+            &parents,      // Parents
+        )
+        .context("Failed to create commit")?;
+
     println!("{}", "✅ Commit created successfully!".green().bold());
-    println!("{}", format!("   Commit ID: {}", commit_id.to_string()[..8].bright_yellow()));
-    println!("{}", format!("   Message: {}", commit_message.subject.bright_white()));
-    
+    println!(
+        "{}",
+        format!(
+            "   Commit ID: {}",
+            commit_id.to_string()[..8].bright_yellow()
+        )
+    );
+    println!(
+        "{}",
+        format!("   Message: {}", commit_message.subject.bright_white())
+    );
+
     if let Some(ref body) = commit_message.body {
         println!("{}", format!("   Body: {}", body.dimmed()));
     }
-    
+
     Ok(())
 }
-

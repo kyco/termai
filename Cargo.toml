@@ -11,6 +11,8 @@ tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.33.0", features = ["bundled"] }
 anyhow = "1.0.89"
 clap = { version = "4.5.19", features = ["derive"] }
+clap_complete = "4.5.21"
+clap_mangen = "0.2.23"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json"] }
@@ -30,9 +32,18 @@ crossterm = "0.27"
 tokio-stream = "0.1"
 futures-util = "0.3"
 toml = "0.8"           # Configuration file parsing
+config = "0.14"        # Layered configuration management
 walkdir = "2.4"        # Directory traversal
 ignore = "0.4"         # Gitignore parsing
 tiktoken-rs = "0.5"    # Token counting
+git2 = "0.18"          # Git operations
+handlebars = "6.0"     # Template engine for presets
+serde_yaml = "0.9"     # Preset file format parsing and config export
+pulldown-cmark = "0.10" # Markdown processing
+pulldown-cmark-to-cmark = "13.0" # Markdown serialization
+comrak = "0.21"        # GitHub-flavored Markdown
+html2text = "0.6"      # HTML to text conversion
+tiny_http = "0.12"     # Local server for preview
 
 [dependencies.uuid]
 version = "1.11.0"

@@ -1,5 +1,6 @@
 use chrono::NaiveDateTime;
 
+#[derive(Debug, Clone)]
 pub struct SessionEntity {
     pub id: String,
     pub name: String,

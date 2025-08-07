@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
-use crate::context::{ProjectInfo, analyzer::FileScore};
+use crate::context::{analyzer::FileScore, ProjectInfo};
 
 /// Cache entry for project analysis results
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -49,7 +49,7 @@ impl ContextCache {
             .ok_or_else(|| anyhow::anyhow!("Unable to determine cache directory"))?
             .join("termai")
             .join("context");
-        
+
         fs::create_dir_all(&cache_dir)?;
         Ok(Self::new(cache_dir))
     }
@@ -95,21 +95,22 @@ impl ContextCache {
 
     /// Get cached project analysis results
     pub fn get_project_analysis(
-        &self, 
-        project_path: &Path, 
-        config_hash: &str
+        &self,
+        project_path: &Path,
+        config_hash: &str,
     ) -> Option<&ProjectCacheEntry> {
         let key = self.project_key(project_path);
-        
+
         if let Some(entry) = self.project_cache.get(&key) {
             // Check if cache is still valid
-            if self.is_cache_valid(&entry.created_at) && 
-               entry.config_hash == config_hash &&
-               self.is_directory_unchanged(project_path, &entry.directory_hash) {
+            if self.is_cache_valid(&entry.created_at)
+                && entry.config_hash == config_hash
+                && self.is_directory_unchanged(project_path, &entry.directory_hash)
+            {
                 return Some(entry);
             }
         }
-        
+
         None
     }
 
@@ -123,7 +124,7 @@ impl ContextCache {
     ) -> Result<()> {
         let key = self.project_key(project_path);
         let directory_hash = self.calculate_directory_hash(project_path)?;
-        
+
         let entry = ProjectCacheEntry {
             project_info,
             file_scores,
@@ -131,7 +132,7 @@ impl ContextCache {
             directory_hash,
             config_hash,
         };
-        
+
         self.project_cache.insert(key, entry);
         Ok(())
     }
@@ -139,32 +140,29 @@ impl ContextCache {
     /// Get cached file analysis result
     pub fn get_file_analysis(&self, file_path: &Path) -> Option<&FileCacheEntry> {
         let key = file_path.to_string_lossy().to_string();
-        
+
         if let Some(entry) = self.file_cache.get(&key) {
-            if self.is_cache_valid(&entry.analyzed_at) && 
-               self.is_file_unchanged(file_path, &entry.content_hash) {
+            if self.is_cache_valid(&entry.analyzed_at)
+                && self.is_file_unchanged(file_path, &entry.content_hash)
+            {
                 return Some(entry);
             }
         }
-        
+
         None
     }
 
     /// Cache file analysis result
-    pub fn cache_file_analysis(
-        &mut self,
-        file_path: &Path,
-        file_score: FileScore,
-    ) -> Result<()> {
+    pub fn cache_file_analysis(&mut self, file_path: &Path, file_score: FileScore) -> Result<()> {
         let key = file_path.to_string_lossy().to_string();
         let content_hash = self.calculate_file_hash(file_path)?;
-        
+
         let entry = FileCacheEntry {
             file_score,
             content_hash,
             analyzed_at: SystemTime::now(),
         };
-        
+
         self.file_cache.insert(key, entry);
         Ok(())
     }
@@ -173,12 +171,11 @@ impl ContextCache {
     pub fn invalidate_project(&mut self, project_path: &Path) {
         let key = self.project_key(project_path);
         self.project_cache.remove(&key);
-        
+
         // Also invalidate related file entries
         let project_str = project_path.to_string_lossy().to_string();
-        self.file_cache.retain(|file_path, _| {
-            !file_path.starts_with(&project_str)
-        });
+        self.file_cache
+            .retain(|file_path, _| !file_path.starts_with(&project_str));
     }
 
     /// Invalidate cache entry for a specific file
@@ -190,13 +187,13 @@ impl ContextCache {
     /// Remove expired cache entries
     fn cleanup_expired(&mut self) {
         let now = SystemTime::now();
-        
+
         self.project_cache.retain(|_, entry| {
             now.duration_since(entry.created_at)
                 .map(|age| age < self.max_age)
                 .unwrap_or(false)
         });
-        
+
         self.file_cache.retain(|_, entry| {
             now.duration_since(entry.analyzed_at)
                 .map(|age| age < self.max_age)
@@ -237,13 +234,18 @@ impl ContextCache {
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        
+
         // Include important files and their modification times
         let important_files = [
-            "Cargo.toml", "package.json", "pyproject.toml", "go.mod",
-            "build.gradle", "pom.xml", ".termai.toml"
+            "Cargo.toml",
+            "package.json",
+            "pyproject.toml",
+            "go.mod",
+            "build.gradle",
+            "pom.xml",
+            ".termai.toml",
         ];
-        
+
         for file_name in &important_files {
             let file_path = project_path.join(file_name);
             if file_path.exists() {
@@ -255,7 +257,7 @@ impl ContextCache {
                 }
             }
         }
-        
+
         Ok(format!("{:x}", hasher.finish()))
     }
 
@@ -265,14 +267,14 @@ impl ContextCache {
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        
+
         if let Ok(metadata) = file_path.metadata() {
             metadata.len().hash(&mut hasher);
             if let Ok(modified) = metadata.modified() {
                 modified.hash(&mut hasher);
             }
         }
-        
+
         Ok(format!("{:x}", hasher.finish()))
     }
 
@@ -289,18 +291,18 @@ impl ContextCache {
     pub fn clear(&mut self) -> Result<()> {
         self.project_cache.clear();
         self.file_cache.clear();
-        
+
         // Remove cache files
         let project_cache_path = self.cache_dir.join("projects.json");
         if project_cache_path.exists() {
             fs::remove_file(project_cache_path)?;
         }
-        
+
         let file_cache_path = self.cache_dir.join("files.json");
         if file_cache_path.exists() {
             fs::remove_file(file_cache_path)?;
         }
-        
+
         Ok(())
     }
 }
@@ -316,14 +318,17 @@ pub struct CacheStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::{
+        analyzer::{FileType, ImportanceFactor},
+        ProjectType,
+    };
     use tempfile::TempDir;
-    use crate::context::{ProjectType, analyzer::{FileType, ImportanceFactor}};
 
     #[test]
     fn test_cache_creation() {
         let temp_dir = TempDir::new().unwrap();
         let cache = ContextCache::new(temp_dir.path().to_path_buf());
-        
+
         assert_eq!(cache.project_cache.len(), 0);
         assert_eq!(cache.file_cache.len(), 0);
     }
@@ -332,7 +337,7 @@ mod tests {
     fn test_project_cache() {
         let temp_dir = TempDir::new().unwrap();
         let mut cache = ContextCache::new(temp_dir.path().to_path_buf());
-        
+
         let project_info = ProjectInfo {
             project_type: ProjectType::Rust,
             root_path: "/test".to_string(),
@@ -340,7 +345,7 @@ mod tests {
             important_files: vec!["Cargo.toml".to_string()],
             confidence: 0.9,
         };
-        
+
         let file_scores = vec![FileScore {
             path: "main.rs".to_string(),
             relevance_score: 0.9,
@@ -349,19 +354,21 @@ mod tests {
             file_type: FileType::SourceCode,
             importance_factors: vec![ImportanceFactor::EntryPoint],
         }];
-        
+
         // Cache the analysis
-        cache.cache_project_analysis(
-            Path::new("/test"),
-            project_info.clone(),
-            file_scores.clone(),
-            "config_hash".to_string(),
-        ).unwrap();
-        
+        cache
+            .cache_project_analysis(
+                Path::new("/test"),
+                project_info.clone(),
+                file_scores.clone(),
+                "config_hash".to_string(),
+            )
+            .unwrap();
+
         // Retrieve from cache
         let cached = cache.get_project_analysis(Path::new("/test"), "config_hash");
         assert!(cached.is_some());
-        
+
         let cached_entry = cached.unwrap();
         assert_eq!(cached_entry.project_info.project_type, ProjectType::Rust);
         assert_eq!(cached_entry.file_scores.len(), 1);

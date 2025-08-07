@@ -9,15 +9,15 @@ pub mod config;
 #[allow(dead_code)]
 pub mod detector;
 #[allow(dead_code)]
+pub mod diff;
+#[allow(dead_code)]
 pub mod multi_session;
 #[allow(dead_code)]
 pub mod optimizer;
 #[allow(dead_code)]
-pub mod templates;
-#[allow(dead_code)]
 pub mod template_manager;
 #[allow(dead_code)]
-pub mod diff;
+pub mod templates;
 
 use crate::path::model::Files;
 use anyhow::Result;
@@ -114,7 +114,9 @@ impl SmartContext {
         if let Some(cache) = &self.cache {
             if let Some(cached_entry) = cache.get_project_analysis(path, &config_hash) {
                 // Apply query filtering to cached results
-                let filtered_scores = self.analyzer.filter_by_query(&cached_entry.file_scores, query);
+                let filtered_scores = self
+                    .analyzer
+                    .filter_by_query(&cached_entry.file_scores, query);
                 let selected_scores = self.optimizer.optimize_files(&filtered_scores)?;
                 return self.scores_to_files(&selected_scores).await;
             }
@@ -133,7 +135,7 @@ impl SmartContext {
         // Step 3.5: Analyze dependencies and enhance scores
         self.analyzer.analyze_dependencies(&mut file_scores)?;
 
-        // Note: Cache writing would require a mutable reference, 
+        // Note: Cache writing would require a mutable reference,
         // so we'll implement it when we restructure the API later
 
         // Step 4: Filter by query if provided
@@ -343,13 +345,13 @@ impl SmartContext {
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        
+
         // Hash key configuration values
         self.config.context.max_tokens.hash(&mut hasher);
         self.config.context.include.hash(&mut hasher);
         self.config.context.exclude.hash(&mut hasher);
         self.config.context.priority_patterns.hash(&mut hasher);
-        
+
         format!("{:x}", hasher.finish())
     }
 

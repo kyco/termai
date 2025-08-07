@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub const SYSTEM_PROMPT: &str = "
 You're an assistant in the terminal.
 You will keep your answers brief as the user is chatting to you from the command line.

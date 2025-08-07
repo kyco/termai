@@ -13,6 +13,7 @@ Claude APIs (now with Claude Opus 4 support) with a focus on privacy, speed, and
 - **🤖 Multi-Provider Support**: Works with both OpenAI and Claude APIs
 - **🚀 Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
 - **🧠 Smart Context Discovery**: Revolutionary intelligent project analysis that automatically selects the most relevant files
+- **🔄 AI-Powered Git Integration**: Complete Git workflow automation with intelligent commit messages, code reviews, and conflict resolution
 - **📁 Local Context Understanding**: Analyze your code and files for more relevant responses
 - **💬 Session Management**: Save and restore conversations for later reference
 - **🔒 Privacy-Focused**: Redact sensitive information before sending to APIs
@@ -222,105 +223,479 @@ entry_points = ["src/main.rs"] # Override entry point detection
 
 ---
 
-## 📋 Commands
+## 📋 Commands Reference
 
-### Smart Context Discovery
+TermAI offers intuitive subcommands for all your AI assistant needs:
+
+### 🚀 Quick Start Commands
 
 ```bash
-termai --smart-context "your query" .              # 🧠 Auto-select relevant files
-termai --smart-context --preview "query" .         # Preview file selection
-termai --smart-context --max-tokens 6000 "query" . # Custom token limit
-termai --smart-context --session name "query" .    # Use with session management
+# Interactive setup (recommended first step)
+termai setup
+
+# Ask a quick question
+termai ask "How do I implement binary search in Rust?"
+
+# Start a conversation
+termai chat
+termai chat "Let's discuss software architecture"
+
+# Smart context analysis
+termai chat --smart-context "Refactor this authentication system" .
 ```
 
-### Setup & Configuration
+### 🧠 Smart Context Discovery
 
 ```bash
-termai setup                    # 🌟 Interactive setup wizard
-termai config show             # View current configuration
-termai config reset            # Clear all settings
-termai config set-claude KEY   # Set Claude API key
-termai config set-openai KEY   # Set OpenAI API key
-```
-
-### Advanced Configuration (Manual)
-
-If you prefer manual configuration over the setup wizard:
-
-```bash
-termai --claude-api-key YOUR_CLAUDE_API_KEY    # Configure Claude
-termai --chat-gpt-api-key YOUR_OPENAI_API_KEY  # Configure OpenAI  
-termai --provider claude                       # Set default provider
-```
-
-## 📖 Usage
-
-### Basic Queries
-
-```bash
-# Ask a simple question
-termai "What is the capital of France?"
-
-# Get coding advice
-termai "How do I implement binary search in Rust?"
-```
-
-### 🧠 Smart Context Discovery (Recommended)
-
-```bash
-# Let AI automatically find relevant files
-termai --smart-context "Add authentication to the user service" .
-
-# Optimize large codebases with automatic chunking
-termai --smart-context "Review and improve error handling" .
+# Automatic file discovery and analysis
+termai ask --smart-context "Add error handling" .
+termai chat --smart-context "Review security issues" .
 
 # Preview what files would be selected
-termai --smart-context --preview "Refactor database queries" .
+termai ask --smart-context --preview-context "Optimize performance" .
+
+# Customize token limits and chunking
+termai ask --smart-context --max-context-tokens 6000 "Explain the codebase" .
+termai chat --smart-context --chunked-analysis --chunk-strategy hierarchical "Full code review" .
+
+# Target specific context
+termai ask --smart-context --context-query "database connections" "Fix connection pooling" .
 ```
 
-### Traditional Local Context
+### ⚙️ Configuration Management
 
 ```bash
-# Create a README for your project
-termai "Create a README for this project" .
+# Interactive setup wizard
+termai setup                           # Complete guided setup
+termai setup --auto-accept            # Non-interactive with defaults
+termai setup --skip-validation        # Skip API key validation
 
-# Generate tests for a specific file
-termai "Write unit tests for this file" ./src/main.rs
+# View and manage configuration
+termai config show                     # Display current settings
+termai config env                      # Show environment variables
+termai config reset                    # Clear all configuration
 
-# Provide explanations for complex code
-termai "Explain what this function does" ./path/to/complex_code.rs
+# Set API keys and providers
+termai config set-claude KEY           # Configure Claude API
+termai config set-openai KEY           # Configure OpenAI API  
+termai config set-provider claude      # Set default provider
 ```
 
-### Working with Git
-
-### Generate a commit message from your changes
-
-```
-git diff | termai "Write a concise git commit message"
-```
-
-### Explain a complex git diff
-
-```                                                                                                                                                               
-git show | termai "Explain what changes were made in this commit"
-```
-
-### Session Management
+### 💬 Session Management
 
 ```bash
-# Start or continue a named session
-termai --session my_project "Tell me about Rust's ownership model"
+# List and manage sessions
+termai sessions list                   # Show all sessions
+termai sessions list --limit 5 --sort date # Show recent 5 sessions
+termai sessions show session_name      # View session details
+termai sessions delete session_name    # Remove a session
 
-# List all saved sessions
-termai sessions list
+# Use sessions in conversations
+termai chat --session my_project       # Continue specific session
+termai ask --session code_review "Explain this function" ./src/lib.rs
 ```
 
-### Privacy & Redaction
+### 🔒 Privacy & Redaction
 
 ```bash
-termai redact add "sensitive_data"     # Add text to redact
-termai redact list                     # List redaction patterns
-termai redact remove "sensitive_data"  # Remove a redaction pattern
+# Manage redaction patterns
+termai redact add "SECRET_KEY"          # Add sensitive text pattern
+termai redact add "user_.*@company.com" # Add regex pattern
+termai redact list                      # Show all patterns
+termai redact remove "SECRET_KEY"       # Remove a pattern
+termai redact reset                     # Clear all patterns
+```
+
+### 🔧 Advanced Features
+
+```bash
+# Custom context directories
+termai ask --directories src,tests,docs "Document this project" .
+termai chat --directory src --exclude "*.test.js,node_modules" "Review the code" .
+
+# Provider and model selection
+termai ask --provider openai "Generate API documentation" .
+termai chat --provider claude --model claude-3-5-sonnet-20241022 "Code review" .
+
+# System prompts and customization
+termai ask --system-prompt "You are a Rust expert" "Optimize this code" ./main.rs
+termai chat --session rust_tutor --system-prompt "Act as a patient teacher"
+```
+
+### 🐚 Shell Completion
+
+```bash
+# Generate completion scripts
+termai completion bash                  # Basic Bash completion
+termai completion zsh                   # Basic Zsh completion  
+termai completion fish                  # Basic Fish completion
+termai completion powershell            # PowerShell completion
+
+# Enhanced completions with dynamic features
+termai completion enhanced bash         # Bash with session name completion
+termai completion enhanced zsh          # Zsh with smart suggestions
+termai completion enhanced fish         # Fish with context-aware completion
+
+# Installation examples
+termai completion bash > ~/.termai-completion.bash
+echo 'source ~/.termai-completion.bash' >> ~/.bashrc
+```
+
+### 🔍 Environment Variables
+
+TermAI supports environment variables for flexible configuration:
+
+```bash
+# API Keys
+export OPENAI_API_KEY="your-key"
+export CLAUDE_API_KEY="your-key"
+
+# Provider settings  
+export TERMAI_PROVIDER="claude"
+export TERMAI_MODEL="claude-3-5-sonnet-20241022"
+
+# Context settings
+export TERMAI_MAX_CONTEXT_TOKENS="4000"
+export TERMAI_SYSTEM_PROMPT="You are a helpful coding assistant"
+
+# View current environment
+termai config env
+```
+
+## 📖 Usage Examples
+
+### 🎯 Common Workflows
+
+#### Development Assistant
+```bash
+# Quick coding questions
+termai ask "How do I implement a thread pool in Rust?"
+termai ask "Best practices for error handling in REST APIs"
+
+# Code analysis with smart context
+termai ask --smart-context "Find potential memory leaks" .
+termai ask --smart-context "Suggest performance optimizations" .
+
+# Interactive development session
+termai chat --session dev_work --smart-context
+# Then continue the conversation naturally
+```
+
+#### Code Review & Documentation
+```bash
+# Review recent changes
+git diff | termai ask "Review this code change for potential issues"
+
+# Generate commit messages
+git diff --staged | termai ask "Write a clear commit message for these changes"
+
+# Document your code
+termai ask --smart-context "Generate comprehensive README documentation" .
+termai ask --directory src "Create API documentation for these modules" .
+```
+
+#### Learning & Exploration  
+```bash
+# Understand complex codebases
+termai ask --smart-context --preview-context "Explain the architecture" .
+termai chat --session learning --smart-context "How does the authentication system work?" .
+
+# Deep dive into specific topics
+termai chat --session rust_patterns --system-prompt "You are a Rust expert"
+```
+
+#### Project Management
+```bash
+# Analyze project health
+termai ask --smart-context "Identify technical debt and areas for refactoring" .
+termai ask --smart-context "Suggest project structure improvements" .
+
+# Generate project assets
+termai ask --smart-context "Create a comprehensive test plan" .
+termai ask --directories src,docs "Generate a contributing guide" .
+```
+
+## 🔄 AI-Powered Git Integration
+
+TermAI revolutionizes Git workflows with intelligent automation that understands your code and context. Say goodbye to repetitive Git tasks and hello to AI-powered development workflows.
+
+### ✨ Complete Git Workflow Automation
+
+**🤖 Smart Commit Generation**
+```bash
+# AI analyzes your staged changes and generates perfect commit messages
+termai commit
+> 📝 Analyzing staged changes...
+> 
+> Suggested commit message:
+> feat(auth): add OAuth2 integration with token refresh
+> 
+> - Add OAuth2Provider trait implementation
+> - Implement token refresh mechanism  
+> - Add comprehensive error handling
+> - Update tests for new auth flow
+> 
+> [e]dit, [a]ccept, [r]egenerate, [c]ancel?
+
+# Quick auto-commit mode
+termai commit --auto
+```
+
+**🔍 Intelligent Code Review**
+```bash
+# Get AI-powered code review before committing
+termai review
+> 🔍 Reviewing staged changes...
+> 
+> ⚠️  Security Issues:
+> src/auth.rs:42 - Use SecretString instead of String for passwords
+> 
+> 🚀 Performance:
+> src/auth.rs:58 - Consider caching OAuth tokens to reduce API calls
+> 
+> ✅ Positive Findings:
+> - Excellent test coverage for new functionality
+> - Follows consistent error handling patterns
+
+# Focus on specific areas
+termai review --security --performance
+```
+
+**🌿 Smart Branch Management**
+```bash
+# Analyze your current branch with AI insights
+termai branch-summary
+> 📊 Branch: feature/oauth (5 commits ahead of main)
+> 
+> AI Analysis:
+> - No breaking changes detected
+> - Well-structured commits with clear progression
+> - Good test coverage maintained
+> 
+> Suggested PR Description:
+> ## OAuth2 Integration
+> This PR adds comprehensive OAuth2 authentication support...
+
+# Generate PR/MR descriptions automatically
+termai branch-summary --pr-description
+```
+
+**⚔️ Conflict Resolution Assistant**
+```bash
+# AI-powered merge conflict analysis and resolution
+termai conflicts detect
+> ⚔️  Found 3 merge conflicts in 2 files
+> 
+> src/auth.rs:
+> - Complexity: Medium (structural changes to auth module)
+> - Strategy: Manual review recommended (business logic conflict)
+> - Confidence: 85% - can suggest resolution approach
+> 
+> tests/auth_test.rs:
+> - Complexity: Low (test assertion updates)  
+> - Strategy: Auto-resolution possible
+> - Confidence: 95% - safe to auto-resolve
+
+# Interactive conflict resolution
+termai conflicts resolve --interactive
+```
+
+**🔄 Interactive Rebase Guidance**
+```bash
+# AI-assisted interactive rebase with smart suggestions
+termai rebase start main --count 5
+> 🔄 Planning interactive rebase of last 5 commits
+> 
+> AI Recommendations:
+> ✅ Squash commits #2 and #3 (both fix typos in same function)
+> ✅ Reword commit #4 (improve message clarity)
+> ⚠️  Keep commit #1 separate (substantial feature addition)
+> 
+> [a]pply suggestions, [m]anual edit, [c]ancel?
+
+# Continue interrupted rebase with AI guidance
+termai rebase continue
+```
+
+**🏷️ Release Management**
+```bash
+# AI-powered tag creation with semantic versioning
+termai tag create --from-tag v1.2.0
+> 🏷️  Analyzing changes since v1.2.0...
+> 
+> Detected Changes:
+> - 3 new features (OAuth, rate limiting, caching)
+> - 2 bug fixes (auth timeout, memory leak)
+> - No breaking changes
+> 
+> Suggested Version: v1.3.0 (minor)
+> 
+> Generated Release Notes:
+> ## v1.3.0 - Enhanced Authentication & Performance
+> 
+> ### 🚀 New Features
+> - OAuth2 integration with multiple providers
+> - Advanced rate limiting system
+> - Intelligent response caching
+```
+
+**🪝 Git Hooks Automation**
+```bash
+# Install AI-powered Git hooks for automated quality assurance
+termai hooks install-all
+> 🪝 Installing TermAI Git hooks...
+> ✅ Pre-commit: Code quality analysis
+> ✅ Commit-msg: Message validation
+> ✅ Pre-push: Final review check
+> ✅ Post-commit: Success insights
+
+# Check hooks status
+termai hooks status
+```
+
+### 🎯 Smart Git Commands Reference
+
+| Command | Purpose | AI Features |
+|---------|---------|-------------|
+| `termai commit` | Generate commit messages | Analyzes diffs, follows conventions, suggests scope |
+| `termai review` | Code review assistance | Security scan, performance check, style validation |
+| `termai branch-summary` | Branch analysis | Change summary, PR descriptions, impact analysis |
+| `termai conflicts` | Merge conflict help | Strategy suggestions, complexity analysis, auto-resolution |
+| `termai rebase` | Interactive rebase guide | Commit squashing, message improvements, conflict prediction |
+| `termai tag` | Release management | Semantic versioning, release notes, change categorization |
+| `termai hooks` | Git hooks management | Quality gates, automation, integration with existing tools |
+| `termai stash` | Stash operations | Smart naming, conflict detection, restoration guidance |
+
+### 🚀 Workflow Examples
+
+**Daily Development Flow**
+```bash
+# Make changes
+git add .
+
+# AI-powered commit
+termai commit
+> feat(api): add user profile endpoints with validation
+
+# AI code review
+termai review
+> ✅ No issues found, ready to push!
+
+# Push with confidence
+git push
+```
+
+**Feature Branch Workflow**
+```bash
+# Create and work on feature branch
+git checkout -b feature/user-profiles
+
+# Multiple commits...
+git add . && termai commit --auto
+git add . && termai commit --auto
+
+# Clean up commits before merging
+termai rebase start main --interactive
+> Squashed 3 commits into coherent feature story
+
+# Generate PR description
+termai branch-summary --pr-description
+> ## User Profile Management
+> Comprehensive user profile system with validation...
+
+# Create PR with generated description
+```
+
+**Release Preparation**
+```bash
+# Analyze changes for release
+termai tag create
+> Suggested version: v2.1.0
+> 
+> Breaking Changes: None
+> New Features: 4
+> Bug Fixes: 2
+
+# Create release with AI-generated notes
+git tag v2.1.0 -m "$(termai tag release-notes --from v2.0.0)"
+```
+
+### 🎬 Workflow Demos
+
+See TermAI's Git integration in action:
+
+![Commit Generation Demo](https://github.com/user/termAI/raw/main/docs/gifs/commit-demo.gif)
+*AI-powered commit message generation with interactive refinement*
+
+![Code Review Demo](https://github.com/user/termAI/raw/main/docs/gifs/review-demo.gif)
+*Comprehensive code review with security and performance analysis*
+
+![Branch Analysis Demo](https://github.com/user/termAI/raw/main/docs/gifs/branch-demo.gif)
+*Smart branch analysis and PR description generation*
+
+![Conflict Resolution Demo](https://github.com/user/termAI/raw/main/docs/gifs/conflicts-demo.gif)
+*AI-assisted merge conflict resolution with strategy recommendations*
+
+### 🎨 Beautiful Terminal Experience
+
+All Git commands feature:
+- **🎨 Rich Colors**: Visual distinction for different types of information
+- **📊 Progress Indicators**: Real-time feedback during analysis
+- **🎯 Interactive Prompts**: Smart defaults with easy customization
+- **💡 Contextual Tips**: Learning opportunities built into the workflow
+- **⚡ Fast Performance**: Efficient analysis even for large repositories
+
+### 🔧 Configuration & Customization
+
+Create `.termai.toml` in your project root:
+
+```toml
+[git]
+# Commit message preferences
+commit_template = "conventional"  # conventional, minimal, detailed
+auto_stage = false               # Auto-stage files before commit
+require_scope = true            # Require scope in commit messages
+
+# Code review settings  
+review_depth = "standard"       # quick, standard, thorough
+security_focus = true          # Enable security analysis
+performance_focus = true       # Enable performance analysis
+
+# Hook configuration
+hooks_enabled = ["pre-commit", "commit-msg"]
+hook_strictness = "warn"       # warn, error, off
+```
+
+---
+
+### 🎯 Session-Based Workflows
+
+```bash
+# Start focused development sessions
+termai chat --session auth_refactor --smart-context "Let's refactor the authentication system" .
+
+# Continue multi-part conversations
+termai chat --session auth_refactor  # Resumes previous conversation
+
+# Organize work by project
+termai sessions list                  # See all active sessions
+termai sessions show auth_refactor    # Review session history
+termai sessions delete old_session    # Clean up completed work
+```
+
+### 🔒 Privacy-First Development
+
+```bash
+# Set up redaction patterns for your organization
+termai redact add "ACME_API_KEY_.*"           # Redact API keys
+termai redact add "user_\d+@company\.com"     # Redact user emails  
+termai redact add "password.*=.*"             # Redact password assignments
+
+# Verify redaction is working
+termai redact list                            # Check active patterns
+
+# Safe analysis of sensitive codebases
+termai ask --smart-context "Review security practices" .  # Redaction applied automatically
 ```
 
 ## 🏗️ Architecture
@@ -351,12 +726,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔮 Future Plans
 
 - Stream responses for faster feedback
-- Auto-completion plugins for common shells  
+- ✅ Enhanced shell completion with dynamic session/model completion
 - Voice input/output support
 - Additional LLM providers (Gemini, Cohere, etc.)
 - Custom fine-tuned models
 - Enhanced smart context with semantic code analysis
 - Team collaboration features for shared context templates
+- Man page generation for offline documentation
+- Command discovery aids with intelligent suggestions
 
 ---                                                                                                                                                                                                                
 

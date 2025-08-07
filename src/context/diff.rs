@@ -129,7 +129,7 @@ impl ContextDiff {
     /// Save a context snapshot to disk
     pub fn save_snapshot(&self, snapshot: &ContextSnapshot) -> Result<()> {
         fs::create_dir_all(&self.cache_dir)?;
-        
+
         let snapshot_file = self.cache_dir.join(format!(
             "context_snapshot_{}.json",
             self.project_hash(&snapshot.project_path)
@@ -234,9 +234,9 @@ impl ContextDiff {
 
         // Find modified or relevance-changed files
         for path in current_file_paths.intersection(&snapshot_files) {
-            if let (Some(current_score), Some(old_snapshot)) = 
-                (current_files.get(path), snapshot.files.get(path)) {
-                
+            if let (Some(current_score), Some(old_snapshot)) =
+                (current_files.get(path), snapshot.files.get(path))
+            {
                 let file_path = Path::new(path);
                 let mut file_modified = false;
                 let mut relevance_changed = false;
@@ -251,8 +251,10 @@ impl ContextDiff {
                         .as_secs();
 
                     let current_size = metadata.len();
-                    
-                    if current_modified != old_snapshot.modified_time || current_size != old_snapshot.size {
+
+                    if current_modified != old_snapshot.modified_time
+                        || current_size != old_snapshot.size
+                    {
                         file_modified = true;
                         modified_files.push(path.clone());
                     }
@@ -260,8 +262,9 @@ impl ContextDiff {
 
                 // Check if relevance score changed significantly
                 let relevance_threshold = 0.1; // 10% change threshold
-                let relevance_diff = (current_score.relevance_score - old_snapshot.relevance_score).abs();
-                
+                let relevance_diff =
+                    (current_score.relevance_score - old_snapshot.relevance_score).abs();
+
                 if relevance_diff > relevance_threshold {
                     relevance_changed = true;
                     relevance_changed_files.push(path.clone());
@@ -298,7 +301,7 @@ impl ContextDiff {
         // Large numbers of changes or high-impact changes might require full reanalysis
         let total_changes = added_files.len() + deleted_files.len() + modified_files.len();
         let high_impact_changes = changes.iter().filter(|c| c.impact_score > 0.7).count();
-        
+
         let incremental_update_possible = total_changes < 20 && high_impact_changes < 5;
 
         Ok(DiffResult {
@@ -330,28 +333,44 @@ impl ContextDiff {
         }
 
         if !diff.modified_files.is_empty() {
-            summary.push_str(&format!("  ✏️  {} files modified\n", diff.modified_files.len()));
+            summary.push_str(&format!(
+                "  ✏️  {} files modified\n",
+                diff.modified_files.len()
+            ));
         }
 
         if !diff.deleted_files.is_empty() {
-            summary.push_str(&format!("  ➖ {} files deleted\n", diff.deleted_files.len()));
+            summary.push_str(&format!(
+                "  ➖ {} files deleted\n",
+                diff.deleted_files.len()
+            ));
         }
 
         if !diff.relevance_changed_files.is_empty() {
-            summary.push_str(&format!("  🎯 {} files with relevance changes\n", diff.relevance_changed_files.len()));
+            summary.push_str(&format!(
+                "  🎯 {} files with relevance changes\n",
+                diff.relevance_changed_files.len()
+            ));
         }
 
         if diff.incremental_update_possible {
-            summary.push_str("✨ Incremental update possible - using optimized context discovery\n");
+            summary
+                .push_str("✨ Incremental update possible - using optimized context discovery\n");
         } else {
             summary.push_str("🔄 Significant changes detected - performing full reanalysis\n");
         }
 
         // Show most impactful changes
-        let mut high_impact: Vec<_> = diff.changes.iter()
+        let mut high_impact: Vec<_> = diff
+            .changes
+            .iter()
             .filter(|c| c.impact_score > 0.5)
             .collect();
-        high_impact.sort_by(|a, b| b.impact_score.partial_cmp(&a.impact_score).unwrap_or(std::cmp::Ordering::Equal));
+        high_impact.sort_by(|a, b| {
+            b.impact_score
+                .partial_cmp(&a.impact_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if !high_impact.is_empty() {
             summary.push_str("\n🎯 High Impact Changes:\n");
@@ -360,7 +379,7 @@ impl ContextDiff {
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or(&change.file_path);
-                
+
                 let change_icon = match change.change_type {
                     ChangeType::Added => "➕",
                     ChangeType::Modified => "✏️",
@@ -406,7 +425,8 @@ impl ContextDiff {
         // Add high-relevance new files
         for added in &diff.added_files {
             if let Some(&relevance) = score_map.get(added) {
-                if relevance > 0.6 { // Only add files with decent relevance
+                if relevance > 0.6 {
+                    // Only add files with decent relevance
                     updated_selection.insert(added.clone());
                 }
             }
@@ -441,7 +461,7 @@ impl ContextDiff {
         // For performance, hash file metadata and first/last chunks instead of entire content
         let metadata = path.metadata()?;
         let mut hasher = DefaultHasher::new();
-        
+
         metadata.len().hash(&mut hasher);
         metadata.modified()?.hash(&mut hasher);
 
@@ -476,11 +496,11 @@ impl ContextDiff {
         }
 
         let mut snapshot_files = Vec::new();
-        
+
         for entry in fs::read_dir(&self.cache_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                 if file_name.starts_with("context_snapshot_") && file_name.ends_with(".json") {
                     if let Ok(metadata) = entry.metadata() {
@@ -558,14 +578,16 @@ mod tests {
         let project_path = temp_dir.path().join("project");
         let scores = vec![create_test_file_score("src/main.rs", 0.9)];
 
-        let snapshot = diff.create_snapshot(
-            &project_path,
-            Some("query_hash".to_string()),
-            "config_hash".to_string(),
-            &scores,
-            &["src/main.rs".to_string()],
-            1000,
-        ).unwrap();
+        let snapshot = diff
+            .create_snapshot(
+                &project_path,
+                Some("query_hash".to_string()),
+                "config_hash".to_string(),
+                &scores,
+                &["src/main.rs".to_string()],
+                1000,
+            )
+            .unwrap();
 
         // Save snapshot
         let save_result = diff.save_snapshot(&snapshot);
@@ -594,41 +616,47 @@ mod tests {
             create_test_file_score("src/lib.rs", 0.8),
         ];
 
-        let snapshot = diff.create_snapshot(
-            &project_path,
-            Some("query_hash".to_string()),
-            "config_hash".to_string(),
-            &initial_scores,
-            &["src/main.rs".to_string(), "src/lib.rs".to_string()],
-            1500,
-        ).unwrap();
+        let snapshot = diff
+            .create_snapshot(
+                &project_path,
+                Some("query_hash".to_string()),
+                "config_hash".to_string(),
+                &initial_scores,
+                &["src/main.rs".to_string(), "src/lib.rs".to_string()],
+                1500,
+            )
+            .unwrap();
 
         // Create current scores with changes
         let current_scores = vec![
             create_test_file_score("src/main.rs", 0.9), // Unchanged
-            create_test_file_score("src/lib.rs", 0.6), // Relevance decreased
-            create_test_file_score("src/new.rs", 0.7), // New file added
+            create_test_file_score("src/lib.rs", 0.6),  // Relevance decreased
+            create_test_file_score("src/new.rs", 0.7),  // New file added
         ];
         // Note: src/utils.rs was deleted (not in current_scores)
 
-        let diff_result = diff.diff_against_snapshot(
-            &snapshot,
-            &current_scores,
-            Some("query_hash"),
-            "config_hash",
-        ).unwrap();
+        let diff_result = diff
+            .diff_against_snapshot(
+                &snapshot,
+                &current_scores,
+                Some("query_hash"),
+                "config_hash",
+            )
+            .unwrap();
 
         assert!(!diff_result.needs_full_reanalysis);
         // Check that we found the new file
         assert!(diff_result.added_files.contains(&"src/new.rs".to_string()));
-        
+
         // Check that we have some changes
         assert!(!diff_result.changes.is_empty());
 
         // Should have changes for added file and relevance change
         assert!(diff_result.changes.len() >= 2);
-        
-        let added_change = diff_result.changes.iter()
+
+        let added_change = diff_result
+            .changes
+            .iter()
             .find(|c| c.change_type == ChangeType::Added && c.file_path == "src/new.rs")
             .unwrap();
         assert_eq!(added_change.new_relevance, Some(0.7));
@@ -643,21 +671,25 @@ mod tests {
         let project_path = temp_dir.path().join("project");
         let scores = vec![create_test_file_score("src/main.rs", 0.9)];
 
-        let snapshot = diff.create_snapshot(
-            &project_path,
-            Some("old_query".to_string()),
-            "config_hash".to_string(),
-            &scores,
-            &["src/main.rs".to_string()],
-            1000,
-        ).unwrap();
+        let snapshot = diff
+            .create_snapshot(
+                &project_path,
+                Some("old_query".to_string()),
+                "config_hash".to_string(),
+                &scores,
+                &["src/main.rs".to_string()],
+                1000,
+            )
+            .unwrap();
 
-        let diff_result = diff.diff_against_snapshot(
-            &snapshot,
-            &scores,
-            Some("new_query"), // Different query
-            "config_hash",
-        ).unwrap();
+        let diff_result = diff
+            .diff_against_snapshot(
+                &snapshot,
+                &scores,
+                Some("new_query"), // Different query
+                "config_hash",
+            )
+            .unwrap();
 
         assert!(diff_result.needs_full_reanalysis);
         assert!(!diff_result.incremental_update_possible);
@@ -709,7 +741,7 @@ mod tests {
         let diff = ContextDiff::new(cache_dir);
 
         let previous_selection = vec!["src/main.rs".to_string(), "src/old.rs".to_string()];
-        
+
         let diff_result = DiffResult {
             changes: Vec::new(),
             added_files: vec!["src/new.rs".to_string()],
@@ -725,11 +757,8 @@ mod tests {
             create_test_file_score("src/new.rs", 0.8), // High relevance - should be included
         ];
 
-        let updated_selection = diff.apply_incremental_update(
-            &previous_selection,
-            &diff_result,
-            &current_scores,
-        );
+        let updated_selection =
+            diff.apply_incremental_update(&previous_selection, &diff_result, &current_scores);
 
         assert!(updated_selection.contains(&"src/main.rs".to_string()));
         assert!(updated_selection.contains(&"src/new.rs".to_string()));
@@ -746,16 +775,22 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "Hello, world!").unwrap();
 
-        let hash1 = diff.calculate_file_hash(&test_file.to_string_lossy()).unwrap();
+        let hash1 = diff
+            .calculate_file_hash(&test_file.to_string_lossy())
+            .unwrap();
         assert!(!hash1.is_empty());
 
         // Same file should produce same hash
-        let hash2 = diff.calculate_file_hash(&test_file.to_string_lossy()).unwrap();
+        let hash2 = diff
+            .calculate_file_hash(&test_file.to_string_lossy())
+            .unwrap();
         assert_eq!(hash1, hash2);
 
         // Modified file should produce different hash
         fs::write(&test_file, "Hello, modified world!").unwrap();
-        let hash3 = diff.calculate_file_hash(&test_file.to_string_lossy()).unwrap();
+        let hash3 = diff
+            .calculate_file_hash(&test_file.to_string_lossy())
+            .unwrap();
         assert_ne!(hash1, hash3);
     }
 }

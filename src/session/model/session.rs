@@ -134,7 +134,11 @@ impl Session {
 
     /// Check if this session has valid smart context for a query
     #[allow(dead_code)]
-    pub fn has_valid_smart_context(&self, query_hash: Option<&str>, config_hash: Option<&str>) -> bool {
+    pub fn has_valid_smart_context(
+        &self,
+        query_hash: Option<&str>,
+        config_hash: Option<&str>,
+    ) -> bool {
         match &self.smart_context {
             Some(context) => context.is_valid_for_query(query_hash, config_hash),
             None => false,
@@ -150,20 +154,17 @@ impl Session {
     /// Add a message with smart context metadata
     #[allow(dead_code)]
     pub fn add_message_with_smart_context(
-        &mut self, 
-        message: String, 
+        &mut self,
+        message: String,
         role: Role,
         include_context_info: bool,
     ) {
         let mut final_message = message;
-        
+
         // If this is a user message and we have smart context, optionally include context info
         if matches!(role, Role::User) && include_context_info {
             if let Some(context) = &self.smart_context {
-                let context_info = format!(
-                    "\n\n[Smart Context: {}]",
-                    context.get_summary()
-                );
+                let context_info = format!("\n\n[Smart Context: {}]", context.get_summary());
                 final_message.push_str(&context_info);
             }
         }

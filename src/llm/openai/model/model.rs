@@ -4,6 +4,9 @@ use serde::Serialize;
 #[serde(rename_all = "lowercase")]
 #[allow(dead_code)]
 pub enum Model {
+    Gpt5,
+    Gpt5Mini,
+    Gpt5Nano,
     Gpt4o,
     Gpt4oMini,
     Gpt4Turbo,
@@ -45,6 +48,9 @@ pub enum Model {
 impl Model {
     pub fn to_string(&self) -> String {
         match self {
+            Model::Gpt5 => "gpt-5".to_owned(),
+            Model::Gpt5Mini => "gpt-5-mini".to_owned(),
+            Model::Gpt5Nano => "gpt-5-nano".to_owned(),
             Model::Gpt4o => "gpt-4o".to_owned(),
             Model::Gpt4oMini => "gpt-4o-mini".to_owned(),
             Model::Gpt4Turbo => "gpt-4-turbo".to_owned(),

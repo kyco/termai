@@ -1,0 +1,30 @@
+[project]
+name = "termai"
+type = "rust"
+version = "1.0"
+
+[context]
+max_tokens = 8000
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "examples/**/*.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+]
+exclude = [
+    "target/**",
+    "**/*.rlib",
+    "**/.*",
+]
+priority_patterns = [
+    "main.rs",
+    "lib.rs",
+    "mod.rs",
+]
+
+[providers]
+default = "claude"
+fallback = "openai"
+locked = false

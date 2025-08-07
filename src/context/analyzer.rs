@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::Path;
 use std::time::SystemTime;
-use std::fs;
 
 /// Represents a file with its relevance score and metadata
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -37,9 +37,9 @@ pub enum ImportanceFactor {
     Documentation,
     SmallSize,
     FrequentlyAccessed,
-    HighlyReferenced,     // File is referenced by many other files
-    DependencyRoot,       // File that others depend on
-    RecentDependency,     // File that recently changed dependencies point to
+    HighlyReferenced, // File is referenced by many other files
+    DependencyRoot,   // File that others depend on
+    RecentDependency, // File that recently changed dependencies point to
 }
 
 /// Analyzes files and assigns relevance scores
@@ -233,8 +233,11 @@ impl FileAnalyzer {
         let path_str = path.to_string_lossy().to_lowercase();
 
         // Check for test directories
-        if path_str.contains("/test/") || path_str.contains("/tests/") 
-            || path_str.starts_with("test/") || path_str.starts_with("tests/") {
+        if path_str.contains("/test/")
+            || path_str.contains("/tests/")
+            || path_str.starts_with("test/")
+            || path_str.starts_with("tests/")
+        {
             return true;
         }
 
@@ -293,7 +296,7 @@ impl FileAnalyzer {
     /// Analyze file dependencies and enhance scores based on relationships
     pub fn analyze_dependencies(&self, files: &mut [FileScore]) -> Result<()> {
         let dependency_map = self.build_dependency_map(files)?;
-        
+
         // Calculate reference counts for each file
         let mut reference_counts: HashMap<String, usize> = HashMap::new();
         for dependencies in dependency_map.values() {
@@ -306,21 +309,34 @@ impl FileAnalyzer {
         for file_score in files.iter_mut() {
             let file_path = &file_score.path;
             let ref_count = reference_counts.get(file_path).unwrap_or(&0);
-            
+
             // High reference count indicates an important file
             if *ref_count >= 3 {
-                if !file_score.importance_factors.contains(&ImportanceFactor::HighlyReferenced) {
-                    file_score.importance_factors.push(ImportanceFactor::HighlyReferenced);
+                if !file_score
+                    .importance_factors
+                    .contains(&ImportanceFactor::HighlyReferenced)
+                {
+                    file_score
+                        .importance_factors
+                        .push(ImportanceFactor::HighlyReferenced);
                     file_score.relevance_score = (file_score.relevance_score + 0.3).min(1.0);
                 }
             }
 
             // Files that others depend on but have few dependencies themselves (root files)
             if *ref_count >= 2 {
-                let own_deps = dependency_map.get(file_path).map(|deps| deps.len()).unwrap_or(0);
+                let own_deps = dependency_map
+                    .get(file_path)
+                    .map(|deps| deps.len())
+                    .unwrap_or(0);
                 if own_deps <= 1 {
-                    if !file_score.importance_factors.contains(&ImportanceFactor::DependencyRoot) {
-                        file_score.importance_factors.push(ImportanceFactor::DependencyRoot);
+                    if !file_score
+                        .importance_factors
+                        .contains(&ImportanceFactor::DependencyRoot)
+                    {
+                        file_score
+                            .importance_factors
+                            .push(ImportanceFactor::DependencyRoot);
                         file_score.relevance_score = (file_score.relevance_score + 0.2).min(1.0);
                     }
                 }
@@ -331,11 +347,15 @@ impl FileAnalyzer {
     }
 
     /// Build a dependency map showing which files depend on which other files
-    fn build_dependency_map(&self, files: &[FileScore]) -> Result<HashMap<String, HashSet<String>>> {
+    fn build_dependency_map(
+        &self,
+        files: &[FileScore],
+    ) -> Result<HashMap<String, HashSet<String>>> {
         let mut dependency_map: HashMap<String, HashSet<String>> = HashMap::new();
-        
+
         // Create a set of all file paths for quick lookup (without directory prefix)
-        let file_names: HashSet<String> = files.iter()
+        let file_names: HashSet<String> = files
+            .iter()
             .filter_map(|f| {
                 Path::new(&f.path)
                     .file_name()
@@ -347,12 +367,12 @@ impl FileAnalyzer {
         for file_score in files {
             let file_path = &file_score.path;
             let mut dependencies = HashSet::new();
-            
+
             // Analyze file content for imports/dependencies
             if let Ok(content) = fs::read_to_string(file_path) {
                 dependencies.extend(self.extract_dependencies(&content, &file_names, file_path)?);
             }
-            
+
             dependency_map.insert(file_path.clone(), dependencies);
         }
 
@@ -361,20 +381,23 @@ impl FileAnalyzer {
 
     /// Extract dependencies from file content based on language-specific patterns
     fn extract_dependencies(
-        &self, 
-        content: &str, 
+        &self,
+        content: &str,
         available_files: &HashSet<String>,
-        file_path: &str
+        file_path: &str,
     ) -> Result<HashSet<String>> {
         let mut dependencies = HashSet::new();
         let path = Path::new(file_path);
-        
+
         match path.extension().and_then(|ext| ext.to_str()) {
             Some("rs") => {
                 // Rust: use, mod, extern crate
                 for line in content.lines() {
                     let line = line.trim();
-                    if line.starts_with("use ") || line.starts_with("mod ") || line.starts_with("extern crate ") {
+                    if line.starts_with("use ")
+                        || line.starts_with("mod ")
+                        || line.starts_with("extern crate ")
+                    {
                         // Extract potential file references
                         self.extract_rust_dependencies(line, available_files, &mut dependencies);
                     }
@@ -427,7 +450,7 @@ impl FileAnalyzer {
         &self,
         line: &str,
         available_files: &HashSet<String>,
-        dependencies: &mut HashSet<String>
+        dependencies: &mut HashSet<String>,
     ) {
         // Simple pattern matching for mod declarations
         if line.starts_with("mod ") {
@@ -447,12 +470,14 @@ impl FileAnalyzer {
         &self,
         line: &str,
         available_files: &HashSet<String>,
-        dependencies: &mut HashSet<String>
+        dependencies: &mut HashSet<String>,
     ) {
         // Look for relative imports like "./module" or "../utils"
         for file_name in available_files {
             let base_name = file_name.trim_end_matches(".js").trim_end_matches(".ts");
-            if line.contains(&format!("./{}", base_name)) || line.contains(&format!("../{}", base_name)) {
+            if line.contains(&format!("./{}", base_name))
+                || line.contains(&format!("../{}", base_name))
+            {
                 dependencies.insert(file_name.clone());
             }
         }
@@ -463,7 +488,7 @@ impl FileAnalyzer {
         &self,
         line: &str,
         available_files: &HashSet<String>,
-        dependencies: &mut HashSet<String>
+        dependencies: &mut HashSet<String>,
     ) {
         for file_name in available_files {
             let module_name = file_name.trim_end_matches(".py");
@@ -478,7 +503,7 @@ impl FileAnalyzer {
         &self,
         _line: &str,
         _available_files: &HashSet<String>,
-        _dependencies: &mut HashSet<String>
+        _dependencies: &mut HashSet<String>,
     ) {
         // Go imports are typically packages, not individual files
         // More complex analysis would be needed for local file dependencies
@@ -489,10 +514,10 @@ impl FileAnalyzer {
         &self,
         _line: &str,
         _available_files: &HashSet<String>,
-        _dependencies: &mut HashSet<String>
+        _dependencies: &mut HashSet<String>,
     ) {
         // Java imports are typically packages, not individual files
-        // More complex analysis would be needed for local file dependencies  
+        // More complex analysis would be needed for local file dependencies
     }
 }
 

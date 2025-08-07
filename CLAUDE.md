@@ -33,27 +33,68 @@ TermAI is a terminal-based AI assistant built in Rust that supports both OpenAI 
 
 ## User Commands
 
+TermAI uses an intuitive subcommand structure for better discoverability and organization:
+
 ### Setup and Configuration
-- `cargo run --release -- setup` - Interactive setup wizard (recommended for first-time setup)
-- `cargo run --release -- config show` - Display current configuration
-- `cargo run --release -- config reset` - Clear all configuration
-- `cargo run --release -- config set-claude KEY` - Set Claude API key
-- `cargo run --release -- config set-openai KEY` - Set OpenAI API key
-- `cargo run --release -- config set-provider claude` - Set default provider
+- `termai setup` - Interactive setup wizard (recommended for first-time setup)
+- `termai config show` - Display current configuration with visual status
+- `termai config set-claude <KEY>` - Set Claude API key
+- `termai config set-openai <KEY>` - Set OpenAI API key  
+- `termai config set-provider claude` - Set default provider (claude or openai)
+- `termai config reset` - Clear all configuration (with confirmation)
 
-### Chat and Usage
-- `cargo run --release -- "your question"` - Basic chat query
-- `cargo run --release -- chat "your question"` - Explicit chat command
-- `cargo run --release -- "question" ./path/to/file` - Chat with local file context
+### One-Shot Questions
+- `termai ask "your question"` - Quick question without starting interactive session
+- `termai ask "question" src/` - Ask with specific directory context
+- `termai ask -d src/ -d docs/ "question"` - Multiple directories as context
+- `termai ask --session mywork "question"` - Save question to named session
+- `termai ask --smart-context "question"` - Use smart context discovery
+- `termai ask --preview-context "question" src/` - Preview context before sending
 
-### Session Management  
-- `cargo run --release -- sessions list` - List all saved sessions
-- `cargo run --release -- --session name "question"` - Use named session
+### Interactive Chat
+- `termai chat` - Start interactive chat session
+- `termai chat --session mywork` - Continue specific session
+- `termai chat src/` - Start chat with directory context
+- `termai chat --smart-context` - Enable smart context discovery
+- `termai chat -d src/ -d tests/` - Multiple directories as context
+
+### Session Management
+- `termai session list` - List all saved sessions with details
+- `termai session show <name>` - View session details and message history
+- `termai session delete <name>` - Delete session (with confirmation)
 
 ### Privacy and Redaction
-- `cargo run --release -- redact add "pattern"` - Add redaction pattern
-- `cargo run --release -- redact list` - List redaction patterns
-- `cargo run --release -- redact remove "pattern"` - Remove redaction pattern
+- `termai redact add "pattern"` - Add pattern to be redacted (e.g., email, name)
+- `termai redact remove "pattern"` - Remove redaction pattern
+- `termai redact list` - List all active redaction patterns with usage info
+
+### Shell Completion
+- `termai completion bash` - Generate Bash completion script
+- `termai completion zsh` - Generate Zsh completion script  
+- `termai completion fish` - Generate Fish completion script
+- `termai completion powershell` - Generate PowerShell completion script
+
+### Quick Examples
+```bash
+# First time setup
+termai setup
+
+# Quick questions
+termai ask "What is Rust?"
+termai ask "Explain this code" src/main.rs
+
+# Interactive sessions
+termai chat
+termai chat --session debugging
+
+# With context
+termai ask "Review this function" -d src/commands/
+termai chat --session review src/
+
+# Privacy protection  
+termai redact add "mycompany@example.com"
+termai ask "analyze logs" --preview-context logs/
+```
 
 ## Architecture
 
@@ -82,6 +123,16 @@ TermAI follows a layered architecture with clear separation of concerns:
 - **repository/**: Session persistence layer
 - **entity/**: Session and message entities
 
+#### Command Structure (`src/commands/`)
+- **mod.rs**: Command dispatcher with enhanced error handling and routing
+- **ask.rs**: One-shot question handler with full LLM integration
+- **chat.rs**: Interactive chat session handler
+- **config.rs**: Configuration and redaction management with enhanced UX
+- **session.rs**: Session management (list, show, delete) with confirmations
+- **setup.rs**: Setup wizard delegation to existing implementation
+- **completion.rs**: Shell completion script generation
+- **help.rs**: Contextual help system with examples and guidance
+
 #### Supporting Modules
 - **path/**: File content extraction for local context
 - **redactions/**: Privacy protection through text redaction
@@ -89,20 +140,22 @@ TermAI follows a layered architecture with clear separation of concerns:
 - **ui/**: User interface components (thinking timer)
 
 ### Data Flow
-1. Arguments parsed via clap (args.rs)
-2. SQLite repository initialized for persistence
-3. Configuration loaded (API keys, provider, redactions)
-4. Local context extracted from specified files/directories
-5. Session created/loaded with message history
-6. User input processed and redacted
-7. LLM provider called (Claude or OpenAI) via adapter pattern
-8. Response processed and displayed
-9. Session and messages persisted
+1. **Command Parsing**: Arguments parsed via clap with subcommand routing (args.rs)
+2. **Repository Initialization**: SQLite repository initialized for persistence
+3. **Command Dispatch**: Commands routed to appropriate handlers with enhanced error handling
+4. **Configuration Loading**: API keys, provider preferences, and redaction patterns loaded
+5. **Context Extraction**: Local context extracted from specified files/directories (if requested)
+6. **Input Processing**: User input processed and redacted for privacy
+7. **LLM Integration**: Provider called (Claude or OpenAI) via service layer
+8. **Response Processing**: Response formatted and displayed with enhanced UX
+9. **Persistence**: Sessions and messages persisted (if session specified)
 
 ### Key Design Patterns
+- **Command Pattern**: Subcommand structure with dedicated handlers for each operation
 - **Repository Pattern**: Data access through traits (ConfigRepository, SessionRepository, MessageRepository)
 - **Adapter Pattern**: LLM provider abstraction in claude/ and openai/ modules
 - **Service Layer**: Business logic separation from data and presentation layers
+- **Enhanced Error Handling**: Context-aware error messages with actionable guidance
 
 ## Database
 - SQLite database stored in `~/.config/termai/app.db`

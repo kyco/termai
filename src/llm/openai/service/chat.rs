@@ -26,6 +26,9 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
         model: model.to_string(),
         messages: chat_messages,
         reasoning_effort: ReasoningEffort::High,
+        verbosity: None,
+        tools: None,
+        tool_choice: None,
     };
     let response = open_ai_adapter::chat(&request, api_key).await?;
 

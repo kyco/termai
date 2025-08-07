@@ -1,6 +1,13 @@
+/// Argument parsing module with dedicated structures for each subcommand
+pub mod structs;
+pub mod validation;
+
+pub use structs::*;
+pub use validation::ArgumentValidator;
+
 use clap::{Parser, Subcommand, ValueEnum};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(version, about, long_about = None)]
 pub struct Args {
     #[command(subcommand)]
@@ -33,83 +40,120 @@ pub struct Args {
     pub provider: Option<Provider>,
     #[arg(short = 'd', long, value_delimiter = ',')]
     pub(crate) directories: Vec<String>,
-    
+
     /// Enable smart context discovery (automatically finds relevant files)
     #[arg(long)]
     pub smart_context: bool,
-    
-    /// Maximum tokens for smart context (default: 4000) 
+
+    /// Maximum tokens for smart context (default: 4000)
     #[arg(long, requires = "smart_context")]
     pub max_context_tokens: Option<usize>,
-    
+
     /// Preview selected context before proceeding
     #[arg(long, requires = "smart_context")]
     pub preview_context: bool,
-    
+
     /// Enable chunked analysis for large projects
     #[arg(long, requires = "smart_context")]
     pub chunked_analysis: bool,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
     /// Interactive setup wizard to configure TermAI
-    Setup,
+    Setup(SetupArgs),
+
     /// Manage configuration settings
     Config {
+        #[command(flatten)]
+        args: ConfigArgs,
         #[command(subcommand)]
         action: ConfigAction,
     },
+
     /// Manage redaction patterns for privacy
     Redact {
+        #[command(flatten)]
+        args: RedactArgs,
         #[command(subcommand)]
         action: RedactAction,
     },
+
     /// Manage chat sessions
     Sessions {
+        #[command(flatten)]
+        args: SessionArgs,
         #[command(subcommand)]
         action: SessionAction,
     },
-    /// Start a chat session (default if no subcommand provided)
-    Chat {
-        /// Chat input
-        input: Option<String>,
-        /// Local directory to include as context
-        directory: Option<String>,
-        /// Multiple directories to include as context  
-        #[arg(short = 'd', long, value_delimiter = ',')]
-        directories: Vec<String>,
-        /// Patterns to exclude from context
-        #[arg(short, long, value_delimiter = ',')]
-        exclude: Vec<String>,
-        /// System prompt to use for this session
+
+    /// Generate shell completion scripts
+    Completion {
+        #[command(flatten)]
+        args: CompletionArgs,
+        #[command(subcommand)]
+        action: CompletionAction,
+    },
+
+    /// Ask a one-shot question with optional context
+    Ask(AskArgs),
+
+    /// Start an interactive chat session
+    Chat(ChatArgs),
+
+    /// Internal completion helper (hidden)
+    #[command(hide = true)]
+    Complete {
+        /// Command line arguments to complete
+        args: Vec<String>,
+    },
+
+    /// Generate AI-powered commit messages
+    Commit(CommitArgs),
+
+    /// Review staged changes with AI analysis
+    Review(ReviewArgs),
+
+    /// Analyze Git branches and generate insights
+    #[command(name = "branch-summary")]
+    BranchSummary(BranchArgs),
+
+    /// Manage Git hooks integration
+    Hooks(HooksArgs),
+
+    /// Manage Git stash with AI assistance
+    Stash(StashArgs),
+
+    /// Manage Git tags and releases with AI assistance
+    Tag(TagArgs),
+
+    /// Interactive Git rebase with AI assistance
+    Rebase(RebaseArgs),
+
+    /// Git merge conflict resolution with AI assistance
+    Conflicts(ConflictsArgs),
+
+    /// Manage templates and presets for reusable AI interactions
+    Preset(PresetArgs),
+
+    /// Show command discovery help and suggestions (hidden)
+    #[command(hide = true, name = "discovery")]
+    Help,
+
+    /// Generate man page documentation (hidden)
+    #[command(hide = true, name = "man")]
+    Man {
+        /// Output file path (optional, defaults to stdout)
         #[arg(long)]
-        system_prompt: Option<String>,
-        /// Session name to use or create
+        output: Option<String>,
+
+        /// Show installation instructions
         #[arg(long)]
-        session: Option<String>,
-        /// Enable smart context discovery (automatically finds relevant files)
-        #[arg(long)]
-        smart_context: bool,
-        /// Query to guide smart context selection
-        #[arg(long, requires = "smart_context")]
-        context_query: Option<String>,
-        /// Maximum tokens for smart context (default: 4000)
-        #[arg(long, requires = "smart_context")]
-        max_context_tokens: Option<usize>,
-        /// Preview selected context before proceeding
-        #[arg(long, requires = "smart_context")]
-        preview_context: bool,
-        /// Enable chunked analysis for large projects (breaks into manageable pieces)
-        #[arg(long, requires = "smart_context")]
-        chunked_analysis: bool,
-        /// Chunking strategy: module, functional, token, hierarchical
-        #[arg(long, requires = "chunked_analysis", default_value = "hierarchical")]
-        chunk_strategy: String,
+        install_help: bool,
     },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum ConfigAction {
     /// Show current configuration
     Show,
@@ -124,9 +168,48 @@ pub enum ConfigAction {
     },
     /// Reset all configuration (clears API keys and settings)
     Reset,
+    /// Show environment variable help and current values
+    Env,
+    
+    // Project configuration commands
+    /// Initialize project configuration (.termai.toml)
+    Init {
+        /// Project type (rust, javascript, python, etc.)
+        #[arg(long)]
+        project_type: Option<String>,
+        /// Use template for project type
+        #[arg(long)]
+        template: Option<String>,
+        /// Force overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+    },
+    /// Show project configuration details
+    Project,
+    /// Validate project configuration
+    Validate,
+    /// Edit project configuration in default editor
+    Edit,
+    /// Export project configuration to file
+    Export {
+        /// Output file path
+        #[arg(long)]
+        file: Option<String>,
+        /// Export format (toml, json, yaml)
+        #[arg(long, default_value = "toml")]
+        format: String,
+    },
+    /// Import project configuration from file
+    Import {
+        /// Input file path
+        file: String,
+        /// Merge with existing configuration instead of replacing
+        #[arg(long)]
+        merge: bool,
+    },
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum RedactAction {
     /// Add a new redaction pattern
     Add { pattern: String },
@@ -136,34 +219,237 @@ pub enum RedactAction {
     List,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum SessionAction {
     /// List all sessions
     List,
+    /// Delete a specific session
+    Delete {
+        /// Name of the session to delete
+        name: String,
+    },
+    /// Show detailed information about a session
+    Show {
+        /// Name of the session to show
+        name: String,
+    },
+    /// Create a new conversation branch
+    Branch {
+        /// Source session name to branch from
+        session: String,
+        /// Name for the new branch (optional)
+        #[arg(long)]
+        name: Option<String>,
+        /// Description for the branch (optional) 
+        #[arg(long)]
+        description: Option<String>,
+        /// Branch from specific message index (0-based)
+        #[arg(long)]
+        from_message: Option<usize>,
+    },
+    /// Show branch tree visualization for a session
+    Tree {
+        /// Session name to show tree for
+        session: String,
+        /// Show interactive navigation interface
+        #[arg(long)]
+        interactive: bool,
+        /// Highlight specific branch in tree
+        #[arg(long)]
+        highlight: Option<String>,
+    },
+    /// List all branches in a session
+    Branches {
+        /// Session name to list branches for
+        session: String,
+        /// Show detailed branch information
+        #[arg(long)]
+        detailed: bool,
+        /// Filter by branch status (active, archived, etc.)
+        #[arg(long)]
+        status: Option<String>,
+    },
+    /// Switch to a different branch in a session
+    Switch {
+        /// Session name containing the target branch
+        session: String,
+        /// Branch name or ID to switch to
+        branch: String,
+        /// Create a new chat session on the target branch
+        #[arg(long)]
+        new_session: bool,
+    },
+    /// Bookmark a branch for quick access
+    Bookmark {
+        /// Session name containing the target branch
+        session: String,
+        /// Branch name or ID to bookmark
+        branch: String,
+        /// Bookmark name (optional, uses branch name if not provided)
+        #[arg(long)]
+        name: Option<String>,
+        /// Remove the bookmark instead of adding it
+        #[arg(long)]
+        remove: bool,
+    },
+    /// Search branches by name, description, or bookmark
+    Search {
+        /// Session name to search within
+        session: String,
+        /// Search query (searches name, description, and bookmarks)
+        query: String,
+        /// Filter by branch status (active, archived, etc.)
+        #[arg(long)]
+        status: Option<String>,
+        /// Show detailed results
+        #[arg(long)]
+        detailed: bool,
+    },
+    /// Show branch statistics and analytics
+    Stats {
+        /// Session name to analyze
+        session: String,
+        /// Show detailed analytics
+        #[arg(long)]
+        detailed: bool,
+    },
+    /// Compare branches side-by-side
+    Compare {
+        /// Session name containing branches to compare
+        session: String,
+        /// Branch names or IDs to compare (space-separated)
+        branches: Vec<String>,
+        /// Show side-by-side comparison view
+        #[arg(long)]
+        side_by_side: bool,
+        /// Compare only outcomes/conclusions
+        #[arg(long)]
+        outcomes_only: bool,
+        /// Show detailed quality analysis
+        #[arg(long)]
+        detailed: bool,
+    },
+    /// Merge branches with conflict resolution
+    Merge {
+        /// Session name containing branches to merge
+        session: String,
+        /// Source branch names or IDs to merge from
+        source_branches: Vec<String>,
+        /// Target branch name or ID to merge into
+        #[arg(long)]
+        into: String,
+        /// Merge strategy: sequential, intelligent, selective, summary, best-of
+        #[arg(long, default_value = "intelligent")]
+        strategy: String,
+        /// Preview merge before applying
+        #[arg(long)]
+        preview: bool,
+        /// Auto-confirm merge if no conflicts
+        #[arg(long)]
+        auto_confirm: bool,
+    },
+    /// Perform selective merge (cherry-pick messages)
+    SelectiveMerge {
+        /// Session name containing branches
+        session: String,
+        /// Source branch name or ID
+        source: String,
+        /// Target branch name or ID
+        target: String,
+        /// Message indices to merge (comma-separated, 0-based)
+        #[arg(long, value_delimiter = ',')]
+        messages: Vec<usize>,
+        /// Preview selected messages before merge
+        #[arg(long)]
+        preview: bool,
+    },
+    /// Archive branches after successful merge
+    Archive {
+        /// Session name containing branches
+        session: String,
+        /// Branch names or IDs to archive
+        branches: Vec<String>,
+        /// Reason for archiving
+        #[arg(long)]
+        reason: Option<String>,
+    },
+    /// Clean up old or unused branches
+    Cleanup {
+        /// Session name to clean up
+        session: String,
+        /// Cleanup strategy: archive-old, remove-empty, consolidate-similar, remove-duplicates
+        #[arg(long, default_value = "archive-old")]
+        strategy: String,
+        /// Days threshold for archive-old strategy
+        #[arg(long, default_value = "30")]
+        days: i64,
+        /// Preview cleanup actions before applying
+        #[arg(long)]
+        preview: bool,
+    },
+    /// Export branches to external formats
+    Export {
+        /// Session name containing branches
+        session: String,
+        /// Branch names or IDs to export
+        branches: Vec<String>,
+        /// Export format: json, markdown, csv, text
+        #[arg(long, default_value = "json")]
+        format: String,
+        /// Output file path (defaults to stdout)
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum CompletionAction {
+    /// Generate Bash completion script
+    Bash,
+    /// Generate Zsh completion script
+    Zsh,
+    /// Generate Fish completion script
+    Fish,
+    /// Generate PowerShell completion script
+    PowerShell,
+    /// Generate enhanced completion with dynamic features
+    Enhanced {
+        /// Shell type for enhanced completion
+        #[arg(value_enum)]
+        shell: CompletionShell,
+    },
+}
+
+#[derive(clap::ValueEnum, Debug, Clone)]
+pub enum CompletionShell {
+    Bash,
+    Zsh,
+    Fish,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Provider {
-    Openapi,
+    Openai,
     Claude,
 }
 
 impl Provider {
     pub fn new(s: &str) -> Provider {
         match s {
-            "openapi" => Provider::Openapi,
+            "openai" => Provider::Openai,
             _ => Provider::Claude,
         }
     }
 
     pub fn to_str(self) -> &'static str {
         match self {
-            Provider::Openapi => "openapi",
+            Provider::Openai => "openai",
             Provider::Claude => "claude",
         }
     }
 }
 
+#[allow(dead_code)]
 impl Args {
     pub fn is_redaction(&self) -> bool {
         matches!(self.command, Some(Commands::Redact { .. }))
@@ -176,7 +462,8 @@ impl Args {
         matches!(
             self.command,
             Some(Commands::Config {
-                action: ConfigAction::SetOpenai { .. }
+                action: ConfigAction::SetOpenai { .. },
+                ..
             })
         ) || self.chat_gpt_api_key.is_some()
     }
@@ -185,7 +472,8 @@ impl Args {
         matches!(
             self.command,
             Some(Commands::Config {
-                action: ConfigAction::SetClaude { .. }
+                action: ConfigAction::SetClaude { .. },
+                ..
             })
         ) || self.claude_api_key.is_some()
     }
@@ -194,7 +482,8 @@ impl Args {
         matches!(
             self.command,
             Some(Commands::Sessions {
-                action: SessionAction::List
+                action: SessionAction::List,
+                ..
             })
         ) || self.sessions_all
     }
@@ -207,21 +496,23 @@ impl Args {
         matches!(
             self.command,
             Some(Commands::Config {
-                action: ConfigAction::SetProvider { .. }
+                action: ConfigAction::SetProvider { .. },
+                ..
             })
         ) || self.provider.is_some()
     }
 
     #[allow(dead_code)]
     pub fn is_setup(&self) -> bool {
-        matches!(self.command, Some(Commands::Setup))
+        matches!(self.command, Some(Commands::Setup(_)))
     }
 
     pub fn is_config_show(&self) -> bool {
         matches!(
             self.command,
             Some(Commands::Config {
-                action: ConfigAction::Show
+                action: ConfigAction::Show,
+                ..
             })
         ) || self.print_config
     }
@@ -229,7 +520,7 @@ impl Args {
     #[allow(dead_code)]
     pub fn should_handle_chat(&self) -> bool {
         match &self.command {
-            Some(Commands::Chat { .. }) => true,
+            Some(Commands::Chat(_)) => true,
             None => true, // Default to chat if no subcommand
             _ => false,
         }
@@ -237,42 +528,42 @@ impl Args {
 
     pub fn get_chat_data(&self) -> Option<String> {
         match &self.command {
-            Some(Commands::Chat { input, .. }) => input.clone(),
+            Some(Commands::Chat(args)) => args.input.clone(),
             _ => self.data.clone(),
         }
     }
 
     pub fn get_chat_directory(&self) -> Option<String> {
         match &self.command {
-            Some(Commands::Chat { directory, .. }) => directory.clone(),
+            Some(Commands::Chat(args)) => args.directory.clone(),
             _ => self.directory.clone(),
         }
     }
 
     pub fn get_chat_directories(&self) -> Vec<String> {
         match &self.command {
-            Some(Commands::Chat { directories, .. }) => directories.clone(),
+            Some(Commands::Chat(args)) => args.directories.clone(),
             _ => self.directories.clone(),
         }
     }
 
     pub fn get_chat_exclude(&self) -> Vec<String> {
         match &self.command {
-            Some(Commands::Chat { exclude, .. }) => exclude.clone(),
+            Some(Commands::Chat(args)) => args.exclude.clone(),
             _ => self.exclude.clone(),
         }
     }
 
     pub fn get_chat_system_prompt(&self) -> Option<String> {
         match &self.command {
-            Some(Commands::Chat { system_prompt, .. }) => system_prompt.clone(),
+            Some(Commands::Chat(args)) => args.system_prompt.clone(),
             _ => self.system_prompt.clone(),
         }
     }
 
     pub fn get_chat_session(&self) -> Option<String> {
         match &self.command {
-            Some(Commands::Chat { session, .. }) => session.clone(),
+            Some(Commands::Chat(args)) => args.session.clone(),
             _ => self.session.clone(),
         }
     }
@@ -280,7 +571,7 @@ impl Args {
     #[allow(dead_code)]
     pub fn get_smart_context(&self) -> bool {
         match &self.command {
-            Some(Commands::Chat { smart_context, .. }) => *smart_context,
+            Some(Commands::Chat(args)) => args.smart_context,
             _ => self.smart_context,
         }
     }
@@ -288,7 +579,7 @@ impl Args {
     #[allow(dead_code)]
     pub fn get_max_context_tokens(&self) -> Option<usize> {
         match &self.command {
-            Some(Commands::Chat { max_context_tokens, .. }) => *max_context_tokens,
+            Some(Commands::Chat(args)) => args.max_context_tokens,
             _ => self.max_context_tokens,
         }
     }
@@ -296,7 +587,7 @@ impl Args {
     #[allow(dead_code)]
     pub fn get_preview_context(&self) -> bool {
         match &self.command {
-            Some(Commands::Chat { preview_context, .. }) => *preview_context,
+            Some(Commands::Chat(args)) => args.preview_context,
             _ => self.preview_context,
         }
     }
@@ -304,7 +595,7 @@ impl Args {
     #[allow(dead_code)]
     pub fn get_chunked_analysis(&self) -> bool {
         match &self.command {
-            Some(Commands::Chat { chunked_analysis, .. }) => *chunked_analysis,
+            Some(Commands::Chat(args)) => args.chunked_analysis,
             _ => self.chunked_analysis,
         }
     }

@@ -14,6 +14,8 @@ pub enum ChatCommand {
     Branch(Option<String>),
     AddContext(String),
     RemoveContext(String),
+    Model(Option<String>),
+    Provider(Option<String>),
 }
 
 impl ChatCommand {
@@ -66,6 +68,22 @@ impl ChatCommand {
                     None
                 }
             }
+            "model" | "m" => {
+                let model = if parts.len() > 1 {
+                    Some(parts[1..].join(" "))
+                } else {
+                    None
+                };
+                Some(ChatCommand::Model(model))
+            }
+            "provider" | "p" => {
+                let provider = if parts.len() > 1 {
+                    Some(parts[1..].join(" "))
+                } else {
+                    None
+                };
+                Some(ChatCommand::Provider(provider))
+            }
             _ => None,
         }
     }
@@ -83,6 +101,8 @@ impl ChatCommand {
             ChatCommand::Branch(_) => "Create a new conversation branch",
             ChatCommand::AddContext(_) => "Add file or directory to context",
             ChatCommand::RemoveContext(_) => "Remove file or directory from context",
+            ChatCommand::Model(_) => "Switch AI model (e.g., gpt-5, gpt-5-mini, claude-3-5-sonnet-20241022)",
+            ChatCommand::Provider(_) => "Switch AI provider (claude or openai)",
         }
     }
 
@@ -104,6 +124,8 @@ impl ChatCommand {
                 "/remove <path>, /rm",
                 "Remove file or directory from context",
             ),
+            ("/model [name], /m", "Switch AI model or show current model"),
+            ("/provider [name], /p", "Switch AI provider (claude/openai) or show current"),
         ]
     }
 }
@@ -148,6 +170,16 @@ mod tests {
             ChatCommand::parse("/add src/main.rs"),
             Some(ChatCommand::AddContext("src/main.rs".to_string()))
         );
+        assert_eq!(
+            ChatCommand::parse("/model gpt-5"),
+            Some(ChatCommand::Model(Some("gpt-5".to_string())))
+        );
+        assert_eq!(ChatCommand::parse("/model"), Some(ChatCommand::Model(None)));
+        assert_eq!(
+            ChatCommand::parse("/provider openai"),
+            Some(ChatCommand::Provider(Some("openai".to_string())))
+        );
+        assert_eq!(ChatCommand::parse("/provider"), Some(ChatCommand::Provider(None)));
 
         // Test non-commands
         assert_eq!(ChatCommand::parse("hello world"), None);

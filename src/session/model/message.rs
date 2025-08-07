@@ -34,10 +34,12 @@ impl Message {
     }
 }
 
+#[allow(dead_code)]
 pub fn contains_system_prompt(messages: &Vec<Message>) -> bool {
     messages.iter().any(|m| m.role == Role::System)
 }
 
+#[allow(dead_code)]
 pub fn messages_with_system_prompt(
     user_prompt: Option<String>,
     messages: &Vec<Message>,

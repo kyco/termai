@@ -1,10 +1,10 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
-use predicates::prelude::*;
 
 /// Integration tests for Smart Context Discovery CLI functionality
-/// 
+///
 /// These tests verify that the --smart-context flag works correctly
 /// with various project types and configurations.
 
@@ -18,21 +18,31 @@ mod cli_integration_tests {
         let path = temp_dir.path();
 
         // Create a realistic Rust project
-        fs::write(path.join("Cargo.toml"), r#"
+        fs::write(
+            path.join("Cargo.toml"),
+            r#"
 [package]
 name = "test-project"
 version = "0.1.0"
 edition = "2021"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         fs::create_dir_all(path.join("src")).unwrap();
-        fs::write(path.join("src/main.rs"), r#"
+        fs::write(
+            path.join("src/main.rs"),
+            r#"
 fn main() {
     println!("Hello, world!");
 }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
-        fs::write(path.join("src/lib.rs"), r#"
+        fs::write(
+            path.join("src/lib.rs"),
+            r#"
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
@@ -47,7 +57,9 @@ mod tests {
         assert_eq!(result, 4);
     }
 }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Test the CLI with --smart-context flag
         let mut cmd = Command::cargo_bin("termai").unwrap();
@@ -58,15 +70,15 @@ mod tests {
         // The command should succeed (though it might fail due to missing API keys)
         // We mainly want to test that the smart context flag is recognized
         let output = cmd.output().unwrap();
-        
+
         // Check that smart context processing was attempted
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         // Should not show "unrecognized flag" error
         assert!(!stderr.contains("unrecognized"));
         assert!(!stderr.contains("unexpected argument"));
-        
+
         // Should indicate smart context discovery was attempted
         // (even if it fails later due to API keys or other issues)
         println!("STDOUT: {}", stdout);
@@ -91,7 +103,7 @@ mod tests {
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Should not show flag parsing errors
         assert!(!stderr.contains("unrecognized"));
         assert!(!stderr.contains("unexpected"));
@@ -115,7 +127,7 @@ mod tests {
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Should not show flag parsing errors
         assert!(!stderr.contains("unrecognized"));
         assert!(!stderr.contains("unexpected"));
@@ -139,7 +151,7 @@ mod tests {
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Should not show flag parsing errors
         assert!(!stderr.contains("unrecognized"));
         assert!(!stderr.contains("unexpected"));
@@ -153,8 +165,10 @@ mod tests {
         // Create project with custom config
         fs::create_dir_all(path.join("src")).unwrap();
         fs::write(path.join("src/main.rs"), "fn main() {}").unwrap();
-        
-        fs::write(path.join(".termai.toml"), r#"
+
+        fs::write(
+            path.join(".termai.toml"),
+            r#"
 [context]
 max_tokens = 3000
 include = ["src/**/*.rs"]
@@ -162,7 +176,9 @@ exclude = ["target/**"]
 
 [project]
 type = "rust"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let mut cmd = Command::cargo_bin("termai").unwrap();
         cmd.arg("--smart-context")
@@ -171,7 +187,7 @@ type = "rust"
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Should not show configuration errors
         assert!(!stderr.contains("Failed to parse"));
         assert!(!stderr.contains("Invalid configuration"));
@@ -199,7 +215,9 @@ mod configuration_tests {
         let path = temp_dir.path();
 
         // Test valid configuration
-        fs::write(path.join(".termai.toml"), r#"
+        fs::write(
+            path.join(".termai.toml"),
+            r#"
 [context]
 max_tokens = 4000
 include = ["*.rs", "*.js", "*.py"]
@@ -210,7 +228,9 @@ enable_cache = true
 [project]
 type = "rust"
 entry_points = ["src/main.rs"]
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Create a simple project to test with
         fs::create_dir_all(path.join("src")).unwrap();
@@ -223,7 +243,7 @@ entry_points = ["src/main.rs"]
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Should not show TOML parsing errors
         assert!(!stderr.contains("Failed to parse .termai.toml"));
         assert!(!stderr.contains("invalid toml"));
@@ -246,7 +266,7 @@ entry_points = ["src/main.rs"]
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Should show configuration error but not crash
         // The exact error message may vary, but should not be a panic
         if output.status.success() {
@@ -283,63 +303,90 @@ mod project_type_detection_cli_tests {
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         if expected_to_work {
             // Should not show project detection errors
             assert!(!stderr.contains("Failed to detect project type"));
             assert!(!stderr.contains("Unsupported project"));
         }
-        
+
         // Should never crash with unrecognized flags
         assert!(!stderr.contains("unrecognized"));
     }
 
     #[test]
     fn test_cli_with_rust_project() {
-        create_project_and_test_cli(&[
-            ("Cargo.toml", "[package]\nname = \"test\""),
-            ("src/main.rs", "fn main() {}"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                ("Cargo.toml", "[package]\nname = \"test\""),
+                ("src/main.rs", "fn main() {}"),
+            ],
+            true,
+        );
     }
 
     #[test]
     fn test_cli_with_javascript_project() {
-        create_project_and_test_cli(&[
-            ("package.json", r#"{"name": "test"}"#),
-            ("index.js", "console.log('hello');"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                ("package.json", r#"{"name": "test"}"#),
+                ("index.js", "console.log('hello');"),
+            ],
+            true,
+        );
     }
 
     #[test]
     fn test_cli_with_python_project() {
-        create_project_and_test_cli(&[
-            ("pyproject.toml", "[project]\nname = \"test\""),
-            ("main.py", "print('hello')"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                ("pyproject.toml", "[project]\nname = \"test\""),
+                ("main.py", "print('hello')"),
+            ],
+            true,
+        );
     }
 
     #[test]
     fn test_cli_with_go_project() {
-        create_project_and_test_cli(&[
-            ("go.mod", "module test\n\ngo 1.21"),
-            ("main.go", "package main\n\nfunc main() {}"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                ("go.mod", "module test\n\ngo 1.21"),
+                ("main.go", "package main\n\nfunc main() {}"),
+            ],
+            true,
+        );
     }
 
     #[test]
     fn test_cli_with_java_project() {
-        create_project_and_test_cli(&[
-            ("pom.xml", "<project><modelVersion>4.0.0</modelVersion></project>"),
-            ("src/main/java/Main.java", "public class Main { public static void main(String[] args) {} }"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                (
+                    "pom.xml",
+                    "<project><modelVersion>4.0.0</modelVersion></project>",
+                ),
+                (
+                    "src/main/java/Main.java",
+                    "public class Main { public static void main(String[] args) {} }",
+                ),
+            ],
+            true,
+        );
     }
 
     #[test]
     fn test_cli_with_kotlin_project() {
-        create_project_and_test_cli(&[
-            ("build.gradle.kts", "plugins { kotlin(\"jvm\") version \"1.9.0\" }"),
-            ("src/main/kotlin/Main.kt", "fun main() {}"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                (
+                    "build.gradle.kts",
+                    "plugins { kotlin(\"jvm\") version \"1.9.0\" }",
+                ),
+                ("src/main/kotlin/Main.kt", "fun main() {}"),
+            ],
+            true,
+        );
     }
 
     #[test]
@@ -352,18 +399,24 @@ mod project_type_detection_cli_tests {
         fs::write(path.join(".gitignore"), "*.log\ntarget/").unwrap();
         fs::write(path.join("README.md"), "# Test Repo").unwrap();
 
-        create_project_and_test_cli(&[
-            (".gitignore", "*.log\ntarget/"),
-            ("README.md", "# Test Repo"),
-        ], true);
+        create_project_and_test_cli(
+            &[
+                (".gitignore", "*.log\ntarget/"),
+                ("README.md", "# Test Repo"),
+            ],
+            true,
+        );
     }
 
     #[test]
     fn test_cli_with_unknown_project_type() {
-        create_project_and_test_cli(&[
-            ("random.txt", "random content"),
-            ("data.csv", "col1,col2\n1,2"),
-        ], false); // May not work as well, but shouldn't crash
+        create_project_and_test_cli(
+            &[
+                ("random.txt", "random content"),
+                ("data.csv", "col1,col2\n1,2"),
+            ],
+            false,
+        ); // May not work as well, but shouldn't crash
     }
 }
 
@@ -377,12 +430,17 @@ mod chunking_integration_tests {
         let path = temp_dir.path();
 
         // Create a large Rust project
-        fs::write(path.join("Cargo.toml"), "[package]\nname = \"large-project\"").unwrap();
+        fs::write(
+            path.join("Cargo.toml"),
+            "[package]\nname = \"large-project\"",
+        )
+        .unwrap();
         fs::create_dir_all(path.join("src")).unwrap();
 
         // Create many source files
         for i in 0..50 {
-            let content = format!(r#"
+            let content = format!(
+                r#"
 // Module {}
 pub fn function_{}() -> i32 {{
     // This is a very long function with lots of documentation
@@ -422,11 +480,15 @@ impl DataStructure{} {{
         Ok(())
     }}
 }}
-"#, i, i, i, i, i);
+"#,
+                i, i, i, i, i
+            );
             fs::write(path.join(&format!("src/module_{}.rs", i)), content).unwrap();
         }
 
-        fs::write(path.join("src/main.rs"), r#"
+        fs::write(
+            path.join("src/main.rs"),
+            r#"
 // Main entry point for large project
 use std::collections::HashMap;
 
@@ -446,25 +508,27 @@ fn main() {
     
     println!("All modules processed successfully");
 }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Test with low token limit to force chunking
         let mut cmd = Command::cargo_bin("termai").unwrap();
         cmd.arg("--smart-context")
             .arg("--max-context-tokens")
-            .arg("1000")  // Very low limit to force chunking
+            .arg("1000") // Very low limit to force chunking
             .arg("Analyze the project structure and suggest improvements")
             .arg(path.to_str().unwrap());
 
         let output = cmd.output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         // Should handle chunking gracefully
         assert!(!stderr.contains("token limit exceeded"));
         assert!(!stderr.contains("panic"));
         assert!(!stderr.contains("thread panicked"));
-        
+
         println!("Large project test - STDOUT: {}", stdout);
         println!("Large project test - STDERR: {}", stderr);
     }

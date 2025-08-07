@@ -68,6 +68,31 @@ impl SessionRepository for SqliteRepository {
             .execute("UPDATE sessions SET current = 0", params![])?;
         Ok(())
     }
+
+    fn delete_session(&self, session_id: &str) -> Result<(), Self::Error> {
+        // Start a transaction to ensure both session and messages are deleted atomically
+        let tx = self.conn.unchecked_transaction()?;
+
+        // Delete all messages for this session first (foreign key constraint)
+        tx.execute(
+            "DELETE FROM messages WHERE session_id = ?1",
+            params![session_id],
+        )?;
+
+        // Delete the session itself
+        let rows_affected =
+            tx.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])?;
+
+        // Commit the transaction
+        tx.commit()?;
+
+        // Check if session was actually deleted
+        if rows_affected == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
+        Ok(())
+    }
 }
 
 fn row_to_session_entity() -> fn(&Row) -> Result<SessionEntity> {
