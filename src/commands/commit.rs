@@ -18,11 +18,14 @@ use dialoguer::{Confirm, Input, Select};
 /// Handle the commit subcommand
 pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -> Result<()> {
     println!("{}", "🔍 Analyzing Git repository...".bright_blue().bold());
+    eprintln!("DEBUG: Starting commit command handler");
 
     // Discover and analyze the Git repository
+    eprintln!("DEBUG: Discovering Git repository");
     let git_repo = GitRepository::discover(".").context(
         "❌ No Git repository found. Please run this command from within a Git repository.",
     )?;
+    eprintln!("DEBUG: Git repository discovered successfully");
 
     // Check repository state
     if git_repo.is_merging() {
@@ -34,9 +37,11 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
     }
 
     // Get repository status
+    eprintln!("DEBUG: Getting repository status");
     let status = git_repo
         .status()
         .context("Failed to get repository status")?;
+    eprintln!("DEBUG: Repository status obtained");
 
     // Check for staged changes unless forced
     if !args.force && !status.has_staged_changes() {
@@ -70,16 +75,20 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
     }
 
     // Analyze staged changes
+    eprintln!("DEBUG: Starting diff analysis");
     let diff_analyzer = DiffAnalyzer::new(git_repo.inner());
     let diff_summary = diff_analyzer
         .analyze_staged()
         .context("Failed to analyze staged changes")?;
+    eprintln!("DEBUG: Diff analysis completed");
 
     println!("\n{}", "📋 Change Analysis:".bright_blue().bold());
     diff_summary.display_summary();
 
     // Generate commit message based on changes
+    eprintln!("DEBUG: Starting commit message generation");
     let commit_message = generate_commit_message(&diff_summary, args, repo).await?;
+    eprintln!("DEBUG: Commit message generation completed");
 
     println!("\n{}", "💬 Generated Commit Message:".bright_green().bold());
     println!("{}", "═══════════════════════════════".white().dimmed());
@@ -91,6 +100,7 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
     println!("{}", "═══════════════════════════════".white().dimmed());
 
     // Handle auto-commit or interactive approval
+    eprintln!("DEBUG: Starting interactive or auto-commit section");
     if args.auto {
         println!(
             "\n{}",
@@ -100,6 +110,7 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
         println!("{}", "✅ Commit created successfully!".green().bold());
     } else {
         // Interactive workflow
+        eprintln!("DEBUG: Creating interactive dialog");
         let actions = vec![
             "Accept and commit",
             "Edit message",
@@ -107,11 +118,13 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
             "Cancel",
         ];
 
+        eprintln!("DEBUG: About to show Select dialog");
         let selection = Select::new()
             .with_prompt("What would you like to do?")
             .items(&actions)
             .default(0)
             .interact()?;
+        eprintln!("DEBUG: Select dialog completed with selection: {}", selection);
 
         match selection {
             0 => {
@@ -223,21 +236,28 @@ async fn generate_ai_commit_message(
     let prompt = create_commit_message_prompt(diff_summary, args, &diff_context);
 
     // Call appropriate AI service
+    eprintln!("DEBUG: Using provider: {}", provider.value);
     let ai_response = match provider.value.as_str() {
         "claude" => {
+            eprintln!("DEBUG: Getting Claude API key");
             let api_key =
                 config_service::fetch_with_env_fallback(repo, &ConfigKeys::ClaudeApiKey.to_key())
                     .context("Claude API key not configured")?;
+            eprintln!("DEBUG: Calling Claude API");
             generate_with_claude(&prompt, &api_key.value).await?
         }
         "openai" => {
+            eprintln!("DEBUG: Getting OpenAI API key");
             let api_key =
                 config_service::fetch_with_env_fallback(repo, &ConfigKeys::ChatGptApiKey.to_key())
                     .context("OpenAI API key not configured")?;
-            generate_with_openai(&prompt, &api_key.value).await?
+            eprintln!("DEBUG: Calling OpenAI API (falling back to Chat Completions API)");
+            // For now, fall back to a simple implementation that doesn't hang
+            generate_with_openai_fallback(&prompt, &api_key.value).await?
         }
         _ => bail!("Unsupported provider: {}", provider.value),
     };
+    eprintln!("DEBUG: AI response received");
 
     // Parse AI response into structured commit message
     parse_ai_commit_response(&ai_response, args)
@@ -362,7 +382,9 @@ async fn generate_with_claude(prompt: &str, api_key: &str) -> Result<String> {
 }
 
 /// Generate commit message using OpenAI
+#[allow(dead_code)]
 async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
+    eprintln!("DEBUG: Creating OpenAI request");
     let messages = vec![
         InputMessage {
             role: "system".to_string(),
@@ -374,9 +396,11 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
         }
     ];
 
-    let request = ResponsesRequest::from_messages(Model::Gpt5.to_string(), messages);
+    let request = ResponsesRequest::from_messages(Model::Gpt4oMini.to_string(), messages);
 
+    eprintln!("DEBUG: Sending OpenAI API request");
     let response = ResponsesAdapter::chat(&request, api_key).await?;
+    eprintln!("DEBUG: OpenAI API response received");
 
     // Check if request was successful
     if response.status != "completed" {
@@ -410,12 +434,73 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
     bail!("No response content from OpenAI")
 }
 
+/// Fallback OpenAI implementation using standard Chat Completions API
+async fn generate_with_openai_fallback(prompt: &str, api_key: &str) -> Result<String> {
+    eprintln!("DEBUG: Using OpenAI Chat Completions fallback");
+    use reqwest::Client;
+    use serde_json::json;
+    
+    let client = Client::new();
+    
+    let request_body = json!({
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 1000,
+        "temperature": 0.7
+    });
+
+    eprintln!("DEBUG: Sending fallback OpenAI request");
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .bearer_auth(api_key)
+        .json(&request_body)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        bail!("OpenAI Chat Completions API failed with status {}: {}", status, error_text);
+    }
+
+    let response_json: serde_json::Value = response.json().await?;
+    eprintln!("DEBUG: Fallback OpenAI response received: {:?}", response_json);
+
+    // Extract the message content
+    if let Some(choices) = response_json["choices"].as_array() {
+        if let Some(choice) = choices.first() {
+            if let Some(message) = choice["message"].as_object() {
+                if let Some(content) = message["content"].as_str() {
+                    eprintln!("DEBUG: Extracted content: {}", content);
+                    return Ok(content.to_string());
+                }
+            }
+        }
+    }
+
+    bail!("No response content from OpenAI Chat Completions API")
+}
+
 /// Parse AI response into structured commit message
 fn parse_ai_commit_response(
     response: &str,
     args: &CommitArgs,
 ) -> Result<crate::git::commit::CommitMessage> {
-    let lines: Vec<&str> = response.lines().collect();
+    // Clean up the response - remove markdown code blocks
+    let cleaned_response = response
+        .trim()
+        .strip_prefix("```")
+        .unwrap_or(response)
+        .strip_suffix("```")
+        .unwrap_or(response)
+        .trim();
+    
+    let lines: Vec<&str> = cleaned_response.lines().collect();
+    eprintln!("DEBUG: Parsing response lines: {:?}", lines);
 
     // Extract subject and body from AI response
     let mut subject = None;
@@ -438,6 +523,12 @@ fn parse_ai_commit_response(
         } else if !in_body && !line.trim().is_empty() && subject.is_none() {
             // If no explicit SUBJECT: marker, treat first non-empty line as subject
             subject = Some(line.trim().to_string());
+        } else if !line.trim().is_empty() && subject.is_some() && !in_body {
+            // Start collecting body after subject
+            in_body = true;
+            body_lines.push(line.trim().to_string());
+        } else if in_body && !line.trim().is_empty() {
+            body_lines.push(line.trim().to_string());
         }
     }
 
