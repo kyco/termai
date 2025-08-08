@@ -7,9 +7,9 @@ use crate::llm::claude::adapter::claude_adapter;
 use crate::llm::claude::model::chat_completion_request::ChatCompletionRequest;
 use crate::llm::claude::model::chat_message::ChatMessage;
 use crate::llm::common::model::role::Role;
-use crate::llm::openai::adapter::open_ai_adapter;
-use crate::llm::openai::model::chat_completion_request::ChatCompletionRequest as OpenAIRequest;
-use crate::llm::openai::model::chat_message::ChatMessage as OpenAIMessage;
+use crate::llm::openai::adapter::responses_adapter::ResponsesAdapter;
+use crate::llm::openai::model::responses_api::{ResponsesRequest, InputMessage, ResponseOutput, ContentItem};
+use crate::llm::openai::model::model::Model;
 use crate::repository::db::SqliteRepository;
 use anyhow::{bail, Context, Result};
 use colored::*;
@@ -363,35 +363,51 @@ async fn generate_with_claude(prompt: &str, api_key: &str) -> Result<String> {
 
 /// Generate commit message using OpenAI
 async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
-    let request = OpenAIRequest {
-        model: "gpt-5".to_string(),
-        messages: vec![
-            OpenAIMessage {
-                role: Role::System.to_string(),
-                content: "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis.".to_string(),
-            },
-            OpenAIMessage {
-                role: Role::User.to_string(),
-                content: prompt.to_string(),
-            }
-        ],
-        reasoning_effort: crate::llm::openai::model::reasoning_effort::ReasoningEffort::Minimal,
-        verbosity: None,
-        tools: None,
-        tool_choice: None,
-    };
-
-    let response = open_ai_adapter::chat(&request, api_key).await?;
-
-    if let Some(choices) = response.choices {
-        if let Some(choice) = choices.first() {
-            Ok(choice.message.content.clone())
-        } else {
-            bail!("No choices in OpenAI response")
+    let messages = vec![
+        InputMessage {
+            role: "system".to_string(),
+            content: "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis.".to_string(),
+        },
+        InputMessage {
+            role: "user".to_string(),
+            content: prompt.to_string(),
         }
-    } else {
-        bail!("No response from OpenAI")
+    ];
+
+    let request = ResponsesRequest::from_messages(Model::Gpt5.to_string(), messages);
+
+    let response = ResponsesAdapter::chat(&request, api_key).await?;
+
+    // Check if request was successful
+    if response.status != "completed" {
+        if let Some(error) = response.error {
+            bail!("OpenAI API error: {}", error.message);
+        } else {
+            bail!("Request failed with status: {}", response.status);
+        }
     }
+
+    // Extract text from response
+    for output in response.output {
+        match output {
+            ResponseOutput::Message { content, .. } => {
+                let message_text: String = content
+                    .into_iter()
+                    .filter_map(|item| match item {
+                        ContentItem::OutputText { text, .. } => Some(text),
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                
+                if !message_text.is_empty() {
+                    return Ok(message_text);
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    bail!("No response content from OpenAI")
 }
 
 /// Parse AI response into structured commit message

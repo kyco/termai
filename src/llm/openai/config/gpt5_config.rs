@@ -187,13 +187,13 @@ mod tests {
     #[test]
     fn test_builder_methods() {
         let config = Gpt5Config::default()
-            .with_reasoning_effort(ReasoningEffort::High)
+            .with_reasoning_effort(ReasoningEffort::Medium)
             .with_verbosity(Verbosity::Low)
             .with_preambles(true)
             .with_storage(true)
             .with_zdr(true);
 
-        assert_eq!(config.reasoning_effort, ReasoningEffort::High);
+        assert_eq!(config.reasoning_effort, ReasoningEffort::Medium);
         assert_eq!(config.verbosity, Verbosity::Low);
         assert!(config.preambles.enabled);
         assert!(!config.store_conversations); // ZDR overrides storage

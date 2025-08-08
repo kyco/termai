@@ -90,21 +90,16 @@ impl OpenAIValidator {
 #[async_trait::async_trait]
 impl ApiKeyValidator for OpenAIValidator {
     async fn validate(&self, api_key: &str) -> Result<()> {
-        // Test the OpenAI API key with a minimal request
+        // Test the OpenAI API key with a minimal request using Responses API
         let response = self
             .client
-            .post("https://api.openai.com/v1/chat/completions")
+            .post("https://api.openai.com/v1/responses")
             .header("Authorization", format!("Bearer {}", api_key))
             .header("content-type", "application/json")
             .json(&json!({
-                "model": "gpt-3.5-turbo",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": "test"
-                    }
-                ],
-                "max_tokens": 1
+                "model": "gpt-5",
+                "input": "test",
+                "max_output_tokens": 1
             }))
             .send()
             .await?;

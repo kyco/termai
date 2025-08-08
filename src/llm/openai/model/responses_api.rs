@@ -3,36 +3,82 @@ use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use crate::llm::openai::model::verbosity::Verbosity;
 use crate::llm::openai::model::custom_tools::{CustomTool, AllowedToolsChoice};
 
-/// GPT-5 Responses API request structure
-/// Optimized for reasoning models with chain of thought support
+/// Request input can be a string or array of messages  
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum RequestInput {
+    Text(String),
+    Messages(Vec<InputMessage>),
+}
+
+/// Input message structure
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InputMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Responses API request structure
 #[derive(Serialize, Debug, Clone)]
 pub struct ResponsesRequest {
     /// Model to use
     pub model: String,
     
-    /// Input text or message
-    pub input: String,
+    /// Input text or message array
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<RequestInput>,
     
-    /// Reasoning configuration
+    /// System instructions
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    
+    /// Reasoning configuration (o-series models only)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningConfig>,
     
     /// Text generation configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<TextConfig>,
     
     /// Tools available to the model
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<Tool>>,
     
     /// Tool choice configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<ToolChoice>,
     
     /// Store conversation for future reference
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
     
     /// Previous response ID for multi-turn conversations
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     
     /// Metadata for the request
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    
+    /// Maximum output tokens
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<u32>,
+    
+    /// Temperature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    
+    /// Top P
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f32>,
+    
+    /// Streaming
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+    
+    /// Verbosity level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verbosity: Option<Verbosity>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -81,8 +127,9 @@ pub enum ToolChoice {
     AllowedTools(AllowedToolsChoice),
 }
 
-/// GPT-5 Responses API response structure
+/// Responses API response structure
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct ResponsesResponse {
     /// Response ID for reference
     pub id: String,
@@ -93,56 +140,73 @@ pub struct ResponsesResponse {
     /// Model used
     pub model: String,
     
-    /// Response choices
-    pub choices: Vec<ResponseChoice>,
+    /// Response status
+    pub status: String, // "completed", "failed", etc.
+    
+    /// Error information if failed
+    pub error: Option<ResponseError>,
+    
+    /// Output array containing messages and tool calls
+    pub output: Vec<ResponseOutput>,
     
     /// Usage statistics
     pub usage: Option<ResponseUsage>,
     
-    /// Reasoning items for multi-turn conversations
-    pub reasoning: Option<Vec<ReasoningItem>>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct ResponseChoice {
-    /// Choice index
-    pub index: usize,
+    /// Reasoning information for o-series models
+    pub reasoning: Option<ResponseReasoning>,
     
-    /// Response content
-    pub message: ResponseMessage,
+    /// Previous response ID
+    pub previous_response_id: Option<String>,
     
-    /// Finish reason
-    pub finish_reason: Option<String>,
+    /// Whether response was stored
+    pub store: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
-pub struct ResponseMessage {
-    /// Message role
-    pub role: String,
-    
-    /// Message content
-    pub content: Option<String>,
-    
-    /// Tool calls if any
-    pub tool_calls: Option<Vec<ToolCall>>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[allow(dead_code)]
-pub struct ToolCall {
-    /// Tool call ID
-    pub id: String,
-    
-    /// Tool type
+pub struct ResponseError {
+    pub message: String,
     #[serde(rename = "type")]
-    pub tool_type: String,
-    
-    /// Function details (for function tools)
-    pub function: Option<ToolCallFunction>,
-    
-    /// Custom tool input (for custom tools)
-    pub input: Option<String>,
+    pub error_type: Option<String>,
+    pub code: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+#[allow(dead_code)]
+pub enum ResponseOutput {
+    #[serde(rename = "message")]
+    Message {
+        id: String,
+        status: String,
+        role: String,
+        content: Vec<ContentItem>,
+    },
+    #[serde(rename = "tool_call")]
+    ToolCall {
+        id: String,
+        status: String,
+        call_type: String,
+        function: Option<ToolCallFunction>,
+    },
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+#[allow(dead_code)]
+pub enum ContentItem {
+    #[serde(rename = "output_text")]
+    OutputText {
+        text: String,
+        annotations: Vec<serde_json::Value>,
+    },
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
+pub struct ResponseReasoning {
+    pub effort: Option<String>,
+    pub summary: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -155,49 +219,41 @@ pub struct ToolCallFunction {
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
 pub struct ResponseUsage {
-    /// Prompt tokens
-    pub prompt_tokens: u32,
+    /// Input tokens
+    pub input_tokens: u32,
     
-    /// Completion tokens
-    pub completion_tokens: u32,
+    /// Output tokens
+    pub output_tokens: u32,
     
     /// Total tokens
     pub total_tokens: u32,
     
-    /// Reasoning tokens (for reasoning models)
-    pub reasoning_tokens: Option<u32>,
+    /// Input token details
+    pub input_tokens_details: Option<InputTokenDetails>,
     
-    /// Completion token details
-    pub completion_tokens_details: Option<ResponseCompletionTokenDetails>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct ResponseCompletionTokenDetails {
-    /// Reasoning tokens used
-    pub reasoning_tokens: Option<u32>,
+    /// Output token details
+    pub output_tokens_details: Option<OutputTokenDetails>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
-pub struct ReasoningItem {
-    /// Reasoning content
-    pub content: Option<String>,
-    
-    /// Encrypted reasoning content (for ZDR mode)
-    pub encrypted_content: Option<String>,
-    
-    /// Item type
-    #[serde(rename = "type")]
-    pub item_type: Option<String>,
+pub struct InputTokenDetails {
+    pub cached_tokens: Option<u32>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
+pub struct OutputTokenDetails {
+    pub reasoning_tokens: Option<u32>,
+}
+
 impl ResponsesRequest {
     /// Create a simple text request
     pub fn simple(model: String, input: String) -> Self {
         Self {
             model,
-            input,
+            input: Some(RequestInput::Text(input)),
+            instructions: None,
             reasoning: Some(ReasoningConfig {
                 effort: ReasoningEffort::Medium,
                 encrypted_content: None,
@@ -207,69 +263,50 @@ impl ResponsesRequest {
             }),
             tools: None,
             tool_choice: None,
-            store: Some(false),
+            store: Some(true),
             previous_response_id: None,
             metadata: None,
+            max_output_tokens: Some(32000), // Set reasonable output limit
+            temperature: None,
+            top_p: None,
+            stream: Some(false),
+            verbosity: None,
+        }
+    }
+
+    /// Create a request from messages (for conversation)
+    pub fn from_messages(model: String, messages: Vec<InputMessage>) -> Self {
+        Self {
+            model,
+            input: Some(RequestInput::Messages(messages)),
+            instructions: None,
+            reasoning: Some(ReasoningConfig {
+                effort: ReasoningEffort::Medium,
+                encrypted_content: None,
+            }),
+            text: Some(TextConfig {
+                verbosity: Verbosity::Medium,
+            }),
+            tools: None,
+            tool_choice: None,
+            store: Some(true),
+            previous_response_id: None,
+            metadata: None,
+            max_output_tokens: Some(32000), // Set reasonable output limit
+            temperature: None,
+            top_p: None,
+            stream: Some(false),
+            verbosity: None,
         }
     }
 
     /// Create a request with custom reasoning effort
     pub fn with_reasoning(model: String, input: String, effort: ReasoningEffort) -> Self {
-        Self {
-            model,
-            input,
-            reasoning: Some(ReasoningConfig {
-                effort,
-                encrypted_content: None,
-            }),
-            text: Some(TextConfig {
-                verbosity: Verbosity::Medium,
-            }),
-            tools: None,
-            tool_choice: None,
-            store: Some(false),
-            previous_response_id: None,
-            metadata: None,
-        }
-    }
-
-    /// Create a request with custom verbosity
-    pub fn with_verbosity(model: String, input: String, verbosity: Verbosity) -> Self {
-        Self {
-            model,
-            input,
-            reasoning: Some(ReasoningConfig {
-                effort: ReasoningEffort::Medium,
-                encrypted_content: None,
-            }),
-            text: Some(TextConfig {
-                verbosity,
-            }),
-            tools: None,
-            tool_choice: None,
-            store: Some(false),
-            previous_response_id: None,
-            metadata: None,
-        }
-    }
-
-    /// Create a request with tools
-    pub fn with_tools(model: String, input: String, tools: Vec<Tool>) -> Self {
-        Self {
-            model,
-            input,
-            reasoning: Some(ReasoningConfig {
-                effort: ReasoningEffort::Medium,
-                encrypted_content: None,
-            }),
-            text: Some(TextConfig {
-                verbosity: Verbosity::Medium,
-            }),
-            tools: Some(tools),
-            tool_choice: Some(ToolChoice::Auto("auto".to_string())),
-            store: Some(false),
-            previous_response_id: None,
-            metadata: None,
-        }
+        let mut request = Self::simple(model, input);
+        request.reasoning = Some(ReasoningConfig {
+            effort,
+            encrypted_content: None,
+        });
+        request
     }
 }

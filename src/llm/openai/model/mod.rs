@@ -1,7 +1,4 @@
-pub(crate) mod chat_completion_request;
-pub(crate) mod chat_completion_response;
 pub(crate) mod custom_tools;
-pub(crate) mod chat_message;
 pub(crate) mod choice;
 pub(crate) mod completion_token_details;
 pub(crate) mod message_content;

@@ -1,48 +1,93 @@
 use crate::llm::common::model::role::Role;
-use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use crate::llm::openai::{
-    adapter::open_ai_adapter,
+    adapter::responses_adapter::ResponsesAdapter,
     model::{
-        chat_completion_request::ChatCompletionRequest, chat_message::ChatMessage, model::Model,
+        responses_api::{ResponsesRequest, InputMessage, ResponseOutput, ContentItem},
+        model::Model,
     },
 };
 use crate::session::model::message::Message;
 use crate::session::model::session::Session;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
-    let model = Model::O3Mini;
+    let model = Model::Gpt5; // Default to GPT-5 for best performance
 
-    let chat_messages = session
+    // Convert session messages to input messages
+    let input_messages = session
         .messages
         .iter()
-        .map(|m| ChatMessage {
+        .map(|m| InputMessage {
             role: m.role.to_string(),
             content: m.content.to_string(),
         })
-        .collect::<Vec<ChatMessage>>();
+        .collect::<Vec<InputMessage>>();
 
-    let request = ChatCompletionRequest {
-        model: model.to_string(),
-        messages: chat_messages,
-        reasoning_effort: ReasoningEffort::High,
-        verbosity: None,
-        tools: None,
-        tool_choice: None,
+    // Check total input size to prevent hanging on extremely large inputs
+    let total_input_size: usize = input_messages
+        .iter()
+        .map(|m| m.content.len())
+        .sum();
+    
+    if total_input_size > 500_000 { // 500KB limit
+        return Err(anyhow!(
+            "Input too large ({} characters). Please reduce input size to under 500,000 characters.",
+            total_input_size
+        ));
+    }
+
+    // Create the request
+    let request = if input_messages.len() == 1 && input_messages[0].role == "user" {
+        // For single user message, use simple text input
+        ResponsesRequest::simple(model.to_string(), input_messages[0].content.clone())
+    } else {
+        // For conversation, use messages format
+        ResponsesRequest::from_messages(model.to_string(), input_messages)
     };
-    let response = open_ai_adapter::chat(&request, api_key).await?;
 
-    if let Some(choices) = response.choices {
-        for choice in choices {
-            let role = choice.message.role;
-            let message = choice.message.content;
-            session.messages.push(Message {
-                id: "".to_string(),
-                role: Role::from_str(&role),
-                content: message,
-            });
+    // Make the request
+    let response = ResponsesAdapter::chat(&request, api_key).await?;
+
+    // Check if request was successful
+    if response.status != "completed" {
+        if let Some(error) = response.error {
+            return Err(anyhow!("OpenAI API error: {}", error.message));
+        } else {
+            return Err(anyhow!("Request failed with status: {}", response.status));
+        }
+    }
+
+    // Process the output
+    for output in response.output {
+        match output {
+            ResponseOutput::Message { role, content, .. } => {
+                // Extract text from content items
+                let message_text = extract_text_from_content(content);
+                if !message_text.is_empty() {
+                    session.messages.push(Message {
+                        id: "".to_string(),
+                        role: Role::from_str(&role),
+                        content: message_text,
+                    });
+                }
+            }
+            ResponseOutput::ToolCall { .. } => {
+                // Handle tool calls if needed in the future
+                // For now, we'll skip them as they're not used in basic chat
+            }
         }
     }
 
     Ok(())
+}
+
+/// Extract text content from content items
+fn extract_text_from_content(content: Vec<ContentItem>) -> String {
+    content
+        .into_iter()
+        .filter_map(|item| match item {
+            ContentItem::OutputText { text, .. } => Some(text),
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
 }

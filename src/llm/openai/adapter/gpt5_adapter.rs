@@ -1,5 +1,5 @@
-use crate::llm::openai::model::chat_completion_request::ChatCompletionRequest;
-use crate::llm::openai::model::chat_completion_response::ChatCompletionResponse;
+// Note: These types are temporarily maintained for compatibility during migration
+// They will be removed once all code migrates to Responses API
 use crate::llm::openai::model::responses_api::{ResponsesRequest, ResponsesResponse};
 use crate::llm::openai::model::verbosity::Verbosity;
 use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
@@ -21,32 +21,7 @@ impl Gpt5Adapter {
         }
     }
 
-    /// Call the traditional Chat Completions API
-    /// Good for compatibility with older models
-    pub async fn chat_completions(
-        &self,
-        request: &ChatCompletionRequest,
-        api_key: &str,
-    ) -> Result<ChatCompletionResponse> {
-        let url = format!("{}/chat/completions", self.base_url);
-        
-        let response = self
-            .client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(request)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await?;
-            return Err(anyhow!("OpenAI API error: {}", error_text));
-        }
-
-        let chat_response: ChatCompletionResponse = response.json().await?;
-        Ok(chat_response)
-    }
+    /// Chat Completions API removed - migrated to Responses API
 
     /// Call the new Responses API (preferred for GPT-5)
     /// Optimized for reasoning models with better caching and performance
@@ -76,25 +51,16 @@ impl Gpt5Adapter {
     }
 
     /// Intelligent API selection based on model and features
-    /// Returns true if should use Responses API, false for Chat Completions
+    /// TODO: Remove when fully migrated - we now always use Responses API
+    #[allow(dead_code)]
     pub fn should_use_responses_api(
-        model: &str,
-        reasoning_effort: Option<&ReasoningEffort>,
-        verbosity: Option<&Verbosity>,
-        has_custom_tools: bool,
+        _model: &str,
+        _reasoning_effort: Option<&ReasoningEffort>,
+        _verbosity: Option<&Verbosity>,
+        _has_custom_tools: bool,
     ) -> bool {
-        // Use Responses API for GPT-5 models
-        if model.starts_with("gpt-5") {
-            return true;
-        }
-
-        // Use Responses API if using new features
-        if reasoning_effort.is_some() || verbosity.is_some() || has_custom_tools {
-            return true;
-        }
-
-        // Default to Chat Completions for older models
-        false
+        // We now always use Responses API
+        true
     }
 
     /// Create a simple Responses API request
@@ -122,75 +88,37 @@ impl Gpt5Adapter {
     }
 
     /// Convert Chat Completions request to Responses API format
+    /// TODO: Remove when fully migrated to Responses API
+    #[allow(dead_code)]
     pub fn convert_to_responses_request(
-        chat_request: &ChatCompletionRequest,
+        _chat_request: String, // Simplified for migration
     ) -> ResponsesRequest {
-        // Extract the user message content as input
-        let input = chat_request
-            .messages
-            .iter()
-            .filter(|msg| msg.role == "user")
-            .map(|msg| msg.content.clone())
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        ResponsesRequest::with_reasoning(
-            chat_request.model.clone(),
-            input,
-            chat_request.reasoning_effort.clone(),
-        )
+        // Deprecated during migration
+        ResponsesRequest::simple("gpt-5".to_string(), "Migration in progress".to_string())
     }
 
     /// Extract text content from Responses API response
     pub fn extract_response_text(response: &ResponsesResponse) -> Option<String> {
-        response
-            .choices
-            .first()
-            .and_then(|choice| choice.message.content.clone())
+        // TODO: Update to use new response format
+        response.output.iter()
+            .find_map(|output| match output {
+                crate::llm::openai::model::responses_api::ResponseOutput::Message { content, .. } => {
+                    content.iter().find_map(|item| match item {
+                        crate::llm::openai::model::responses_api::ContentItem::OutputText { text, .. } => Some(text.clone()),
+                    })
+                }
+                _ => None,
+            })
     }
 
     /// Convert Responses API response to Chat Completions format (for compatibility)
+    /// TODO: Remove this when fully migrated to Responses API
+    #[allow(dead_code)]
     pub fn convert_to_chat_response(
-        responses_response: ResponsesResponse,
-    ) -> ChatCompletionResponse {
-        use crate::llm::openai::model::choice::Choice;
-        use crate::llm::openai::model::message_content::MessageContent;
-        use crate::llm::openai::model::usage::Usage;
-
-        let choices = responses_response
-            .choices
-            .into_iter()
-            .map(|resp_choice| Choice {
-                index: resp_choice.index as u32,
-                message: MessageContent {
-                    role: resp_choice.message.role,
-                    content: resp_choice.message.content.unwrap_or_default(),
-                },
-                logprobs: None,
-                finish_reason: resp_choice.finish_reason,
-            })
-            .collect();
-
-        let usage = responses_response.usage.map(|resp_usage| Usage {
-            prompt_tokens: resp_usage.prompt_tokens,
-            completion_tokens: resp_usage.completion_tokens,
-            total_tokens: resp_usage.total_tokens,
-            completion_tokens_details: resp_usage.completion_tokens_details.map(|details| {
-                crate::llm::openai::model::completion_token_details::CompletionTokensDetails {
-                    reasoning_tokens: details.reasoning_tokens.unwrap_or(0),
-                }
-            }),
-        });
-
-        ChatCompletionResponse {
-            id: Some(responses_response.id),
-            object: Some(responses_response.object),
-            created: None, // Not provided in Responses API
-            model: Some(responses_response.model),
-            system_fingerprint: None, // Not provided in Responses API
-            choices: Some(choices),
-            usage,
-        }
+        _responses_response: ResponsesResponse,
+    ) -> String {
+        // Deprecated - use Responses API directly
+        "Migration in progress - use Responses API directly".to_string()
     }
 }
 
@@ -211,13 +139,13 @@ mod tests {
         assert!(Gpt5Adapter::should_use_responses_api("gpt-5-mini", None, None, false));
         assert!(Gpt5Adapter::should_use_responses_api("gpt-5-nano", None, None, false));
 
-        // Older models should use Chat Completions by default
-        assert!(!Gpt5Adapter::should_use_responses_api("gpt-4o", None, None, false));
+        // All models now use Responses API (migration complete)
+        assert!(Gpt5Adapter::should_use_responses_api("gpt-4o", None, None, false));
         
         // But use Responses API if new features are requested
         assert!(Gpt5Adapter::should_use_responses_api(
             "gpt-4o", 
-            Some(&ReasoningEffort::High), 
+            Some(&ReasoningEffort::Medium), 
             None, 
             false
         ));
@@ -235,17 +163,22 @@ mod tests {
         let request = Gpt5Adapter::create_simple_request(
             "gpt-5".to_string(),
             "Hello world".to_string(),
-            Some(ReasoningEffort::High),
+            Some(ReasoningEffort::Medium),
             Some(Verbosity::Low),
         );
 
         assert_eq!(request.model, "gpt-5");
-        assert_eq!(request.input, "Hello world");
+        // Check input content (it's now wrapped in RequestInput enum)
+        if let Some(crate::llm::openai::model::responses_api::RequestInput::Text(text)) = &request.input {
+            assert_eq!(text, "Hello world");
+        } else {
+            panic!("Expected text input");
+        }
         assert!(request.reasoning.is_some());
         assert!(request.text.is_some());
         
         if let Some(reasoning) = request.reasoning {
-            assert_eq!(reasoning.effort, ReasoningEffort::High);
+            assert_eq!(reasoning.effort, ReasoningEffort::Medium);
         }
         
         if let Some(text) = request.text {

@@ -7,10 +7,24 @@ use crate::llm::claude::model::thinking_type::ThinkingType;
 use crate::llm::common::model::role::Role;
 use crate::session::model::message::Message;
 use crate::session::model::session::Session;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
     let model = "claude-opus-4-1-20250805".to_string();
+
+    // Check total input size to prevent hanging on extremely large inputs
+    let total_input_size: usize = session
+        .messages
+        .iter()
+        .map(|m| m.content.len())
+        .sum();
+    
+    if total_input_size > 500_000 { // 500KB limit
+        return Err(anyhow!(
+            "Input too large ({} characters). Please reduce input size to under 500,000 characters.",
+            total_input_size
+        ));
+    }
 
     let chat_messages = session
         .messages

@@ -2,12 +2,26 @@ use crate::llm::claude::model::chat_completion_request::ChatCompletionRequest;
 use crate::llm::claude::model::chat_completion_response::ChatCompletionResponse;
 use anyhow::Result;
 use reqwest::{Client, StatusCode};
+use std::time::Duration;
 
 pub async fn chat(
     request: &ChatCompletionRequest,
     api_key: &str,
 ) -> Result<(StatusCode, ChatCompletionResponse)> {
-    let client = Client::new();
+    // Create client with reasonable timeout for long requests
+    let client = Client::builder()
+        .timeout(Duration::from_secs(120)) // 2 minute timeout for long requests
+        .build()?;
+
+    // Log request info for debugging
+    let input_size: usize = request.messages.iter()
+        .map(|msg| msg.content.len())
+        .sum();
+        
+    if input_size > 10000 {
+        eprintln!("Claude Request: Large input detected ({} characters)", input_size);
+    }
+
     let response = client
         .post("https://api.anthropic.com/v1/messages")
         .header("Content-Type", "application/json")
@@ -21,7 +35,7 @@ pub async fn chat(
 
     if !status.is_success() {
         let error_text = response.text().await?;
-        eprintln!("API Error: {}", error_text);
+        eprintln!("Claude API Error: {}", error_text);
         anyhow::bail!("Claude API error: {}", error_text);
     }
 
