@@ -1,7 +1,6 @@
 use crate::llm::openai::model::responses_api::{ResponsesRequest, ResponsesResponse};
 use anyhow::{Result, anyhow};
 use reqwest::Client;
-use std::time::Duration;
 
 /// Adapter for the OpenAI Responses API
 pub struct ResponsesAdapter;
@@ -12,9 +11,8 @@ impl ResponsesAdapter {
         request: &ResponsesRequest,
         api_key: &str,
     ) -> Result<ResponsesResponse> {
-        // Create client with reasonable timeout for long requests
+        // Create client without timeout restrictions
         let client = Client::builder()
-            .timeout(Duration::from_secs(120)) // 2 minute timeout for long requests
             .build()?;
 
         // Log request info for debugging

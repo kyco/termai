@@ -2,15 +2,13 @@ use crate::llm::claude::model::chat_completion_request::ChatCompletionRequest;
 use crate::llm::claude::model::chat_completion_response::ChatCompletionResponse;
 use anyhow::Result;
 use reqwest::{Client, StatusCode};
-use std::time::Duration;
 
 pub async fn chat(
     request: &ChatCompletionRequest,
     api_key: &str,
 ) -> Result<(StatusCode, ChatCompletionResponse)> {
-    // Create client with reasonable timeout for long requests
+    // Create client without timeout restrictions
     let client = Client::builder()
-        .timeout(Duration::from_secs(120)) // 2 minute timeout for long requests
         .build()?;
 
     // Log request info for debugging

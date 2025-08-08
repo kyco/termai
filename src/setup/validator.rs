@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use reqwest::Client;
 use serde_json::json;
-use std::time::Duration;
 
 #[async_trait::async_trait]
 pub trait ApiKeyValidator {
@@ -16,7 +15,6 @@ impl ClaudeValidator {
     pub fn new() -> Self {
         Self {
             client: Client::builder()
-                .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap(),
         }
@@ -80,7 +78,6 @@ impl OpenAIValidator {
     pub fn new() -> Self {
         Self {
             client: Client::builder()
-                .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap(),
         }
