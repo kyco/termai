@@ -85,9 +85,6 @@ pub struct ResponsesRequest {
 pub struct ReasoningConfig {
     /// Reasoning effort level
     pub effort: ReasoningEffort,
-    
-    /// Include encrypted reasoning content (for ZDR mode)
-    pub encrypted_content: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -189,6 +186,11 @@ pub enum ResponseOutput {
         call_type: String,
         function: Option<ToolCallFunction>,
     },
+    #[serde(rename = "reasoning")]
+    Reasoning {
+        id: String,
+        summary: Vec<String>,
+    },
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -256,7 +258,6 @@ impl ResponsesRequest {
             instructions: None,
             reasoning: Some(ReasoningConfig {
                 effort: ReasoningEffort::Medium,
-                encrypted_content: None,
             }),
             text: Some(TextConfig {
                 verbosity: Verbosity::Medium,
@@ -282,7 +283,6 @@ impl ResponsesRequest {
             instructions: None,
             reasoning: Some(ReasoningConfig {
                 effort: ReasoningEffort::Medium,
-                encrypted_content: None,
             }),
             text: Some(TextConfig {
                 verbosity: Verbosity::Medium,
@@ -305,7 +305,6 @@ impl ResponsesRequest {
         let mut request = Self::simple(model, input);
         request.reasoning = Some(ReasoningConfig {
             effort,
-            encrypted_content: None,
         });
         request
     }

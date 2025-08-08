@@ -182,10 +182,6 @@ mod examples {
 
         // Enable ZDR mode
         request.store = Some(false);
-        if let Some(ref mut reasoning) = request.reasoning {
-            // In a real implementation, you'd get this from a previous response
-            reasoning.encrypted_content = Some("encrypted_reasoning_tokens_here".to_string());
-        }
 
         let response = adapter.responses(&request, api_key).await?;
         

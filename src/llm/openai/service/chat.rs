@@ -75,6 +75,9 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
                 // Handle tool calls if needed in the future
                 // For now, we'll skip them as they're not used in basic chat
             }
+            ResponseOutput::Reasoning { .. } => {
+                // Skip reasoning output - it's metadata, not user-facing content
+            }
         }
     }
 

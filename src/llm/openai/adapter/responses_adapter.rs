@@ -48,8 +48,18 @@ impl ResponsesAdapter {
             ));
         }
 
-        let parsed_response: ResponsesResponse = response.json().await?;
-        Ok(parsed_response)
+        // Get response text first to debug parsing issues
+        let response_text = response.text().await?;
+        
+        // Try to parse the JSON response
+        match serde_json::from_str::<ResponsesResponse>(&response_text) {
+            Ok(parsed_response) => Ok(parsed_response),
+            Err(e) => {
+                eprintln!("Failed to parse OpenAI response: {}", e);
+                eprintln!("Response body: {}", response_text);
+                Err(anyhow!("Error decoding response body: {}", e))
+            }
+        }
     }
 
     /// Make a streaming request to the Responses API
