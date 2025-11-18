@@ -48,7 +48,7 @@ pub enum Model {
 impl Model {
     pub fn to_string(&self) -> String {
         match self {
-            Model::Gpt5 => "gpt-5".to_owned(),
+            Model::Gpt5 => "gpt-5.1".to_owned(),
             Model::Gpt5Mini => "gpt-5-mini".to_owned(),
             Model::Gpt5Nano => "gpt-5-nano".to_owned(),
             Model::Gpt4o => "gpt-4o".to_owned(),

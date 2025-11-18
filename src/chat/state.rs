@@ -138,7 +138,7 @@ impl ChatState {
     fn get_default_model_for_provider(&self, provider: &str) -> String {
         match provider {
             "claude" => "claude-sonnet-4-20250514".to_string(), // Claude Sonnet 4 is now the default
-            "openai" => "gpt-5".to_string(), // GPT-5 is now the default
+            "openai" => "gpt-5.1".to_string(), // GPT-5.1 is now the default
             _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
@@ -172,8 +172,8 @@ impl ChatState {
     /// Get a description for a model
     fn get_model_description(&self, model: &str) -> &'static str {
         match model {
-            // GPT-5 series
-            "gpt-5" => "Most intelligent model, best for complex reasoning and coding",
+            // GPT-5.1 series
+            "gpt-5.1" => "Most intelligent model, best for complex reasoning and coding",
             "gpt-5-mini" => "Cost-optimized reasoning, balances speed/cost/capability",
             "gpt-5-nano" => "High-throughput, simple instruction-following",
             // o3 series (deep research)
@@ -252,13 +252,13 @@ mod tests {
     #[test]
     fn test_provider_switching() {
         let mut state = ChatState::default();
-        
+
         // Switch to OpenAI
         let result = state.switch_provider("openai".to_string());
         assert!(result.is_ok());
         assert_eq!(state.provider, "openai");
-        assert_eq!(state.model, "gpt-5"); // Should default to GPT-5
-        
+        assert_eq!(state.model, "gpt-5.1"); // Should default to GPT-5.1
+
         // Switch to invalid provider
         let result = state.switch_provider("invalid".to_string());
         assert!(result.is_err());
@@ -266,8 +266,8 @@ mod tests {
 
     #[test]
     fn test_model_switching() {
-        let mut state = ChatState::new("openai".to_string(), "gpt-5".to_string());
-        
+        let mut state = ChatState::new("openai".to_string(), "gpt-5.1".to_string());
+
         // Switch to valid model within same provider
         if state.available_models.contains(&"gpt-5-mini".to_string()) {
             let result = state.switch_model("gpt-5-mini".to_string());
@@ -275,7 +275,7 @@ mod tests {
             assert_eq!(state.model, "gpt-5-mini");
             assert_eq!(state.provider, "openai"); // Provider should remain the same
         }
-        
+
         // Switch to model from different provider - should automatically switch provider
         let result = state.switch_model("claude-sonnet-4-20250514".to_string());
         assert!(result.is_ok());
@@ -285,12 +285,12 @@ mod tests {
 
     #[test]
     fn test_model_validation() {
-        let state = ChatState::new("openai".to_string(), "gpt-5".to_string());
-        
+        let state = ChatState::new("openai".to_string(), "gpt-5.1".to_string());
+
         assert!(state.can_switch_to_provider("claude"));
         assert!(state.can_switch_to_provider("openai"));
         assert!(!state.can_switch_to_provider("invalid"));
-        
+
         // Should be able to switch to models within the same provider
         if state.available_models.contains(&"gpt-5-mini".to_string()) {
             assert!(state.can_switch_to_model("gpt-5-mini"));
@@ -299,11 +299,11 @@ mod tests {
 
     #[test]
     fn test_status_display() {
-        let state = ChatState::new("openai".to_string(), "gpt-5".to_string());
+        let state = ChatState::new("openai".to_string(), "gpt-5.1".to_string());
         let status = state.status();
-        
+
         assert!(status.contains("openai"));
-        assert!(status.contains("gpt-5"));
+        assert!(status.contains("gpt-5.1"));
         assert!(status.contains("Available models:"));
     }
 }

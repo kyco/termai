@@ -43,7 +43,7 @@ impl Gpt5Config {
     /// Create config optimized for coding tasks
     pub fn for_coding() -> Self {
         Self {
-            reasoning_effort: ReasoningEffort::Minimal,
+            reasoning_effort: ReasoningEffort::High,
             verbosity: Verbosity::Medium,
             prefer_responses_api: true,
             preambles: PreambleConfig::default(),
@@ -67,7 +67,7 @@ impl Gpt5Config {
     /// Create config optimized for quick responses
     pub fn for_speed() -> Self {
         Self {
-            reasoning_effort: ReasoningEffort::Minimal,
+            reasoning_effort: ReasoningEffort::None,
             verbosity: Verbosity::Low,
             prefer_responses_api: true,
             preambles: PreambleConfig::default(),
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_coding_config() {
         let config = Gpt5Config::for_coding();
-        assert_eq!(config.reasoning_effort, ReasoningEffort::Minimal);
+        assert_eq!(config.reasoning_effort, ReasoningEffort::High);
         assert_eq!(config.verbosity, Verbosity::Medium);
     }
 
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn test_speed_config() {
         let config = Gpt5Config::for_speed();
-        assert_eq!(config.reasoning_effort, ReasoningEffort::Minimal);
+        assert_eq!(config.reasoning_effort, ReasoningEffort::None);
         assert_eq!(config.verbosity, Verbosity::Low);
     }
 

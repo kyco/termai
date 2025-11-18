@@ -1,19 +1,19 @@
-# GPT-5 Feature Implementation Verification
+# GPT-5.1 Feature Implementation Verification
 
 ## ✅ Successfully Implemented Features
 
-### 1. GPT-5 Model Family Support
-- ✅ `gpt-5` (default for OpenAI)
+### 1. GPT-5.1 Model Family Support
+- ✅ `gpt-5.1` (default for OpenAI)
 - ✅ `gpt-5-mini` (cost-optimized)
 - ✅ `gpt-5-nano` (high-throughput)
 - ✅ Model strings correctly mapped
 - ✅ Added to completion system
 
 ### 2. Enhanced Reasoning Effort
-- ✅ `Minimal` - New minimal reasoning level (perfect for coding)
+- ✅ `None` - New none reasoning level (perfect for low-latency interactions)
 - ✅ `Low` - Quick responses
-- ✅ `Medium` - Balanced (default)
-- ✅ `High` - Thorough reasoning
+- ✅ `Medium` - Balanced reasoning
+- ✅ `High` - Thorough reasoning (default for TermAI coding and agentic tasks)
 - ✅ Implements Display trait for easy conversion
 - ✅ Serde support for serialization
 
@@ -55,15 +55,15 @@
 
 ### 9. Configuration System
 - ✅ `Gpt5Config` with preset configurations:
-  - `for_coding()` - Minimal reasoning, medium verbosity
+  - `for_coding()` - High reasoning, medium verbosity (for complex coding and agentic tasks)
   - `for_reasoning()` - High reasoning, high verbosity, preambles
-  - `for_speed()` - Minimal reasoning, low verbosity
+  - `for_speed()` - None reasoning, low verbosity
   - `for_privacy()` - ZDR mode, no storage
 - ✅ Builder pattern for customization
 - ✅ Comprehensive configuration options
 
 ### 10. Updated Integration Points
-- ✅ Commit command uses GPT-5 with minimal reasoning (optimal for coding)
+- ✅ Commit command uses GPT-5.1 with high reasoning (optimal for coding and multi-step planning)
 - ✅ Chat completion request supports new features
 - ✅ Service layer updated for new model support
 - ✅ Completion system includes new models
@@ -85,7 +85,7 @@
 
 ### Intelligent API Selection
 The system automatically chooses the best API:
-- GPT-5 models → Responses API (better performance)
+- GPT-5.1 models → Responses API (better performance)
 - Older models → Chat Completions (compatibility)
 - Feature requirements → Responses API when needed
 
@@ -112,20 +112,20 @@ The GPT-5 integration is **production-ready** with:
 
 ## 🚀 Usage Examples
 
-### Basic GPT-5 Usage
+### Basic GPT-5.1 Usage
 ```bash
 # Switch to OpenAI provider (if not already set)
 termai config set-provider openai
 
-# Chat with GPT-5 (now the default)
+# Chat with GPT-5.1 (now the default)
 termai chat
 
-# Generate commit messages with GPT-5 + minimal reasoning
+# Generate commit messages with GPT-5.1 + high reasoning (for coding and agentic tasks)
 termai commit
 ```
 
 ### Advanced Features
-The implementation supports all documented GPT-5 features:
+The implementation supports all documented GPT-5.1 features:
 - Custom tools with freeform input
 - Allowed tools for safety
 - Verbosity control for response length
@@ -136,9 +136,11 @@ The implementation supports all documented GPT-5 features:
 ## 📋 Migration Notes
 
 The system is designed for seamless migration:
-- GPT-5 becomes the new default OpenAI model
+- GPT-5.1 becomes the new default OpenAI model
+- TermAI defaults to "high" reasoning with "medium" verbosity for optimal coding and agentic task performance
+- OpenAI's GPT-5.1 base default is "none" reasoning, but TermAI uses "high" for better results
 - Existing workflows continue to work
 - New features are opt-in
-- Performance improvements are automatic for GPT-5 models
+- Performance improvements are automatic for GPT-5.1 models
 
-This implementation provides **complete GPT-5 support** as specified in the OpenAI documentation, with intelligent defaults and comprehensive configurability.
+This implementation provides **complete GPT-5.1 support** as specified in the OpenAI documentation, with intelligent defaults and comprehensive configurability.

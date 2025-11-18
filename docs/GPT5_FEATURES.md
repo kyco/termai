@@ -1,13 +1,13 @@
-# GPT-5 Features in TermAI
+# GPT-5.1 Features in TermAI
 
-This document outlines the new GPT-5 features implemented in TermAI, including usage examples and best practices.
+This document outlines the new GPT-5.1 features implemented in TermAI, including usage examples and best practices.
 
 ## Overview
 
-TermAI now fully supports GPT-5's advanced capabilities, including:
+TermAI now fully supports GPT-5.1's advanced capabilities, including:
 
-- **GPT-5 Model Family**: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
-- **Enhanced Reasoning**: Minimal, Low, Medium, High reasoning efforts
+- **GPT-5.1 Model Family**: `gpt-5.1`, `gpt-5-mini`, `gpt-5-nano`
+- **Enhanced Reasoning**: None, Low, Medium, High reasoning efforts
 - **Verbosity Control**: Low, Medium, High response lengths
 - **Dual API Support**: Both Chat Completions and new Responses API
 - **Custom Tools**: Freeform text input with optional grammar constraints
@@ -26,15 +26,15 @@ termai config set-provider openai
 # Set your OpenAI API key
 termai config set-openai your-api-key-here
 
-# Start chatting with GPT-5 (now the default)
+# Start chatting with GPT-5.1 (now the default)
 termai chat
 ```
 
 ### Model Selection
 
-GPT-5 offers three variants:
+GPT-5.1 offers three variants:
 
-- **`gpt-5`**: Best for complex reasoning, broad world knowledge, code-heavy tasks
+- **`gpt-5.1`**: Best for complex reasoning, broad world knowledge, code-heavy tasks
 - **`gpt-5-mini`**: Cost-optimized reasoning, balances speed/cost/capability  
 - **`gpt-5-nano`**: High-throughput tasks, simple instruction-following
 
@@ -42,18 +42,18 @@ GPT-5 offers three variants:
 
 ### 1. Enhanced Reasoning Effort
 
-GPT-5 introduces a new "minimal" reasoning level, perfect for coding:
+GPT-5.1 introduces a new "none" reasoning level, perfect for low-latency interactions:
 
 ```rust
-// The commit command now uses minimal reasoning for faster code generation
-reasoning_effort: ReasoningEffort::Minimal
+// The commit command now uses none reasoning for faster code generation
+reasoning_effort: ReasoningEffort::None
 ```
 
 **Reasoning Levels:**
-- `Minimal`: Fastest, best for coding and instruction-following
+- `None`: Fastest, best for low-latency interactions and simple tasks
 - `Low`: Quick responses with basic reasoning
-- `Medium`: Balanced reasoning (default)
-- `High`: Thorough reasoning for complex problems
+- `Medium`: Balanced reasoning
+- `High`: Thorough reasoning for complex problems (default for TermAI coding tasks)
 
 ### 2. Verbosity Control
 
@@ -72,7 +72,7 @@ pub enum Verbosity {
 
 TermAI automatically uses the optimal API:
 
-- **GPT-5 models**: Prefer Responses API for better performance
+- **GPT-5.1 models**: Prefer Responses API for better performance
 - **Older models**: Use Chat Completions for compatibility
 - **Auto-detection**: Based on model and requested features
 
@@ -124,9 +124,9 @@ TermAI provides optimized configurations for common use cases:
 ```rust
 // Optimized for different scenarios
 let configs = vec![
-    Gpt5Config::for_coding(),    // Minimal reasoning, medium verbosity
+    Gpt5Config::for_coding(),    // High reasoning, medium verbosity (for complex coding and agentic tasks)
     Gpt5Config::for_reasoning(), // High reasoning, high verbosity, preambles
-    Gpt5Config::for_speed(),     // Minimal reasoning, low verbosity
+    Gpt5Config::for_speed(),     // None reasoning, low verbosity
     Gpt5Config::for_privacy(),   // ZDR mode, no storage
 ];
 ```
@@ -135,10 +135,10 @@ let configs = vec![
 
 ### Coding Tasks
 
-The system is automatically optimized for coding with GPT-5:
+The system is automatically optimized for coding with GPT-5.1:
 
 ```bash
-# The commit command now uses minimal reasoning for faster, more focused commit messages
+# The commit command now uses high reasoning with medium verbosity for complex coding and agentic tasks
 termai commit
 
 # Interactive coding sessions benefit from the optimized settings
@@ -153,7 +153,7 @@ For complex analysis, TermAI automatically adapts:
 # Multi-turn conversations maintain reasoning context
 termai chat --session analysis
 
-# Smart context discovery works better with GPT-5's improved reasoning
+# Smart context discovery works better with GPT-5.1's improved reasoning
 termai chat --smart-context
 ```
 
@@ -169,13 +169,18 @@ let config = Gpt5Config::for_privacy()
 
 ## Migration from Previous Models
 
+### From GPT-5 to GPT-5.1
+- OpenAI's GPT-5.1 defaults to "none" reasoning for low-latency
+- TermAI defaults to "high" reasoning with "medium" verbosity for coding and agentic tasks
+- GPT-5.1 is a drop-in replacement for GPT-5
+
 ### From o3/o4 Models
-- Use `gpt-5` with medium or high reasoning
+- Use `gpt-5.1` with medium or high reasoning
 - Start with medium reasoning, increase to high if needed
 
 ### From gpt-4.1
-- Use `gpt-5` with minimal or low reasoning  
-- Start with minimal reasoning and tune prompts
+- Use `gpt-5.1` with none or low reasoning
+- Start with none reasoning and tune prompts
 
 ### From gpt-4.1-mini/o4-mini
 - Use `gpt-5-mini` with prompt tuning
@@ -185,8 +190,9 @@ let config = Gpt5Config::for_privacy()
 
 ## Best Practices
 
-### For Coding
-- Use minimal reasoning effort for faster responses
+### For Coding and Agentic Tasks
+- Use high reasoning effort with medium verbosity for complex coding, bug fixing, and multi-step planning
+- Use none reasoning for simple, quick tasks
 - Enable preambles for complex tool-calling scenarios
 - Medium verbosity provides good balance of detail and speed
 
@@ -202,22 +208,22 @@ let config = Gpt5Config::for_privacy()
 
 ## Performance Optimizations
 
-GPT-5 in TermAI includes several performance improvements:
+GPT-5.1 in TermAI includes several performance improvements:
 
-1. **Automatic API Selection**: Uses Responses API for GPT-5 models
+1. **Automatic API Selection**: Uses Responses API for GPT-5.1 models
 2. **Reasoning Context**: Maintains chain of thought between turns
 3. **Smart Caching**: Better cache hit rates with Responses API
-4. **Minimal Reasoning**: Optimized for coding tasks
+4. **High Reasoning Default**: Optimized for complex coding and agentic tasks
 
 ## Configuration
 
-TermAI's GPT-5 configuration is backward compatible but adds new options:
+TermAI's GPT-5.1 configuration is backward compatible but adds new options:
 
 ```toml
 # .termai.toml
 [providers.openai]
-model = "gpt-5"
-reasoning_effort = "minimal"
+model = "gpt-5.1"
+reasoning_effort = "high"
 verbosity = "medium"
 prefer_responses_api = true
 preambles = false
@@ -229,7 +235,7 @@ zero_data_retention = false
 
 ### Common Issues
 
-1. **API Errors**: Ensure you're using a GPT-5 compatible API key
+1. **API Errors**: Ensure you're using a GPT-5.1 compatible API key
 2. **Feature Not Available**: Some features require the Responses API
 3. **Performance**: Try reducing reasoning effort or verbosity for faster responses
 
@@ -243,7 +249,7 @@ TERMAI_DEBUG=1 termai chat
 
 ## Implementation Details
 
-The GPT-5 integration includes:
+The GPT-5.1 integration includes:
 
 - **New Model Types**: Added `Gpt5`, `Gpt5Mini`, `Gpt5Nano` to model enum
 - **Enhanced Requests**: Support for verbosity, custom tools, allowed tools

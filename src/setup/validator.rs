@@ -94,7 +94,7 @@ impl ApiKeyValidator for OpenAIValidator {
             .header("Authorization", format!("Bearer {}", api_key))
             .header("content-type", "application/json")
             .json(&json!({
-                "model": "gpt-5",
+                "model": "gpt-5.1",
                 "input": "test",
                 "max_output_tokens": 1
             }))

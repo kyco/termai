@@ -18,6 +18,7 @@ pub async fn handle_chat_command(args: &ChatArgs, repo: &SqliteRepository) -> Re
 
     let input = &args.input;
     let session_name = &args.session;
+    let last_session = args.last_session;
     let directory = &args.directory;
     let directories = &args.directories;
     let exclude = &args.exclude;
@@ -30,8 +31,68 @@ pub async fn handle_chat_command(args: &ChatArgs, repo: &SqliteRepository) -> Re
     };
 
     // Get or create session
-    let session = if let Some(name) = session_name {
-        sessions_service::session(repo, repo, name)?
+    let session = if last_session {
+        // Resume the most recent session
+        let session = sessions_service::get_most_recent_session(repo, repo)?;
+
+        // Show message when resuming last session
+        println!("🔄 {} '{}'", "Resuming last session".bright_green(), session.name.bright_cyan());
+        println!();
+
+        // Show previous messages if any
+        if !session.messages.is_empty() {
+            println!("{}", "═".repeat(80).bright_black());
+            println!("   {} previous messages loaded", session.messages.len().to_string().bright_yellow());
+            println!("{}", "═".repeat(80).bright_black());
+            println!();
+
+            // Display previous messages
+            for message in &session.messages {
+                let role_display = match message.role.to_string().as_str() {
+                    "user" => "You".bright_blue().bold(),
+                    "assistant" => "AI".bright_magenta().bold(),
+                    "system" => "System".bright_yellow().bold(),
+                    _ => message.role.to_string().white().bold(),
+                };
+
+                println!("{}: {}", role_display, message.content.dimmed());
+                println!();
+            }
+
+            println!("{}", "─".repeat(80).bright_black());
+            println!();
+        }
+
+        session
+    } else if let Some(name) = session_name {
+        let session = sessions_service::session(repo, repo, name)?;
+
+        // Show previous messages if continuing an existing session
+        if !session.messages.is_empty() {
+            println!("{}", "═".repeat(80).bright_black());
+            println!("📝 {} '{}'", "Continuing session".bright_green(), name.bright_cyan());
+            println!("   {} previous messages loaded", session.messages.len().to_string().bright_yellow());
+            println!("{}", "═".repeat(80).bright_black());
+            println!();
+
+            // Display previous messages
+            for message in &session.messages {
+                let role_display = match message.role.to_string().as_str() {
+                    "user" => "You".bright_blue().bold(),
+                    "assistant" => "AI".bright_magenta().bold(),
+                    "system" => "System".bright_yellow().bold(),
+                    _ => message.role.to_string().white().bold(),
+                };
+
+                println!("{}: {}", role_display, message.content.dimmed());
+                println!();
+            }
+
+            println!("{}", "─".repeat(80).bright_black());
+            println!();
+        }
+
+        session
     } else {
         Session::new_temporary()
     };

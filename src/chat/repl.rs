@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::validate::{MatchingBracketValidator, Validator};
+use rustyline::validate::Validator;
 use rustyline::{error::ReadlineError, history::FileHistory, Config, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::collections::HashSet;
@@ -11,7 +11,6 @@ use std::collections::HashSet;
 pub struct ChatHelper {
     completer: FilenameCompleter,
     highlighter: MatchingBracketHighlighter,
-    validator: MatchingBracketValidator,
     hinter: HistoryHinter,
     commands: HashSet<String>,
 }
@@ -32,7 +31,6 @@ impl ChatHelper {
         Self {
             completer: FilenameCompleter::new(),
             highlighter: MatchingBracketHighlighter::new(),
-            validator: MatchingBracketValidator::new(),
             hinter: HistoryHinter::new(),
             commands,
         }
@@ -122,13 +120,16 @@ impl Highlighter for ChatHelper {
 impl Validator for ChatHelper {
     fn validate(
         &self,
-        ctx: &mut rustyline::validate::ValidationContext,
+        _ctx: &mut rustyline::validate::ValidationContext,
     ) -> rustyline::Result<rustyline::validate::ValidationResult> {
-        self.validator.validate(ctx)
+        // Always accept input - no validation for chat messages
+        // This allows users to send messages with unmatched brackets, special characters, etc.
+        Ok(rustyline::validate::ValidationResult::Valid(None))
     }
 
     fn validate_while_typing(&self) -> bool {
-        self.validator.validate_while_typing()
+        // Don't validate while typing to allow any characters
+        false
     }
 }
 

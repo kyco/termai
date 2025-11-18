@@ -257,7 +257,7 @@ impl ResponsesRequest {
             input: Some(RequestInput::Text(input)),
             instructions: None,
             reasoning: Some(ReasoningConfig {
-                effort: ReasoningEffort::Medium,
+                effort: ReasoningEffort::High,
             }),
             text: Some(TextConfig {
                 verbosity: Verbosity::Medium,
@@ -282,7 +282,7 @@ impl ResponsesRequest {
             input: Some(RequestInput::Messages(messages)),
             instructions: None,
             reasoning: Some(ReasoningConfig {
-                effort: ReasoningEffort::Medium,
+                effort: ReasoningEffort::High,
             }),
             text: Some(TextConfig {
                 verbosity: Verbosity::Medium,

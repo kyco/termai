@@ -31,6 +31,33 @@ pub fn fetch_all_sessions<SR: SessionRepository, MR: MessageRepository>(
     Ok(())
 }
 
+pub fn get_most_recent_session<SR: SessionRepository, MR: MessageRepository>(
+    session_repo: &SR,
+    message_repository: &MR,
+) -> Result<Session> {
+    let session_entities = session_repo.fetch_all_sessions()
+        .map_err(|e| anyhow::anyhow!("Failed to fetch sessions: {:?}", e))?;
+
+    if session_entities.is_empty() {
+        return Err(anyhow::anyhow!("No previous sessions found. Start a new session with a name: termai chat --session <name>"));
+    }
+
+    // Sort by expires_at (most recent first) and get the first one
+    // expires_at is updated every time the session is used, so it reflects the last usage time
+    let mut sessions = session_entities
+        .iter()
+        .map(|s| Session::from(s))
+        .collect::<Vec<Session>>();
+
+    sessions.sort_by(|a, b| b.expires_at.cmp(&a.expires_at));
+
+    let most_recent = sessions.first()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get most recent session"))?;
+
+    let session = session_with_messages(message_repository, most_recent);
+    Ok(session)
+}
+
 pub fn session<SR: SessionRepository, MR: MessageRepository>(
     session_repo: &SR,
     message_repository: &MR,

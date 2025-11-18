@@ -40,9 +40,13 @@ pub struct ChatArgs {
     #[arg(long)]
     pub system_prompt: Option<String>,
 
-    /// Session name to use or create
-    #[arg(long)]
+    /// Session name to continue/create (continues previous chat history if session exists)
+    #[arg(long, short = 's', alias = "continue", alias = "resume")]
     pub session: Option<String>,
+
+    /// Resume the last/most recent session automatically
+    #[arg(short = 'c', long = "last", conflicts_with = "session")]
+    pub last_session: bool,
 
     /// Enable smart context discovery (automatically finds relevant files)
     #[arg(long)]

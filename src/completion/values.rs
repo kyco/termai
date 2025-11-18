@@ -37,8 +37,8 @@ impl CompletionValues {
             "claude-3-opus-20240229".to_string(),
             "claude-3-sonnet-20240229".to_string(),
             "claude-3-haiku-20240307".to_string(),
-            // OpenAI GPT-5 series
-            "gpt-5".to_string(),
+            // OpenAI GPT-5.1 series
+            "gpt-5.1".to_string(),
             "gpt-5-mini".to_string(),
             "gpt-5-nano".to_string(),
             // OpenAI o3 series (deep research)
