@@ -231,15 +231,38 @@ mod tests {
 
     fn create_test_repo() -> (NamedTempFile, SmartContextRepositoryImpl) {
         let temp_db = NamedTempFile::new().unwrap();
-        let conn = Connection::open(&temp_db).unwrap();
+        let conn = Connection::open(temp_db.path()).unwrap();
+        // The application schema doesn't enforce foreign keys for sessions (no PK/UNIQUE on id),
+        // so keep foreign key checks disabled for repository unit tests.
+        conn.execute("PRAGMA foreign_keys = OFF", []).unwrap();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                current INTEGER NOT NULL DEFAULT 0
+            )",
+            [],
+        )
+        .unwrap();
         let repo = SmartContextRepositoryImpl::new(conn);
         repo.initialize().unwrap();
         (temp_db, repo)
     }
 
+    fn create_session(repo: &SmartContextRepositoryImpl, session_id: &str) {
+        repo.connection
+            .execute(
+                "INSERT INTO sessions (id, name, expires_at, current) VALUES (?1, ?2, ?3, ?4)",
+                params![session_id, session_id, "0", 0],
+            )
+            .unwrap();
+    }
+
     #[test]
     fn test_create_and_find_smart_context() {
         let (_temp_db, repo) = create_test_repo();
+        create_session(&repo, "session123");
 
         let entity = create_smart_context_entity(
             "session123".to_string(),
@@ -274,6 +297,7 @@ mod tests {
     #[test]
     fn test_update_smart_context() {
         let (_temp_db, repo) = create_test_repo();
+        create_session(&repo, "session456");
 
         let mut entity = create_smart_context_entity(
             "session456".to_string(),
@@ -312,6 +336,8 @@ mod tests {
     #[test]
     fn test_find_by_project_path() {
         let (_temp_db, repo) = create_test_repo();
+        create_session(&repo, "session1");
+        create_session(&repo, "session2");
 
         // Create multiple entities for the same project path
         let entity1 = create_smart_context_entity(
@@ -357,6 +383,7 @@ mod tests {
     #[test]
     fn test_delete_by_session_id() {
         let (_temp_db, repo) = create_test_repo();
+        create_session(&repo, "session_to_delete");
 
         let entity = create_smart_context_entity(
             "session_to_delete".to_string(),

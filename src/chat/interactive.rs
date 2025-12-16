@@ -521,7 +521,7 @@ where
         let chat_state = ChatState::new(provider_str.to_string(),
             match provider {
                 Provider::Claude => "claude-sonnet-4-20250514".to_string(),
-                Provider::Openai => "gpt-5.1".to_string(),
+                Provider::Openai => "gpt-5.2".to_string(),
             }
         );
 

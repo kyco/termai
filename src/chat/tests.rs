@@ -5,6 +5,30 @@ mod tests {
     use crate::llm::common::model::role::Role;
     use chrono::Local;
 
+    fn strip_ansi(input: &str) -> String {
+        let mut output = String::with_capacity(input.len());
+        let mut chars = input.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '\u{1b}' {
+                if chars.peek() == Some(&'[') {
+                    // Consume '['
+                    chars.next();
+                    // Skip until the final byte of the CSI sequence (usually a letter like 'm')
+                    while let Some(next) = chars.next() {
+                        if next.is_ascii_alphabetic() {
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+            output.push(ch);
+        }
+
+        output
+    }
+
     #[test]
     fn test_command_parsing() {
         // Test basic commands
@@ -189,7 +213,7 @@ mod tests {
     fn test_formatter_context_info() {
         let formatter = ChatFormatter::new();
         let files = vec!["src/main.rs".to_string(), "src/lib.rs".to_string()];
-        let info = formatter.format_context_info(2, &files);
+        let info = strip_ansi(&formatter.format_context_info(2, &files));
 
         assert!(info.contains("Context Information"));
         assert!(info.contains("Total files: 2"));
@@ -201,7 +225,7 @@ mod tests {
     fn test_formatter_context_info_many_files() {
         let formatter = ChatFormatter::new();
         let files: Vec<String> = (0..15).map(|i| format!("file_{}.rs", i)).collect();
-        let info = formatter.format_context_info(15, &files);
+        let info = strip_ansi(&formatter.format_context_info(15, &files));
 
         assert!(info.contains("Total files: 15"));
         assert!(info.contains("file_0.rs"));

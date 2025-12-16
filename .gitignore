@@ -1,3 +1,5 @@
 /target
 *.db
 .idea
+.DS_Store
+.termai_history

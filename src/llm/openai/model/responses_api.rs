@@ -32,7 +32,7 @@ pub struct ResponsesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
     
-    /// Reasoning configuration (o-series models only)
+    /// Reasoning configuration
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningConfig>,
     
@@ -257,7 +257,7 @@ impl ResponsesRequest {
             input: Some(RequestInput::Text(input)),
             instructions: None,
             reasoning: Some(ReasoningConfig {
-                effort: ReasoningEffort::High,
+                effort: ReasoningEffort::XHigh,
             }),
             text: Some(TextConfig {
                 verbosity: Verbosity::Medium,
@@ -282,7 +282,7 @@ impl ResponsesRequest {
             input: Some(RequestInput::Messages(messages)),
             instructions: None,
             reasoning: Some(ReasoningConfig {
-                effort: ReasoningEffort::High,
+                effort: ReasoningEffort::XHigh,
             }),
             text: Some(TextConfig {
                 verbosity: Verbosity::Medium,

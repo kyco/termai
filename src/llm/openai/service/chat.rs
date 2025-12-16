@@ -11,7 +11,7 @@ use crate::session::model::session::Session;
 use anyhow::{Result, anyhow};
 
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
-    let model = Model::Gpt5; // Default to GPT-5.1 for best performance
+    let model = Model::Gpt5; // Default to GPT-5.2 for best performance
 
     // Convert session messages to input messages
     let input_messages = session

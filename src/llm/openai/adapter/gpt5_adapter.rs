@@ -94,7 +94,7 @@ impl Gpt5Adapter {
         _chat_request: String, // Simplified for migration
     ) -> ResponsesRequest {
         // Deprecated during migration
-        ResponsesRequest::simple("gpt-5.1".to_string(), "Migration in progress".to_string())
+        ResponsesRequest::simple("gpt-5.2".to_string(), "Migration in progress".to_string())
     }
 
     /// Extract text content from Responses API response
@@ -134,8 +134,8 @@ mod tests {
 
     #[test]
     fn test_should_use_responses_api() {
-        // GPT-5.1 models should use Responses API
-        assert!(Gpt5Adapter::should_use_responses_api("gpt-5.1", None, None, false));
+        // GPT-5.2 models should use Responses API
+        assert!(Gpt5Adapter::should_use_responses_api("gpt-5.2", None, None, false));
         assert!(Gpt5Adapter::should_use_responses_api("gpt-5-mini", None, None, false));
         assert!(Gpt5Adapter::should_use_responses_api("gpt-5-nano", None, None, false));
 
@@ -161,13 +161,13 @@ mod tests {
     #[test]
     fn test_create_simple_request() {
         let request = Gpt5Adapter::create_simple_request(
-            "gpt-5.1".to_string(),
+            "gpt-5.2".to_string(),
             "Hello world".to_string(),
             Some(ReasoningEffort::Medium),
             Some(Verbosity::Low),
         );
 
-        assert_eq!(request.model, "gpt-5.1");
+        assert_eq!(request.model, "gpt-5.2");
         // Check input content (it's now wrapped in RequestInput enum)
         if let Some(crate::llm::openai::model::responses_api::RequestInput::Text(text)) = &request.input {
             assert_eq!(text, "Hello world");

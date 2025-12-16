@@ -28,7 +28,7 @@ pub struct Gpt5Config {
 impl Default for Gpt5Config {
     fn default() -> Self {
         Self {
-            reasoning_effort: ReasoningEffort::Medium,
+            reasoning_effort: ReasoningEffort::XHigh,
             verbosity: Verbosity::Medium,
             prefer_responses_api: true,
             preambles: PreambleConfig::default(),
@@ -43,7 +43,7 @@ impl Gpt5Config {
     /// Create config optimized for coding tasks
     pub fn for_coding() -> Self {
         Self {
-            reasoning_effort: ReasoningEffort::High,
+            reasoning_effort: ReasoningEffort::XHigh,
             verbosity: Verbosity::Medium,
             prefer_responses_api: true,
             preambles: PreambleConfig::default(),
@@ -55,7 +55,7 @@ impl Gpt5Config {
     /// Create config optimized for complex reasoning tasks
     pub fn for_reasoning() -> Self {
         Self {
-            reasoning_effort: ReasoningEffort::High,
+            reasoning_effort: ReasoningEffort::XHigh,
             verbosity: Verbosity::High,
             prefer_responses_api: true,
             preambles: PreambleConfig::enabled(),
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Gpt5Config::default();
-        assert_eq!(config.reasoning_effort, ReasoningEffort::Medium);
+        assert_eq!(config.reasoning_effort, ReasoningEffort::XHigh);
         assert_eq!(config.verbosity, Verbosity::Medium);
         assert!(config.prefer_responses_api);
         assert!(!config.preambles.enabled);
@@ -157,14 +157,14 @@ mod tests {
     #[test]
     fn test_coding_config() {
         let config = Gpt5Config::for_coding();
-        assert_eq!(config.reasoning_effort, ReasoningEffort::High);
+        assert_eq!(config.reasoning_effort, ReasoningEffort::XHigh);
         assert_eq!(config.verbosity, Verbosity::Medium);
     }
 
     #[test]
     fn test_reasoning_config() {
         let config = Gpt5Config::for_reasoning();
-        assert_eq!(config.reasoning_effort, ReasoningEffort::High);
+        assert_eq!(config.reasoning_effort, ReasoningEffort::XHigh);
         assert_eq!(config.verbosity, Verbosity::High);
         assert!(config.preambles.enabled);
         assert!(config.store_conversations);

@@ -8,6 +8,7 @@ pub enum ReasoningEffort {
     Low,
     Medium,
     High,
+    XHigh,
 }
 
 impl std::fmt::Display for ReasoningEffort {
@@ -17,6 +18,7 @@ impl std::fmt::Display for ReasoningEffort {
             ReasoningEffort::Low => write!(f, "low"),
             ReasoningEffort::Medium => write!(f, "medium"),
             ReasoningEffort::High => write!(f, "high"),
+            ReasoningEffort::XHigh => write!(f, "xhigh"),
         }
     }
 }

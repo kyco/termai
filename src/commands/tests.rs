@@ -233,6 +233,7 @@ mod tests {
             exclude: vec!["*.log".to_string()],
             system_prompt: None,
             session: Some("test_session".to_string()),
+            last_session: false,
             smart_context: true,
             context_query: Some("rust code".to_string()),
             max_context_tokens: Some(4000),

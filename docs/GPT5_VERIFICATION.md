@@ -1,9 +1,11 @@
-# GPT-5.1 Feature Implementation Verification
+# GPT-5.2 Feature Implementation Verification
 
 ## ✅ Successfully Implemented Features
 
-### 1. GPT-5.1 Model Family Support
-- ✅ `gpt-5.1` (default for OpenAI)
+### 1. GPT-5.2 Model Family Support
+- ✅ `gpt-5.2` (default for OpenAI)
+- ✅ `gpt-5.2-chat-latest` (chat-optimized)
+- ✅ `gpt-5.2-pro` (extra compute)
 - ✅ `gpt-5-mini` (cost-optimized)
 - ✅ `gpt-5-nano` (high-throughput)
 - ✅ Model strings correctly mapped
@@ -13,7 +15,8 @@
 - ✅ `None` - New none reasoning level (perfect for low-latency interactions)
 - ✅ `Low` - Quick responses
 - ✅ `Medium` - Balanced reasoning
-- ✅ `High` - Thorough reasoning (default for TermAI coding and agentic tasks)
+- ✅ `High` - Thorough reasoning
+- ✅ `XHigh` - Maximum reasoning effort (default for TermAI OpenAI chat)
 - ✅ Implements Display trait for easy conversion
 - ✅ Serde support for serialization
 
@@ -55,24 +58,22 @@
 
 ### 9. Configuration System
 - ✅ `Gpt5Config` with preset configurations:
-  - `for_coding()` - High reasoning, medium verbosity (for complex coding and agentic tasks)
-  - `for_reasoning()` - High reasoning, high verbosity, preambles
+  - `for_coding()` - XHigh reasoning, medium verbosity (for complex coding and agentic tasks)
+  - `for_reasoning()` - XHigh reasoning, high verbosity, preambles
   - `for_speed()` - None reasoning, low verbosity
   - `for_privacy()` - ZDR mode, no storage
 - ✅ Builder pattern for customization
 - ✅ Comprehensive configuration options
 
 ### 10. Updated Integration Points
-- ✅ Commit command uses GPT-5.1 with high reasoning (optimal for coding and multi-step planning)
+- ✅ OpenAI chat defaults to GPT-5.2 with xhigh reasoning
 - ✅ Chat completion request supports new features
 - ✅ Service layer updated for new model support
 - ✅ Completion system includes new models
 
 ## ✅ Build Status
 - ✅ **Cargo build**: Successful
-- ✅ **Cargo test**: 181/191 tests passing (9 OpenAI-specific tests all pass)
-- ✅ **CLI functionality**: Working correctly
-- ✅ **No compilation errors**: All issues resolved
+- ⚠️ **Cargo test**: Runs, but some tests are currently failing (see `cargo test` output)
 
 ## ✅ Code Quality
 - ✅ Comprehensive test coverage for new features
@@ -85,7 +86,7 @@
 
 ### Intelligent API Selection
 The system automatically chooses the best API:
-- GPT-5.1 models → Responses API (better performance)
+- GPT-5.2 models → Responses API (better performance)
 - Older models → Chat Completions (compatibility)
 - Feature requirements → Responses API when needed
 
@@ -112,20 +113,17 @@ The GPT-5 integration is **production-ready** with:
 
 ## 🚀 Usage Examples
 
-### Basic GPT-5.1 Usage
+### Basic GPT-5.2 Usage
 ```bash
 # Switch to OpenAI provider (if not already set)
 termai config set-provider openai
 
-# Chat with GPT-5.1 (now the default)
+# Chat with GPT-5.2 (now the default)
 termai chat
-
-# Generate commit messages with GPT-5.1 + high reasoning (for coding and agentic tasks)
-termai commit
 ```
 
 ### Advanced Features
-The implementation supports all documented GPT-5.1 features:
+The implementation supports all documented GPT-5.2 features:
 - Custom tools with freeform input
 - Allowed tools for safety
 - Verbosity control for response length
@@ -136,11 +134,11 @@ The implementation supports all documented GPT-5.1 features:
 ## 📋 Migration Notes
 
 The system is designed for seamless migration:
-- GPT-5.1 becomes the new default OpenAI model
-- TermAI defaults to "high" reasoning with "medium" verbosity for optimal coding and agentic task performance
-- OpenAI's GPT-5.1 base default is "none" reasoning, but TermAI uses "high" for better results
+- GPT-5.2 becomes the new default OpenAI model
+- TermAI defaults to "xhigh" reasoning with "medium" verbosity for optimal coding and agentic task performance
+- OpenAI's GPT-5.2 base default is "none" reasoning, but TermAI uses "xhigh" for better results
 - Existing workflows continue to work
 - New features are opt-in
-- Performance improvements are automatic for GPT-5.1 models
+- Performance improvements are automatic for GPT-5.2 models
 
-This implementation provides **complete GPT-5.1 support** as specified in the OpenAI documentation, with intelligent defaults and comprehensive configurability.
+This implementation provides **complete GPT-5.2 support** as specified in the OpenAI documentation, with intelligent defaults and comprehensive configurability.

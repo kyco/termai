@@ -396,7 +396,7 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
         }
     ];
 
-    let request = ResponsesRequest::from_messages(Model::Gpt4oMini.to_string(), messages);
+    let request = ResponsesRequest::from_messages(Model::Gpt5.to_string(), messages);
 
     eprintln!("DEBUG: Sending OpenAI API request");
     let response = ResponsesAdapter::chat(&request, api_key).await?;
@@ -443,13 +443,13 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str) -> Result<St
     let client = Client::new();
     
     let request_body = json!({
-        "model": "gpt-4o-mini",
+        "model": "gpt-5.2",
         "messages": [
             {"role": "system", "content": "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis."},
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 1000,
-        "temperature": 0.7
+        "reasoning_effort": "xhigh"
     });
 
     eprintln!("DEBUG: Sending fallback OpenAI request");

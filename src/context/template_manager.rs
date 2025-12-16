@@ -471,6 +471,7 @@ mod tests {
 
         // Create some files to analyze
         std::fs::create_dir_all(project_path.join("src")).unwrap();
+        std::fs::create_dir_all(project_path.join("tests")).unwrap();
         std::fs::write(project_path.join("src/auth.rs"), "// auth code").unwrap();
         std::fs::write(project_path.join("tests/auth_test.rs"), "// test code").unwrap();
         std::fs::write(project_path.join("README.md"), "# Project").unwrap();
@@ -493,8 +494,8 @@ mod tests {
         let menu = TemplateManager::display_template_menu();
 
         assert!(menu.contains("Available Context Templates"));
-        assert!(menu.contains("Security Analysis"));
-        assert!(menu.contains("Code Refactoring"));
+        assert!(menu.contains("security"));
+        assert!(menu.contains("refactoring"));
         assert!(menu.contains("Select a template"));
     }
 

@@ -101,7 +101,7 @@ impl ChatCommand {
             ChatCommand::Branch(_) => "Create a new conversation branch",
             ChatCommand::AddContext(_) => "Add file or directory to context",
             ChatCommand::RemoveContext(_) => "Remove file or directory from context",
-            ChatCommand::Model(_) => "Switch AI model (e.g., gpt-5.1, gpt-5-mini, claude-3-5-sonnet-20241022)",
+            ChatCommand::Model(_) => "Switch AI model (e.g., gpt-5.2, gpt-5-mini, claude-3-5-sonnet-20241022)",
             ChatCommand::Provider(_) => "Switch AI provider (claude or openai)",
         }
     }
@@ -171,8 +171,8 @@ mod tests {
             Some(ChatCommand::AddContext("src/main.rs".to_string()))
         );
         assert_eq!(
-            ChatCommand::parse("/model gpt-5.1"),
-            Some(ChatCommand::Model(Some("gpt-5.1".to_string())))
+            ChatCommand::parse("/model gpt-5.2"),
+            Some(ChatCommand::Model(Some("gpt-5.2".to_string())))
         );
         assert_eq!(ChatCommand::parse("/model"), Some(ChatCommand::Model(None)));
         assert_eq!(

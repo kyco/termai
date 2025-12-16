@@ -1,4 +1,4 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 use rusqlite::Connection;
 use std::fs;
@@ -13,7 +13,7 @@ fn test_database_initialization() {
     fs::create_dir_all(&config_dir).unwrap();
 
     // Run termai with a simple command that forces db initialization
-    let mut cmd = Command::cargo_bin("termai").unwrap();
+    let mut cmd = cargo_bin_cmd!("termai");
     cmd.env("HOME", home_dir.to_str().unwrap())
         .arg("--print-config");
 
@@ -43,7 +43,7 @@ fn test_config_storage() {
 
     // Set test API key
     let test_key = "test_api_key_123";
-    let mut cmd = Command::cargo_bin("termai").unwrap();
+    let mut cmd = cargo_bin_cmd!("termai");
     cmd.env("HOME", home_dir.to_str().unwrap())
         .arg("--chat-gpt-api-key")
         .arg(test_key);
@@ -51,7 +51,7 @@ fn test_config_storage() {
     cmd.assert().success();
 
     // Verify key was stored by checking config
-    let mut cmd = Command::cargo_bin("termai").unwrap();
+    let mut cmd = cargo_bin_cmd!("termai");
     cmd.env("HOME", home_dir.to_str().unwrap())
         .arg("--print-config");
 

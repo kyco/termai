@@ -21,7 +21,7 @@ mod examples {
         let api_key = "your-api-key";
 
         // Create a simple request with custom reasoning and verbosity
-        let request = ResponsesRequest::with_reasoning("gpt-5.1".to_string(), "Explain quantum computing".to_string(), ReasoningEffort::Medium);
+        let request = ResponsesRequest::with_reasoning("gpt-5.2".to_string(), "Explain quantum computing".to_string(), ReasoningEffort::Medium);
 
         let response = adapter.responses(&request, api_key).await?;
         
@@ -51,7 +51,7 @@ mod examples {
         );
 
         let mut request = ResponsesRequest::simple(
-            "gpt-5.1".to_string(), 
+            "gpt-5.2".to_string(), 
             "Calculate the fibonacci sequence for n=10 using the code_exec tool".to_string()
         );
 
@@ -84,7 +84,7 @@ mod examples {
         };
 
         let mut request = ResponsesRequest::simple(
-            "gpt-5.1".to_string(),
+            "gpt-5.2".to_string(),
             "Help me calculate 2+2 and get weather for San Francisco".to_string()
         );
 
@@ -113,7 +113,7 @@ mod examples {
             println!("Using {} config: {}", name, config.describe());
 
             let request = Gpt5Adapter::create_simple_request(
-                "gpt-5.1".to_string(),
+                "gpt-5.2".to_string(),
                 "Write a Python function to sort a list".to_string(),
                 Some(config.reasoning_effort),
                 Some(config.verbosity),
@@ -148,7 +148,7 @@ mod examples {
 
         // First turn
         let mut request = ResponsesRequest::simple(
-            "gpt-5.1".to_string(),
+            "gpt-5.2".to_string(),
             "Let's solve this step by step: What's 15 * 24?".to_string()
         );
         request.store = Some(true); // Enable storage for multi-turn
@@ -158,7 +158,7 @@ mod examples {
 
         // Second turn - reference previous response
         let mut request2 = ResponsesRequest::simple(
-            "gpt-5.1".to_string(),
+            "gpt-5.2".to_string(),
             "Now divide that result by 6".to_string()
         );
         request2.previous_response_id = Some(response1.id.clone());
@@ -176,7 +176,7 @@ mod examples {
         let api_key = "your-api-key";
 
         let mut request = ResponsesRequest::simple(
-            "gpt-5.1".to_string(),
+            "gpt-5.2".to_string(),
             "Analyze this sensitive data: [redacted for example]".to_string()
         );
 
@@ -206,10 +206,10 @@ mod examples {
             
             // Just verify the request creation works
             let request = ResponsesRequest::simple(
-                "gpt-5.1".to_string(),
+                "gpt-5.2".to_string(),
                 "test".to_string()
             );
-            assert_eq!(request.model, "gpt-5.1");
+            assert_eq!(request.model, "gpt-5.2");
             // Check input content (it's now wrapped in RequestInput enum)
             if let Some(crate::llm::openai::model::responses_api::RequestInput::Text(text)) = &request.input {
                 assert_eq!(text, "test");
@@ -218,7 +218,7 @@ mod examples {
             }
 
             let config = Gpt5Config::for_coding();
-            assert_eq!(config.reasoning_effort, ReasoningEffort::High);
+            assert_eq!(config.reasoning_effort, ReasoningEffort::XHigh);
         }
     }
 }
