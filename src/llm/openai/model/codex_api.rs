@@ -32,6 +32,9 @@ pub struct CodexRequest {
     /// Temperature for sampling
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
+
+    /// Whether to store the conversation (must be false for Codex)
+    pub store: bool,
 }
 
 /// Codex input - can be text or messages
@@ -131,6 +134,7 @@ impl CodexRequest {
             stream: Some(false),
             max_output_tokens: Some(16000),
             temperature: None,
+            store: false,
         }
     }
 
@@ -143,6 +147,7 @@ impl CodexRequest {
             stream: Some(false),
             max_output_tokens: Some(16000),
             temperature: None,
+            store: false,
         }
     }
 
