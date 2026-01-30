@@ -229,6 +229,8 @@ async fn call_openai_api(repo: &SqliteRepository, messages: Vec<Message>) -> Res
 /// Call Codex API with the given messages (OAuth authentication)
 async fn call_codex_api(repo: &SqliteRepository, messages: Vec<Message>) -> Result<String> {
     use crate::auth::token_manager::TokenManager;
+    use crate::config::model::keys::ConfigKeys;
+    use crate::config::service::config_service;
 
     // Get valid access token (auto-refreshes if needed)
     let token_manager = TokenManager::new(repo);
@@ -240,12 +242,17 @@ async fn call_codex_api(repo: &SqliteRepository, messages: Vec<Message>) -> Resu
             "Not authenticated with Codex. Run 'termai config login-codex' to authenticate with your ChatGPT Plus/Pro subscription."
         ))?;
 
+    // Get configured model (if any)
+    let model = config_service::fetch_by_key(repo, &ConfigKeys::CodexDefaultModel.to_key())
+        .ok()
+        .map(|c| c.value);
+
     // Create a temporary session to use the Codex chat service
     let mut session = Session::new_temporary();
     session.messages = messages;
 
     // Use the Codex chat service
-    crate::llm::openai::service::codex::chat(&access_token, &mut session).await?;
+    crate::llm::openai::service::codex::chat(&access_token, &mut session, model.as_deref()).await?;
 
     // Extract the assistant's response from the updated session
     if let Some(last_message) = session.messages.last() {

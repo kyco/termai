@@ -395,7 +395,7 @@ where
                         "Not authenticated with Codex. Run 'termai config login-codex' to authenticate."
                     ))?;
 
-                openai::service::codex::chat(&access_token, &mut self.session).await?;
+                openai::service::codex::chat(&access_token, &mut self.session, Some(&self.chat_state.model)).await?;
             }
             _ => {
                 return Err(anyhow!("Unsupported provider: {}", self.chat_state.provider));
