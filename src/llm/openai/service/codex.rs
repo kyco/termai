@@ -16,8 +16,10 @@ use anyhow::{anyhow, Result};
 const DEFAULT_CODEX_MODEL: &str = "gpt-4o";
 
 /// Chat using the Codex API with OAuth authentication
-pub async fn chat(access_token: &str, session: &mut Session, model: Option<&str>) -> Result<()> {
-    let model = model.unwrap_or(DEFAULT_CODEX_MODEL).to_string();
+pub async fn chat(access_token: &str, session: &mut Session, model_param: Option<&str>) -> Result<()> {
+    eprintln!("Codex: model parameter received: {:?}", model_param);
+    let model = model_param.unwrap_or(DEFAULT_CODEX_MODEL).to_string();
+    eprintln!("Codex: Using model: {}", model);
 
     // Convert session messages to Codex format
     let messages: Vec<CodexMessage> = session
