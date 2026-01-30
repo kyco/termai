@@ -17,22 +17,37 @@ const DEFAULT_CODEX_MODEL: &str = "gpt-4o";
 
 /// Chat using the Codex API with OAuth authentication
 pub async fn chat(access_token: &str, session: &mut Session, model_param: Option<&str>) -> Result<()> {
-    eprintln!("Codex: model parameter received: {:?}", model_param);
     let model = model_param.unwrap_or(DEFAULT_CODEX_MODEL).to_string();
-    eprintln!("Codex: Using model: {}", model);
 
-    // Convert session messages to Codex format
-    let messages: Vec<CodexMessage> = session
-        .messages
-        .iter()
-        .map(|m| CodexMessage {
-            role: m.role.to_string(),
-            content: m.content.clone(),
-        })
-        .collect();
+    // Extract system messages for instructions, and non-system messages for input
+    let mut instructions: Option<String> = None;
+    let mut chat_messages: Vec<CodexMessage> = Vec::new();
+
+    for m in &session.messages {
+        if m.role == Role::System {
+            // Combine system messages into instructions
+            if let Some(ref mut inst) = instructions {
+                inst.push_str("\n\n");
+                inst.push_str(&m.content);
+            } else {
+                instructions = Some(m.content.clone());
+            }
+        } else {
+            chat_messages.push(CodexMessage {
+                role: m.role.to_string(),
+                content: m.content.clone(),
+            });
+        }
+    }
+
+    // Provide default instructions if none found
+    let instructions = instructions.unwrap_or_else(|| {
+        "You are a helpful AI assistant.".to_string()
+    });
 
     // Check total input size
-    let total_input_size: usize = messages.iter().map(|m| m.content.len()).sum();
+    let total_input_size: usize = chat_messages.iter().map(|m| m.content.len()).sum::<usize>()
+        + instructions.len();
 
     if total_input_size > 500_000 {
         return Err(anyhow!(
@@ -41,11 +56,13 @@ pub async fn chat(access_token: &str, session: &mut Session, model_param: Option
         ));
     }
 
-    // Create the request
-    let request = if messages.len() == 1 && messages[0].role == "user" {
-        CodexRequest::simple(model, messages[0].content.clone())
+    // Create the request with instructions
+    let request = if chat_messages.len() == 1 && chat_messages[0].role == "user" {
+        CodexRequest::simple(model, chat_messages[0].content.clone())
+            .with_instructions(instructions)
     } else {
-        CodexRequest::from_messages(model, messages)
+        CodexRequest::from_messages(model, chat_messages)
+            .with_instructions(instructions)
     };
 
     // Make the request
