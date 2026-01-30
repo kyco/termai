@@ -224,8 +224,41 @@ where
             ChatCommand::Provider(provider_name) => {
                 self.handle_provider_command(provider_name).await?;
             }
+            ChatCommand::Tools(setting) => {
+                self.handle_tools_command(setting);
+            }
         }
         Ok(())
+    }
+
+    /// Handle /tools command - toggle or set tool usage
+    fn handle_tools_command(&mut self, setting: Option<bool>) {
+        match setting {
+            Some(enabled) => {
+                self.chat_state.set_tools_enabled(enabled);
+            }
+            None => {
+                self.chat_state.toggle_tools();
+            }
+        }
+
+        let status = if self.chat_state.tools_enabled {
+            "enabled"
+        } else {
+            "disabled"
+        };
+
+        let provider_note = if self.chat_state.provider != "openai" {
+            format!("\n⚠️  Note: Tools are only supported with the OpenAI provider. Current provider: {}", self.chat_state.provider)
+        } else {
+            String::new()
+        };
+
+        self.repl.print_message(&self.formatter.format_success(&format!(
+            "Tools are now {}. The AI can execute bash commands, read/write files, and list directories.{}",
+            status,
+            provider_note
+        )));
     }
 
     /// Handle regular chat messages
@@ -344,7 +377,11 @@ where
                     self.config_repo,
                     &ConfigKeys::ChatGptApiKey.to_key(),
                 )?;
-                openai::service::chat::chat(&api_key.value, &mut self.session).await?;
+                if self.chat_state.tools_enabled {
+                    openai::service::chat::chat_with_tools(&api_key.value, &mut self.session).await?;
+                } else {
+                    openai::service::chat::chat(&api_key.value, &mut self.session).await?;
+                }
             }
             "openai-codex" | "openai_codex" | "codex" => {
                 use crate::auth::token_manager::TokenManager;
@@ -521,7 +558,7 @@ where
 
         // Get current provider from config
         let provider_config = config_service::fetch_by_key(
-            config_repo, 
+            config_repo,
             &ConfigKeys::ProviderKey.to_key()
         )?;
         let provider = Provider::new(&provider_config.value);
@@ -532,14 +569,25 @@ where
             Provider::OpenaiCodex => "openai-codex",
         };
 
-        // Get current model - use default for the provider
-        let chat_state = ChatState::new(provider_str.to_string(),
-            match provider {
-                Provider::Claude => "claude-sonnet-4-20250514".to_string(),
-                Provider::Openai => "gpt-5.2".to_string(),
-                Provider::OpenaiCodex => "gpt-4o".to_string(),
-            }
-        );
+        // Get saved default model for this provider, or use hardcoded default
+        let model_config_key = match provider {
+            Provider::Claude => ConfigKeys::ClaudeDefaultModel,
+            Provider::Openai => ConfigKeys::OpenAIDefaultModel,
+            Provider::OpenaiCodex => ConfigKeys::CodexDefaultModel,
+        };
+
+        let default_model = config_service::fetch_by_key(config_repo, &model_config_key.to_key())
+            .map(|c| c.value)
+            .unwrap_or_else(|_| {
+                // Fallback to hardcoded defaults
+                match provider {
+                    Provider::Claude => "claude-sonnet-4-20250514".to_string(),
+                    Provider::Openai => "gpt-5.2".to_string(),
+                    Provider::OpenaiCodex => "gpt-5.2-codex".to_string(),
+                }
+            });
+
+        let chat_state = ChatState::new(provider_str.to_string(), default_model);
 
         Ok(chat_state)
     }

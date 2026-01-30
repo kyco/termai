@@ -48,6 +48,7 @@ base64 = "0.21"        # Base64 encoding for PKCE
 sha2 = "0.10"          # SHA256 for PKCE challenge
 rand = "0.8"           # Random generation for state/verifier
 webbrowser = "1.0"     # Open browser for OAuth flow
+indexmap = "=2.11.4"   # Pin to version compatible with Rust < 1.82 (MSRV 1.63)
 
 [dependencies.uuid]
 version = "1.11.0"

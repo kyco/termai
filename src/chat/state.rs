@@ -6,12 +6,16 @@ use serde::{Serialize, Deserialize};
 pub struct ChatState {
     /// Current AI provider (claude or openai)
     pub provider: String,
-    
+
     /// Current model name
     pub model: String,
-    
+
     /// Available models for the current provider
     pub available_models: Vec<String>,
+
+    /// Whether tools (bash, file operations) are enabled for this session
+    #[serde(default)]
+    pub tools_enabled: bool,
 }
 
 impl ChatState {
@@ -22,6 +26,7 @@ impl ChatState {
             provider,
             model,
             available_models,
+            tools_enabled: false,
         }
     }
 
@@ -32,6 +37,17 @@ impl ChatState {
             "claude".to_string(),
             "claude-sonnet-4-20250514".to_string(),
         )
+    }
+
+    /// Enable or disable tools for this session
+    pub fn set_tools_enabled(&mut self, enabled: bool) {
+        self.tools_enabled = enabled;
+    }
+
+    /// Toggle tools on/off and return the new state
+    pub fn toggle_tools(&mut self) -> bool {
+        self.tools_enabled = !self.tools_enabled;
+        self.tools_enabled
     }
 
     /// Switch to a different provider
@@ -109,10 +125,12 @@ impl ChatState {
 
     /// Get current status as a formatted string
     pub fn status(&self) -> String {
+        let tools_status = if self.tools_enabled { "on" } else { "off" };
         format!(
-            "🤖 Provider: {} | Model: {} | Available models: {}",
+            "🤖 Provider: {} | Model: {} | Tools: {} | Available models: {}",
             self.provider,
             self.model,
+            tools_status,
             self.available_models.join(", ")
         )
     }
@@ -120,7 +138,7 @@ impl ChatState {
     /// Get models available for a specific provider
     fn get_models_for_provider(provider: &str) -> Vec<String> {
         let all_models = CompletionValues::model_names();
-        
+
         match provider {
             "claude" => all_models
                 .into_iter()
@@ -128,7 +146,11 @@ impl ChatState {
                 .collect(),
             "openai" => all_models
                 .into_iter()
-                .filter(|m| m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") || m.starts_with("computer-use"))
+                .filter(|m| (m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") || m.starts_with("computer-use")) && !m.contains("codex"))
+                .collect(),
+            "openai-codex" | "codex" => all_models
+                .into_iter()
+                .filter(|m| m.contains("codex"))
                 .collect(),
             _ => Vec::new(),
         }
@@ -137,8 +159,9 @@ impl ChatState {
     /// Get default model for a provider
     fn get_default_model_for_provider(&self, provider: &str) -> String {
         match provider {
-            "claude" => "claude-sonnet-4-20250514".to_string(), // Claude Sonnet 4 is now the default
-            "openai" => "gpt-5.2".to_string(), // GPT-5.2 is now the default
+            "claude" => "claude-sonnet-4-20250514".to_string(),
+            "openai" => "gpt-5.2".to_string(),
+            "openai-codex" | "codex" => "gpt-5.2-codex".to_string(),
             _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
@@ -147,6 +170,8 @@ impl ChatState {
     fn get_provider_for_model(&self, model: &str) -> String {
         if model.starts_with("claude") {
             "claude".to_string()
+        } else if model.contains("codex") {
+            "openai-codex".to_string()
         } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") || model.starts_with("o4") || model.starts_with("computer-use") {
             "openai".to_string()
         } else {
@@ -176,6 +201,10 @@ impl ChatState {
             "gpt-5.2" => "Most intelligent model, best for complex reasoning and coding",
             "gpt-5.2-pro" => "Extra compute for harder problems; higher latency/cost",
             "gpt-5.2-chat-latest" => "Chat-optimized GPT-5.2 variant (latest)",
+            // GPT-5.2 Codex models (ChatGPT Plus/Pro via OAuth)
+            "gpt-5.2-codex" => "Full Codex model for ChatGPT Plus/Pro subscribers",
+            "gpt-5.1-codex-mini" => "Faster Codex mini model for quick responses",
+            "gpt-5.1-codex-max" => "Maximum capability Codex model for complex tasks",
             // GPT-5 series
             "gpt-5.1" => "Previous GPT-5.1 flagship model (deprecated)",
             "gpt-5-mini" => "Cost-optimized reasoning, balances speed/cost/capability",

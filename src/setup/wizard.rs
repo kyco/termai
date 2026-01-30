@@ -58,15 +58,21 @@ impl SetupWizard {
                 let api_key = self.get_claude_api_key().await?;
                 self.save_claude_config(repo, &api_key)?;
                 self.set_provider(repo, "claude")?;
+                // Step 3: Model Selection
+                self.select_and_save_model(repo, "claude")?;
             }
             Provider::OpenAI => {
                 let api_key = self.get_openai_api_key().await?;
                 self.save_openai_config(repo, &api_key)?;
                 self.set_provider(repo, "openai")?;
+                // Step 3: Model Selection
+                self.select_and_save_model(repo, "openai")?;
             }
             Provider::OpenAICodex => {
                 self.setup_codex_auth(repo).await?;
                 self.set_provider(repo, "openai-codex")?;
+                // Step 3: Model Selection
+                self.select_and_save_model(repo, "openai-codex")?;
             }
             Provider::Both => {
                 let claude_key = self.get_claude_api_key().await?;
@@ -77,10 +83,12 @@ impl SetupWizard {
                 // Ask which to use as default
                 let default_provider = self.select_default_provider()?;
                 self.set_provider(repo, &default_provider)?;
+                // Step 3: Model Selection for default provider
+                self.select_and_save_model(repo, &default_provider)?;
             }
         }
 
-        // Step 3: Setup Complete
+        // Step 4: Setup Complete
         self.show_completion()?;
 
         Ok(())
@@ -321,6 +329,94 @@ impl SetupWizard {
     fn set_provider<R: ConfigRepository>(&self, repo: &R, provider: &str) -> Result<()> {
         config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), provider)?;
         Ok(())
+    }
+
+    fn select_and_save_model<R: ConfigRepository>(&self, repo: &R, provider: &str) -> Result<()> {
+        use crate::chat::state::ChatState;
+
+        println!();
+        println!(
+            "{}",
+            "Step 3 of 4: Choose Your Default Model"
+                .bright_yellow()
+                .bold()
+        );
+        println!();
+
+        // Get models for this provider
+        let state = ChatState::new(provider.to_string(), "placeholder".to_string());
+        let available_models = state.available_models.clone();
+
+        if available_models.is_empty() {
+            println!("No models available for this provider.");
+            return Ok(());
+        }
+
+        // Build model options with descriptions
+        let model_descriptions: Vec<String> = available_models
+            .iter()
+            .map(|model| {
+                let desc = Self::get_model_description(model);
+                format!("{} - {}", model, desc)
+            })
+            .collect();
+
+        // Determine default selection (first model is usually the recommended one)
+        let default_idx = 0;
+
+        let selection = Select::with_theme(&self.theme)
+            .with_prompt("Which model would you like to use as default?")
+            .items(&model_descriptions)
+            .default(default_idx)
+            .interact()?;
+
+        let selected_model = &available_models[selection];
+
+        // Save the model preference
+        let config_key = match provider {
+            "claude" => ConfigKeys::ClaudeDefaultModel,
+            "openai-codex" | "codex" => ConfigKeys::CodexDefaultModel,
+            _ => ConfigKeys::OpenAIDefaultModel,
+        };
+
+        config_service::write_config(repo, &config_key.to_key(), selected_model)?;
+
+        println!(
+            "✅ Default model set to: {}",
+            selected_model.bright_cyan()
+        );
+
+        Ok(())
+    }
+
+    fn get_model_description(model: &str) -> &'static str {
+        match model {
+            // GPT-5.2 series
+            "gpt-5.2" => "Most intelligent model, best for complex reasoning",
+            "gpt-5.2-pro" => "Extra compute for harder problems",
+            "gpt-5.2-chat-latest" => "Chat-optimized variant",
+            // GPT-5.2 Codex models
+            "gpt-5.2-codex" => "Full Codex model for subscribers (Recommended)",
+            "gpt-5.1-codex-mini" => "Faster Codex mini model",
+            "gpt-5.1-codex-max" => "Maximum capability Codex model",
+            // GPT-5 series
+            "gpt-5.1" => "Previous flagship model",
+            "gpt-5-mini" => "Cost-optimized reasoning",
+            "gpt-5-nano" => "High-throughput, simple tasks",
+            // o-series
+            "o3" => "Most powerful reasoning model",
+            "o3-pro" => "Extra compute for reasoning",
+            "o4-mini" => "Faster, affordable reasoning",
+            "o3-mini" => "Small reasoning model",
+            // Claude models
+            "claude-opus-4-1-20250805" => "Latest Opus with enhanced capabilities",
+            "claude-opus-4-20250514" => "Most powerful Claude model",
+            "claude-sonnet-4-20250514" => "Best overall, excels at writing (Recommended)",
+            "claude-3-7-sonnet-20250219" => "Enhanced Sonnet model",
+            "claude-3-5-sonnet-20241022" => "Excellent for complex tasks",
+            "claude-3-5-haiku-20241022" => "Fast model for quick responses",
+            _ => "AI language model",
+        }
     }
 
     fn show_completion(&self) -> Result<()> {

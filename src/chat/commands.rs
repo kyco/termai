@@ -16,6 +16,7 @@ pub enum ChatCommand {
     RemoveContext(String),
     Model(Option<String>),
     Provider(Option<String>),
+    Tools(Option<bool>), // None = toggle, Some(true) = on, Some(false) = off
 }
 
 impl ChatCommand {
@@ -84,6 +85,18 @@ impl ChatCommand {
                 };
                 Some(ChatCommand::Provider(provider))
             }
+            "tools" | "t" => {
+                let setting = if parts.len() > 1 {
+                    match parts[1].to_lowercase().as_str() {
+                        "on" | "true" | "enable" | "enabled" | "1" => Some(true),
+                        "off" | "false" | "disable" | "disabled" | "0" => Some(false),
+                        _ => None, // Invalid argument, treat as toggle
+                    }
+                } else {
+                    None // No argument = toggle
+                };
+                Some(ChatCommand::Tools(setting))
+            }
             _ => None,
         }
     }
@@ -103,6 +116,7 @@ impl ChatCommand {
             ChatCommand::RemoveContext(_) => "Remove file or directory from context",
             ChatCommand::Model(_) => "Switch AI model (e.g., gpt-5.2, gpt-5-mini, claude-3-5-sonnet-20241022)",
             ChatCommand::Provider(_) => "Switch AI provider (claude or openai)",
+            ChatCommand::Tools(_) => "Toggle or set tool usage (bash, file operations) for OpenAI",
         }
     }
 
@@ -126,6 +140,7 @@ impl ChatCommand {
             ),
             ("/model [name], /m", "Switch AI model or show current model"),
             ("/provider [name], /p", "Switch AI provider (claude/openai) or show current"),
+            ("/tools [on|off], /t", "Toggle or set tool usage (bash, file ops) for OpenAI"),
         ]
     }
 }

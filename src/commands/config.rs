@@ -38,6 +38,7 @@ pub async fn handle_config_command(
             let mut has_apis = false;
 
             // Show provider first
+            let mut current_provider = String::new();
             for config in &configs {
                 if config.key == ConfigKeys::ProviderKey.to_key() {
                     println!(
@@ -45,6 +46,7 @@ pub async fn handle_config_command(
                         "🤖 Default Provider:".bright_green(),
                         config.value.bright_cyan()
                     );
+                    current_provider = config.value.clone();
                     has_provider = true;
                 }
             }
@@ -55,6 +57,23 @@ pub async fn handle_config_command(
                     "🤖 Default Provider:".bright_green(),
                     "Not set".red()
                 );
+            }
+
+            // Show default model if set
+            let model_key = match current_provider.as_str() {
+                "claude" => ConfigKeys::ClaudeDefaultModel.to_key(),
+                "openai-codex" | "codex" => ConfigKeys::CodexDefaultModel.to_key(),
+                _ => ConfigKeys::OpenAIDefaultModel.to_key(),
+            };
+
+            for config in &configs {
+                if config.key == model_key {
+                    println!(
+                        "{}     {}",
+                        "🎯 Default Model:".bright_green(),
+                        config.value.bright_cyan()
+                    );
+                }
             }
 
             println!();
@@ -338,6 +357,12 @@ pub async fn handle_config_command(
         }
         ConfigAction::CodexStatus => {
             crate::commands::codex_auth::handle_codex_status(repo)
+        }
+        ConfigAction::SetModel { model } => {
+            handle_set_model(repo, model)
+        }
+        ConfigAction::ListModels { provider, refresh } => {
+            handle_list_models(repo, provider.as_ref(), *refresh).await
         }
     }
 }
@@ -969,4 +994,225 @@ fn show_next_steps() {
     println!("   {}       # Validate configuration", "termai config validate".cyan());
     println!("   {}          # Edit configuration", "termai config edit".cyan());
     println!("   {}              # Start chatting with project context", "termai chat".cyan());
+}
+
+/// Handle setting the default model
+fn handle_set_model(repo: &SqliteRepository, model: &str) -> Result<()> {
+    use crate::chat::state::ChatState;
+    use crate::completion::values::CompletionValues;
+    use crate::config::model::keys::ConfigKeys;
+    use crate::config::service::config_service;
+
+    // Validate model exists
+    let all_models = CompletionValues::model_names();
+    if !all_models.contains(&model.to_string()) {
+        println!("{}", "❌ Invalid model name".red().bold());
+        println!();
+        println!("{}", "💡 Available models:".bright_yellow().bold());
+        println!("   {}  # List all models", "termai config list-models".cyan());
+        return Ok(());
+    }
+
+    // Determine provider for this model
+    let temp_state = ChatState::new("openai".to_string(), "gpt-5.2".to_string());
+    let provider = if model.starts_with("claude") {
+        "claude"
+    } else if model.contains("codex") {
+        "openai-codex"
+    } else {
+        "openai"
+    };
+
+    // Get the appropriate config key based on provider
+    let config_key = match provider {
+        "claude" => ConfigKeys::ClaudeDefaultModel,
+        "openai-codex" => ConfigKeys::CodexDefaultModel,
+        _ => ConfigKeys::OpenAIDefaultModel,
+    };
+
+    // Save the model preference
+    config_service::write_config(repo, &config_key.to_key(), model)
+        .context("Failed to save model preference")?;
+
+    // Also update the provider if it doesn't match
+    let current_provider = config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key())
+        .map(|c| c.value)
+        .unwrap_or_default();
+
+    if current_provider != provider {
+        config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), provider)
+            .context("Failed to save provider preference")?;
+        println!(
+            "{} {} (for model {})",
+            "✅ Provider updated to".green().bold(),
+            provider.bright_cyan().bold(),
+            model.bright_yellow()
+        );
+    }
+
+    println!(
+        "{} {}",
+        "✅ Default model set to".green().bold(),
+        model.bright_cyan().bold()
+    );
+
+    // Show model description
+    let description = temp_state.list_models();
+    let model_line = description.lines()
+        .find(|line| line.contains(model))
+        .unwrap_or("");
+    if !model_line.is_empty() {
+        let desc_part = model_line.split(" - ").nth(1).unwrap_or("");
+        if !desc_part.is_empty() {
+            println!("   {}", desc_part.dimmed());
+        }
+    }
+
+    println!();
+    println!("{}", "💡 Start using:".bright_yellow().bold());
+    println!("   {}              # Start chatting with this model", "termai chat".cyan());
+    println!("   {}  # Quick question", "termai ask \"question\"".cyan());
+
+    Ok(())
+}
+
+/// Handle listing available models
+async fn handle_list_models(
+    repo: &SqliteRepository,
+    provider: Option<&crate::args::Provider>,
+    refresh: bool,
+) -> Result<()> {
+    use crate::args::Provider;
+    use crate::chat::state::ChatState;
+    use crate::config::model::keys::ConfigKeys;
+    use crate::llm::openai::service::models_service::ModelsService;
+
+    println!("{}", "🤖 Available Models".bright_blue().bold());
+    println!("{}", "═══════════════════".white().dimmed());
+    println!();
+
+    // Get models for all providers or a specific one
+    let providers_to_show: Vec<&str> = match provider {
+        Some(Provider::Claude) => vec!["claude"],
+        Some(Provider::Openai) => vec!["openai"],
+        Some(Provider::OpenaiCodex) => vec!["openai-codex"],
+        None => vec!["claude", "openai", "openai-codex"],
+    };
+
+    for provider_name in providers_to_show {
+        // Print provider header
+        let provider_display = match provider_name {
+            "claude" => "🧠 Claude (Anthropic)",
+            "openai" => "⚡ OpenAI (API Key)",
+            "openai-codex" => "🔐 OpenAI Codex (ChatGPT Plus/Pro)",
+            _ => provider_name,
+        };
+        println!("{}", provider_display.bright_green().bold());
+
+        // For OpenAI, fetch from API
+        if provider_name == "openai" {
+            let api_key_result =
+                config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key());
+
+            match api_key_result {
+                Ok(api_key_config) if !api_key_config.value.is_empty() => {
+                    let status_msg = if refresh {
+                        "Refreshing models from OpenAI API..."
+                    } else {
+                        "Fetching models from OpenAI..."
+                    };
+                    println!("   {}", status_msg.dimmed());
+
+                    let models_result = if refresh {
+                        ModelsService::refresh_models(repo, &api_key_config.value).await
+                    } else {
+                        ModelsService::get_models(repo, &api_key_config.value).await
+                    };
+
+                    match models_result {
+                        Ok(models) => {
+                            // Sort models by id for consistent display
+                            let mut sorted_models = models;
+                            sorted_models.sort_by(|a, b| a.id.cmp(&b.id));
+
+                            for model in &sorted_models {
+                                println!(
+                                    "   {} {}",
+                                    format!("• {}", model.id).bright_cyan(),
+                                    format!("(owned by: {})", model.owned_by).dimmed()
+                                );
+                            }
+
+                            if sorted_models.is_empty() {
+                                println!(
+                                    "   {}",
+                                    "No chat models found".yellow()
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            println!(
+                                "   {} {}",
+                                "⚠️  Failed to fetch models:".yellow(),
+                                e.to_string().dimmed()
+                            );
+                            // Fall back to hardcoded list
+                            println!("   {}", "Showing default models:".dimmed());
+                            let state = ChatState::new(
+                                provider_name.to_string(),
+                                "placeholder".to_string(),
+                            );
+                            for line in state.list_models().lines().skip(1) {
+                                if !line.starts_with("Use '/model") {
+                                    println!("{}", line);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    println!(
+                        "   {}",
+                        "⚠️  No API key configured. Using default list.".yellow()
+                    );
+                    let state =
+                        ChatState::new(provider_name.to_string(), "placeholder".to_string());
+                    for line in state.list_models().lines().skip(1) {
+                        if !line.starts_with("Use '/model") {
+                            println!("{}", line);
+                        }
+                    }
+                }
+            }
+        } else {
+            // For Claude and Codex, use hardcoded lists (no public API)
+            let state = ChatState::new(provider_name.to_string(), "placeholder".to_string());
+            for line in state.list_models().lines().skip(1) {
+                if !line.starts_with("Use '/model") {
+                    println!("{}", line);
+                }
+            }
+        }
+        println!();
+    }
+
+    println!("{}", "💡 Set default model:".bright_yellow().bold());
+    println!(
+        "   {}  # Set as default",
+        "termai config set-model <model>".cyan()
+    );
+    println!();
+    println!("{}", "💡 Switch model in chat:".bright_yellow().bold());
+    println!(
+        "   {}            # Change model during session",
+        "/model <model>".cyan()
+    );
+    println!();
+    println!("{}", "💡 Refresh models:".bright_yellow().bold());
+    println!(
+        "   {}  # Force refresh from API",
+        "termai config list-models --refresh".cyan()
+    );
+
+    Ok(())
 }

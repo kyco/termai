@@ -216,6 +216,22 @@ pub enum ConfigAction {
     /// Show OpenAI Codex authentication status
     #[command(name = "codex-status")]
     CodexStatus,
+    /// Set default model for current provider
+    #[command(name = "set-model")]
+    SetModel {
+        /// Model name (e.g., "gpt-5.2", "claude-sonnet-4-20250514")
+        model: String,
+    },
+    /// List available models
+    #[command(name = "list-models")]
+    ListModels {
+        /// Filter by provider
+        #[arg(long, value_enum)]
+        provider: Option<Provider>,
+        /// Force refresh from API (ignore cache)
+        #[arg(long)]
+        refresh: bool,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]
