@@ -44,6 +44,10 @@ pulldown-cmark-to-cmark = "13.0" # Markdown serialization
 comrak = "0.21"        # GitHub-flavored Markdown
 html2text = "0.6"      # HTML to text conversion
 tiny_http = "0.12"     # Local server for preview
+base64 = "0.21"        # Base64 encoding for PKCE
+sha2 = "0.10"          # SHA256 for PKCE challenge
+rand = "0.8"           # Random generation for state/verifier
+webbrowser = "1.0"     # Open browser for OAuth flow
 
 [dependencies.uuid]
 version = "1.11.0"

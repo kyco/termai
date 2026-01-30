@@ -346,6 +346,20 @@ where
                 )?;
                 openai::service::chat::chat(&api_key.value, &mut self.session).await?;
             }
+            "openai-codex" | "openai_codex" | "codex" => {
+                use crate::auth::token_manager::TokenManager;
+
+                // Get valid access token (auto-refreshes if needed)
+                let token_manager = TokenManager::new(self.config_repo);
+                let access_token = token_manager
+                    .get_valid_token()
+                    .await?
+                    .ok_or_else(|| anyhow!(
+                        "Not authenticated with Codex. Run 'termai config login-codex' to authenticate."
+                    ))?;
+
+                openai::service::codex::chat(&access_token, &mut self.session).await?;
+            }
             _ => {
                 return Err(anyhow!("Unsupported provider: {}", self.chat_state.provider));
             }
@@ -515,6 +529,7 @@ where
         let provider_str = match provider {
             Provider::Claude => "claude",
             Provider::Openai => "openai",
+            Provider::OpenaiCodex => "openai-codex",
         };
 
         // Get current model - use default for the provider
@@ -522,6 +537,7 @@ where
             match provider {
                 Provider::Claude => "claude-sonnet-4-20250514".to_string(),
                 Provider::Openai => "gpt-5.2".to_string(),
+                Provider::OpenaiCodex => "gpt-4o".to_string(),
             }
         );
 
@@ -589,6 +605,7 @@ where
         let provider = match self.chat_state.provider.as_str() {
             "claude" => Provider::Claude,
             "openai" => Provider::Openai,
+            "openai-codex" | "openai_codex" | "codex" => Provider::OpenaiCodex,
             _ => return Err(anyhow!("Unknown provider: {}", self.chat_state.provider)),
         };
 

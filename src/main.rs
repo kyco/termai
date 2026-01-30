@@ -1,4 +1,5 @@
 mod args;
+mod auth;
 mod branch;
 mod chat;
 mod commands;

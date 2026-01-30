@@ -131,6 +131,9 @@ pub async fn handle_ask_command(args: &AskArgs, repo: &SqliteRepository) -> Resu
         "openai" => call_openai_api(repo, messages)
             .await
             .context("Failed to get response from OpenAI API")?,
+        "openai-codex" | "openai_codex" | "codex" => call_codex_api(repo, messages)
+            .await
+            .context("Failed to get response from Codex API")?,
         _ => {
             return Err(anyhow::anyhow!(
                 "Unknown provider: {}. Run 'termai config show' to check configuration.",
@@ -201,7 +204,7 @@ async fn call_claude_api(repo: &SqliteRepository, messages: Vec<Message>) -> Res
     Err(anyhow::anyhow!("No response received from Claude API"))
 }
 
-/// Call OpenAI API with the given messages  
+/// Call OpenAI API with the given messages
 async fn call_openai_api(repo: &SqliteRepository, messages: Vec<Message>) -> Result<String> {
     let api_key = config_service::fetch_with_env_fallback(repo, &ConfigKeys::ChatGptApiKey.to_key())
         .context("OpenAI API key not configured. Run 'termai setup' to add your API key or set OPENAI_API_KEY environment variable.")?;
@@ -221,4 +224,35 @@ async fn call_openai_api(repo: &SqliteRepository, messages: Vec<Message>) -> Res
     }
 
     Err(anyhow::anyhow!("No response received from OpenAI API"))
+}
+
+/// Call Codex API with the given messages (OAuth authentication)
+async fn call_codex_api(repo: &SqliteRepository, messages: Vec<Message>) -> Result<String> {
+    use crate::auth::token_manager::TokenManager;
+
+    // Get valid access token (auto-refreshes if needed)
+    let token_manager = TokenManager::new(repo);
+    let access_token = token_manager
+        .get_valid_token()
+        .await
+        .context("Failed to get Codex access token")?
+        .ok_or_else(|| anyhow::anyhow!(
+            "Not authenticated with Codex. Run 'termai config login-codex' to authenticate with your ChatGPT Plus/Pro subscription."
+        ))?;
+
+    // Create a temporary session to use the Codex chat service
+    let mut session = Session::new_temporary();
+    session.messages = messages;
+
+    // Use the Codex chat service
+    crate::llm::openai::service::codex::chat(&access_token, &mut session).await?;
+
+    // Extract the assistant's response from the updated session
+    if let Some(last_message) = session.messages.last() {
+        if last_message.role == Role::Assistant {
+            return Ok(last_message.content.clone());
+        }
+    }
+
+    Err(anyhow::anyhow!("No response received from Codex API"))
 }

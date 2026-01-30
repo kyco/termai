@@ -10,7 +10,7 @@ use colored::*;
 use std::process::Command;
 
 /// Handle config subcommands with enhanced feedback and error handling
-pub fn handle_config_command(
+pub async fn handle_config_command(
     repo: &SqliteRepository,
     action: &ConfigAction,
     _args: &ConfigArgs,
@@ -75,6 +75,14 @@ pub fn handle_config_command(
                             "{}    {}",
                             "⚡ OpenAI API:".bright_green(),
                             "✅ Configured".green()
+                        );
+                        has_apis = true;
+                    }
+                    key if key == ConfigKeys::CodexAccessToken.to_key() => {
+                        println!(
+                            "{}  {}",
+                            "🔐 OpenAI Codex:".bright_green(),
+                            "✅ Authenticated".green()
                         );
                         has_apis = true;
                     }
@@ -321,6 +329,15 @@ pub fn handle_config_command(
         }
         ConfigAction::Import { file, merge } => {
             handle_config_import(file, *merge)
+        }
+        ConfigAction::LoginCodex => {
+            crate::commands::codex_auth::handle_login_codex(repo).await
+        }
+        ConfigAction::LogoutCodex => {
+            crate::commands::codex_auth::handle_logout_codex(repo)
+        }
+        ConfigAction::CodexStatus => {
+            crate::commands::codex_auth::handle_codex_status(repo)
         }
     }
 }

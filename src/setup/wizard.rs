@@ -13,6 +13,7 @@ use std::time::Duration;
 pub enum Provider {
     Claude,
     OpenAI,
+    OpenAICodex,
     Both,
 }
 
@@ -20,7 +21,8 @@ impl Provider {
     pub fn description(&self) -> &'static str {
         match self {
             Provider::Claude => "Claude (Anthropic) - Best for analysis & coding",
-            Provider::OpenAI => "OpenAI - Versatile general purpose",
+            Provider::OpenAI => "OpenAI (API Key) - Versatile general purpose",
+            Provider::OpenAICodex => "OpenAI Codex (ChatGPT Plus/Pro) - Use your subscription",
             Provider::Both => "Both providers (recommended)",
         }
     }
@@ -61,6 +63,10 @@ impl SetupWizard {
                 let api_key = self.get_openai_api_key().await?;
                 self.save_openai_config(repo, &api_key)?;
                 self.set_provider(repo, "openai")?;
+            }
+            Provider::OpenAICodex => {
+                self.setup_codex_auth(repo).await?;
+                self.set_provider(repo, "openai-codex")?;
             }
             Provider::Both => {
                 let claude_key = self.get_claude_api_key().await?;
@@ -111,7 +117,7 @@ impl SetupWizard {
         );
         println!();
 
-        let providers = vec![Provider::Claude, Provider::OpenAI, Provider::Both];
+        let providers = vec![Provider::Claude, Provider::OpenAI, Provider::OpenAICodex, Provider::Both];
 
         let selection = Select::with_theme(&self.theme)
             .with_prompt("Which AI provider would you like to use?")
@@ -121,7 +127,7 @@ impl SetupWizard {
                     .map(|p| p.description())
                     .collect::<Vec<_>>(),
             )
-            .default(2) // Default to "Both"
+            .default(3) // Default to "Both"
             .interact()?;
 
         Ok(providers[selection].clone())
@@ -237,6 +243,51 @@ impl SetupWizard {
         }
     }
 
+    async fn setup_codex_auth<R: ConfigRepository>(&self, repo: &R) -> Result<()> {
+        use crate::auth::oauth_client::OAuthClient;
+        use crate::auth::token_manager::TokenManager;
+
+        println!();
+        println!(
+            "{}",
+            "🔐 OpenAI Codex Authentication".bright_green().bold()
+        );
+        println!();
+        println!("This will authenticate using your ChatGPT Plus or Pro subscription.");
+        println!("You will be redirected to OpenAI's login page in your browser.");
+        println!();
+
+        let pb = self.create_progress_bar();
+        pb.set_message("Opening browser for authentication...");
+
+        // Start OAuth flow
+        let oauth_client = OAuthClient::new();
+        let tokens = oauth_client.authorize().await?;
+
+        pb.finish_with_message("✅ Browser authentication completed!");
+
+        // Save tokens
+        let token_manager = TokenManager::new(repo);
+        token_manager.save_tokens(&tokens)?;
+
+        println!();
+        println!("{}", "✅ Codex authentication successful!".green().bold());
+        println!();
+        println!(
+            "Token expires: {}",
+            tokens.expires_at.format("%Y-%m-%d %H:%M:%S UTC")
+        );
+
+        if tokens.refresh_token.is_some() {
+            println!(
+                "{}",
+                "Refresh token saved - your session will be automatically renewed.".green()
+            );
+        }
+
+        Ok(())
+    }
+
     fn select_default_provider(&self) -> Result<String> {
         println!();
         println!("{}", "Choose Default Provider".bright_yellow().bold());
@@ -329,6 +380,10 @@ impl SetupWizard {
             ConfigKeys::ChatGptApiKey.to_key(),
             ConfigKeys::ProviderKey.to_key(),
             ConfigKeys::Redacted.to_key(),
+            ConfigKeys::CodexAccessToken.to_key(),
+            ConfigKeys::CodexRefreshToken.to_key(),
+            ConfigKeys::CodexTokenExpiry.to_key(),
+            ConfigKeys::CodexIdToken.to_key(),
         ];
 
         for key in keys_to_clear {
@@ -351,8 +406,10 @@ impl SetupWizard {
             config_service::fetch_by_key(repo, &ConfigKeys::ClaudeApiKey.to_key()).is_ok();
         let openai_exists =
             config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key()).is_ok();
+        let codex_exists =
+            config_service::fetch_by_key(repo, &ConfigKeys::CodexAccessToken.to_key()).is_ok();
 
-        if claude_exists || openai_exists {
+        if claude_exists || openai_exists || codex_exists {
             println!(
                 "{}",
                 "⚠️  Existing Configuration Detected".bright_yellow().bold()
@@ -415,6 +472,12 @@ impl SetupWizard {
             println!("OpenAI API: {}", "✅ Configured".green());
         } else {
             println!("OpenAI API: {}", "❌ Not configured".red());
+        }
+
+        if config_service::fetch_by_key(repo, &ConfigKeys::CodexAccessToken.to_key()).is_ok() {
+            println!("OpenAI Codex: {}", "✅ Authenticated".green());
+        } else {
+            println!("OpenAI Codex: {}", "❌ Not authenticated".red());
         }
 
         // Show redactions count

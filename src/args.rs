@@ -207,6 +207,15 @@ pub enum ConfigAction {
         #[arg(long)]
         merge: bool,
     },
+    /// Login to OpenAI Codex using OAuth (ChatGPT Plus/Pro)
+    #[command(name = "login-codex")]
+    LoginCodex,
+    /// Logout from OpenAI Codex (clear OAuth tokens)
+    #[command(name = "logout-codex")]
+    LogoutCodex,
+    /// Show OpenAI Codex authentication status
+    #[command(name = "codex-status")]
+    CodexStatus,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -431,12 +440,16 @@ pub enum CompletionShell {
 pub enum Provider {
     Openai,
     Claude,
+    /// OpenAI Codex - uses OAuth with ChatGPT Plus/Pro subscription
+    #[value(name = "openai-codex")]
+    OpenaiCodex,
 }
 
 impl Provider {
     pub fn new(s: &str) -> Provider {
         match s {
             "openai" => Provider::Openai,
+            "openai-codex" | "openai_codex" | "codex" => Provider::OpenaiCodex,
             _ => Provider::Claude,
         }
     }
@@ -445,6 +458,7 @@ impl Provider {
         match self {
             Provider::Openai => "openai",
             Provider::Claude => "claude",
+            Provider::OpenaiCodex => "openai-codex",
         }
     }
 }

@@ -227,7 +227,11 @@ mod tests {
         );
         assert_eq!(
             Provider::OpenAI.description(),
-            "OpenAI - Versatile general purpose"
+            "OpenAI (API Key) - Versatile general purpose"
+        );
+        assert_eq!(
+            Provider::OpenAICodex.description(),
+            "OpenAI Codex (ChatGPT Plus/Pro) - Use your subscription"
         );
         assert_eq!(Provider::Both.description(), "Both providers (recommended)");
     }

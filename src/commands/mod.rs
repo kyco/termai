@@ -5,6 +5,7 @@
 pub mod ask;
 pub mod branch;
 pub mod chat;
+pub mod codex_auth;
 pub mod commit;
 pub mod completion;
 pub mod config;
@@ -50,6 +51,7 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
             action,
         }) => {
             config::handle_config_command(repo, action, config_args)
+                .await
                 .context("❌ Configuration command failed")
                 .map_err(|e| enhance_config_error(e, action))?;
             Ok(true)
