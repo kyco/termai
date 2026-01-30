@@ -94,11 +94,11 @@ impl BrowserPreview {
         role: &crate::llm::common::model::role::Role,
         title: Option<&str>,
     ) -> Result<String> {
-        let message = Message {
-            id: uuid::Uuid::new_v4().to_string(),
-            role: role.clone(),
-            content: content.to_string(),
-        };
+        let message = Message::new(
+            uuid::Uuid::new_v4().to_string(),
+            role.clone(),
+            content.to_string(),
+        );
 
         self.preview_messages(&[message], title).await
     }
@@ -757,16 +757,16 @@ mod tests {
         let preview = BrowserPreview::new(config).unwrap();
 
         let messages = vec![
-            Message {
-                id: "1".to_string(),
-                role: Role::User,
-                content: "Hello, world!".to_string(),
-            },
-            Message {
-                id: "2".to_string(),
-                role: Role::Assistant,
-                content: "Hello! How can I help you?".to_string(),
-            },
+            Message::new(
+                "1".to_string(),
+                Role::User,
+                "Hello, world!".to_string(),
+            ),
+            Message::new(
+                "2".to_string(),
+                Role::Assistant,
+                "Hello! How can I help you?".to_string(),
+            ),
         ];
 
         let html = preview.generate_html_content(&messages, Some("Test Chat")).unwrap();

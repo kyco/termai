@@ -77,11 +77,11 @@ pub async fn handle_ask_command(args: &AskArgs, repo: &SqliteRepository) -> Resu
         .unwrap_or_else(|| SYSTEM_PROMPT.to_string());
 
     // Create messages for the request
-    let mut messages = vec![Message {
-        id: Uuid::new_v4().to_string(),
-        role: Role::System,
-        content: effective_system_prompt,
-    }];
+    let mut messages = vec![Message::new(
+        Uuid::new_v4().to_string(),
+        Role::System,
+        effective_system_prompt,
+    )];
 
     // Add context if available
     if context_included && !context_files.is_empty() {
@@ -98,19 +98,19 @@ pub async fn handle_ask_command(args: &AskArgs, repo: &SqliteRepository) -> Resu
         context_content
             .push_str("Please answer the following question with reference to this context.\n\n");
 
-        messages.push(Message {
-            id: Uuid::new_v4().to_string(),
-            role: Role::User,
-            content: context_content,
-        });
+        messages.push(Message::new(
+            Uuid::new_v4().to_string(),
+            Role::User,
+            context_content,
+        ));
     }
 
     // Add the main question
-    messages.push(Message {
-        id: Uuid::new_v4().to_string(),
-        role: Role::User,
-        content: question.to_string(),
-    });
+    messages.push(Message::new(
+        Uuid::new_v4().to_string(),
+        Role::User,
+        question.to_string(),
+    ));
 
     println!();
     println!("{}", "💭 Processing your question...".bright_yellow());

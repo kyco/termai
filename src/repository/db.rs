@@ -16,6 +16,7 @@ impl SqliteRepository {
         migrate_messages_id_column(&conn)?;
         messages_add_session_id_column(&conn)?;
         messages_add_role_column(&conn)?;
+        messages_add_type_columns(&conn)?;
         sessions_add_current_column(&conn)?;
         sessions_rename_column_key_to_name(&conn)?;
         if cfg!(debug_assertions) {
@@ -128,6 +129,37 @@ fn messages_add_role_column(conn: &Connection) -> Result<()> {
         conn.execute("ALTER TABLE messages ADD COLUMN role TEXT NOT NULL", [])?;
     }
     drop(stmt);
+    Ok(())
+}
+
+fn messages_add_type_columns(conn: &Connection) -> Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
+    let mut has_message_type = false;
+    let mut has_compaction_metadata = false;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    for col in rows {
+        let col_name = col?;
+        if col_name == "message_type" {
+            has_message_type = true;
+        }
+        if col_name == "compaction_metadata" {
+            has_compaction_metadata = true;
+        }
+    }
+    drop(stmt);
+
+    if !has_message_type {
+        conn.execute(
+            "ALTER TABLE messages ADD COLUMN message_type TEXT NOT NULL DEFAULT 'standard'",
+            [],
+        )?;
+    }
+    if !has_compaction_metadata {
+        conn.execute(
+            "ALTER TABLE messages ADD COLUMN compaction_metadata TEXT",
+            [],
+        )?;
+    }
     Ok(())
 }
 

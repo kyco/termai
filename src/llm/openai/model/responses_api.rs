@@ -3,12 +3,14 @@ use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use crate::llm::openai::model::verbosity::Verbosity;
 use crate::llm::openai::model::custom_tools::{CustomTool, AllowedToolsChoice};
 
-/// Request input can be a string or array of messages  
+/// Request input can be a string or array of messages
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum RequestInput {
     Text(String),
     Messages(Vec<InputMessage>),
+    /// Extended input that supports compaction items alongside regular messages
+    Extended(Vec<ExtendedInputItem>),
 }
 
 /// Input message structure
@@ -16,6 +18,35 @@ pub enum RequestInput {
 pub struct InputMessage {
     pub role: String,
     pub content: String,
+}
+
+/// Extended input item - can be a message or compaction
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum ExtendedInputItem {
+    /// A regular message
+    Message(InputMessage),
+    /// A compaction item with encrypted content
+    Compaction(CompactionInputItem),
+}
+
+/// Compaction input item for including compressed history
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CompactionInputItem {
+    #[serde(rename = "type")]
+    pub item_type: String, // "compaction"
+    pub id: String,
+    pub encrypted_content: String,
+}
+
+impl CompactionInputItem {
+    pub fn new(id: String, encrypted_content: String) -> Self {
+        Self {
+            item_type: "compaction".to_string(),
+            id,
+            encrypted_content,
+        }
+    }
 }
 
 /// Responses API request structure
@@ -100,14 +131,21 @@ pub enum Tool {
     Function(FunctionTool),
 }
 
+/// Function tool for the Responses API
+/// Note: The Responses API expects name/description/parameters at the top level,
+/// not nested inside a "function" object like the Chat Completions API
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FunctionTool {
     #[serde(rename = "type")]
     pub tool_type: String, // "function"
-    pub function: FunctionDefinition,
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
 }
 
+/// Legacy function definition structure (for Chat Completions API compatibility)
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct FunctionDefinition {
     pub name: String,
     pub description: String,
@@ -179,12 +217,14 @@ pub enum ResponseOutput {
         role: String,
         content: Vec<ContentItem>,
     },
-    #[serde(rename = "tool_call")]
-    ToolCall {
+    /// Function call from the Responses API
+    /// The name and arguments are at the top level, not nested
+    #[serde(rename = "function_call")]
+    FunctionCall {
         id: String,
-        status: String,
-        call_type: String,
-        function: Option<ToolCallFunction>,
+        call_id: String,
+        name: String,
+        arguments: String,
     },
     #[serde(rename = "reasoning")]
     Reasoning {
@@ -293,6 +333,32 @@ impl ResponsesRequest {
             previous_response_id: None,
             metadata: None,
             max_output_tokens: Some(32000), // Set reasonable output limit
+            temperature: None,
+            top_p: None,
+            stream: Some(false),
+            verbosity: None,
+        }
+    }
+
+    /// Create a request from extended input (supports compaction items)
+    #[allow(dead_code)]
+    pub fn from_extended(model: String, items: Vec<ExtendedInputItem>) -> Self {
+        Self {
+            model,
+            input: Some(RequestInput::Extended(items)),
+            instructions: None,
+            reasoning: Some(ReasoningConfig {
+                effort: ReasoningEffort::XHigh,
+            }),
+            text: Some(TextConfig {
+                verbosity: Verbosity::Medium,
+            }),
+            tools: None,
+            tool_choice: None,
+            store: Some(true),
+            previous_response_id: None,
+            metadata: None,
+            max_output_tokens: Some(32000),
             temperature: None,
             top_p: None,
             stream: Some(false),

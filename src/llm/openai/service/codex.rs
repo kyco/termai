@@ -60,22 +60,22 @@ pub async fn chat(access_token: &str, session: &mut Session) -> Result<()> {
 
     // Extract text from the response
     if let Some(text) = response.extract_text() {
-        session.messages.push(Message {
-            id: String::new(),
-            role: Role::Assistant,
-            content: text,
-        });
+        session.messages.push(Message::new(
+            String::new(),
+            Role::Assistant,
+            text,
+        ));
     } else {
         // Try to extract from output directly
         for output in response.output {
             if let CodexOutput::Message { role, content, .. } = output {
                 let message_text = extract_text_from_content(content);
                 if !message_text.is_empty() {
-                    session.messages.push(Message {
-                        id: String::new(),
-                        role: Role::from_str(&role),
-                        content: message_text,
-                    });
+                    session.messages.push(Message::new(
+                        String::new(),
+                        Role::from_str(&role),
+                        message_text,
+                    ));
                 }
             }
         }

@@ -12,7 +12,7 @@ impl MessageRepository for SqliteRepository {
     ) -> Result<Vec<MessageEntity>, Self::Error> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, session_id, role, content FROM messages WHERE session_id = ?1")?;
+            .prepare("SELECT id, session_id, role, content, message_type, compaction_metadata FROM messages WHERE session_id = ?1")?;
         let rows = stmt.query_map([session_id], row_to_message_entity())?;
 
         let mut messages = Vec::new();
@@ -24,12 +24,14 @@ impl MessageRepository for SqliteRepository {
 
     fn add_message_to_session(&self, message: &MessageEntity) -> Result<(), Self::Error> {
         self.conn.execute(
-            "INSERT INTO messages (id, session_id, role, content) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO messages (id, session_id, role, content, message_type, compaction_metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 message.id,
                 message.session_id,
                 message.role,
-                message.content
+                message.content,
+                message.message_type,
+                message.compaction_metadata
             ],
         )?;
         Ok(())
@@ -42,7 +44,9 @@ fn row_to_message_entity() -> fn(&Row) -> Result<MessageEntity> {
         let session_id: String = row.get(1)?;
         let role: String = row.get(2)?;
         let content: String = row.get(3)?;
+        let message_type: String = row.get(4).unwrap_or_else(|_| "standard".to_string());
+        let compaction_metadata: Option<String> = row.get(5).ok();
 
-        Ok(MessageEntity::new(id, session_id, role, content))
+        Ok(MessageEntity::new_with_type(id, session_id, role, content, message_type, compaction_metadata))
     }
 }

@@ -11,21 +11,8 @@ impl ResponsesAdapter {
         request: &ResponsesRequest,
         api_key: &str,
     ) -> Result<ResponsesResponse> {
-        // Create client without timeout restrictions
         let client = Client::builder()
             .build()?;
-
-        // Log request info for debugging
-        let input_size = match &request.input {
-            Some(crate::llm::openai::model::responses_api::RequestInput::Text(text)) => text.len(),
-            Some(crate::llm::openai::model::responses_api::RequestInput::Messages(msgs)) => 
-                msgs.iter().map(|m| m.content.len()).sum(),
-            None => 0,
-        };
-        
-        if input_size > 10000 {
-            eprintln!("OpenAI Request: Large input detected ({} characters)", input_size);
-        }
 
         let response = client
             .post("https://api.openai.com/v1/responses")

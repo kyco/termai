@@ -542,11 +542,11 @@ pub fn quick_export_message(
     format: ExportFormat,
     output_path: &Path,
 ) -> Result<()> {
-    let message = Message {
-        id: uuid::Uuid::new_v4().to_string(),
-        role: role.clone(),
-        content: content.to_string(),
-    };
+    let message = Message::new(
+        uuid::Uuid::new_v4().to_string(),
+        role.clone(),
+        content.to_string(),
+    );
 
     let exporter = ConversationExporter::new(ExportConfig::default());
     exporter.export_messages(&[message], format, output_path, Some("TermAI Response"))
@@ -560,16 +560,16 @@ mod tests {
     #[test]
     fn test_markdown_export() {
         let messages = vec![
-            Message {
-                id: "1".to_string(),
-                role: Role::User,
-                content: "Hello, world!".to_string(),
-            },
-            Message {
-                id: "2".to_string(),
-                role: Role::Assistant,
-                content: "Hello! How can I help you today?".to_string(),
-            },
+            Message::new(
+                "1".to_string(),
+                Role::User,
+                "Hello, world!".to_string(),
+            ),
+            Message::new(
+                "2".to_string(),
+                Role::Assistant,
+                "Hello! How can I help you today?".to_string(),
+            ),
         ];
 
         let exporter = ConversationExporter::new(ExportConfig::default());
@@ -587,11 +587,11 @@ mod tests {
     #[test]
     fn test_json_export() {
         let messages = vec![
-            Message {
-                id: "1".to_string(),
-                role: Role::User,
-                content: "Test message".to_string(),
-            },
+            Message::new(
+                "1".to_string(),
+                Role::User,
+                "Test message".to_string(),
+            ),
         ];
 
         let exporter = ConversationExporter::new(ExportConfig::default());
@@ -607,11 +607,11 @@ mod tests {
     fn test_export_formats() {
         let temp_dir = TempDir::new().unwrap();
         
-        let message = Message {
-            id: "1".to_string(),
-            role: Role::Assistant,
-            content: "Test content with `code`".to_string(),
-        };
+        let message = Message::new(
+            "1".to_string(),
+            Role::Assistant,
+            "Test content with `code`".to_string(),
+        );
 
         for format in [ExportFormat::Markdown, ExportFormat::Json, ExportFormat::PlainText].iter().cloned() {
             let filename = format!("test.{}", match format {

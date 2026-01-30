@@ -73,11 +73,11 @@ pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
         response_text.push_str(&content);
     }
 
-    session.messages.push(Message {
-        id: "".to_string(),
-        role: Role::Assistant,
-        content: response_text,
-    });
+    session.messages.push(Message::new(
+        "".to_string(),
+        Role::Assistant,
+        response_text,
+    ));
 
     Ok(())
 }
