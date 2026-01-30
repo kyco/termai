@@ -48,6 +48,8 @@ impl OAuthClient {
     /// Start the OAuth authorization flow
     ///
     /// Opens the browser for user authentication and waits for the callback.
+    /// If the browser cannot be opened (e.g., on a headless server), displays
+    /// the URL for the user to copy and paste manually.
     pub async fn authorize(&self) -> Result<OAuthTokens> {
         // Generate PKCE parameters
         let code_verifier = generate_code_verifier();
@@ -57,8 +59,21 @@ impl OAuthClient {
         // Build authorization URL
         let auth_url = self.build_auth_url(&state, &code_challenge);
 
-        // Open browser
-        webbrowser::open(&auth_url).map_err(|e| anyhow!("Failed to open browser: {}", e))?;
+        // Always display the URL for users who need to copy it
+        println!();
+        println!("If the browser doesn't open, copy this URL:");
+        println!();
+        println!("  {}", auth_url);
+        println!();
+
+        // Try to open browser, but don't fail if it can't open
+        if webbrowser::open(&auth_url).is_err() {
+            println!("Could not open browser automatically.");
+            println!("Please open the URL above in your browser.");
+            println!();
+        }
+
+        println!("Waiting for authentication...");
 
         // Wait for callback
         let callback_port = 1455;
