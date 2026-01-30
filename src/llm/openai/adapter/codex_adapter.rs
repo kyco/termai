@@ -72,8 +72,15 @@ impl CodexAdapter {
     }
 
     /// Parse SSE (Server-Sent Events) response and extract the final CodexResponse
+    ///
+    /// Handles multiple SSE event types:
+    /// - `response.output_text.delta` - accumulates text deltas
+    /// - `response.output_text.done` - final text for a segment
+    /// - `response.completed` - full response object
+    /// - `response.failed` - error handling
     fn parse_sse_response(sse_text: &str) -> Result<CodexResponse> {
         let mut final_response: Option<CodexResponse> = None;
+        let mut accumulated_text = String::new();
 
         for line in sse_text.lines() {
             // SSE format: "data: {...json...}" or "event: ..." etc.
@@ -85,26 +92,67 @@ impl CodexAdapter {
 
                 // Try to parse as JSON
                 if let Ok(event) = serde_json::from_str::<serde_json::Value>(data) {
-                    // Check if this is a response.completed event with the full response
-                    if event.get("type").and_then(|t| t.as_str()) == Some("response.completed") {
-                        if let Some(response_obj) = event.get("response") {
-                            if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
-                                final_response = Some(parsed);
+                    let event_type = event.get("type").and_then(|t| t.as_str());
+
+                    match event_type {
+                        // Accumulate text deltas
+                        Some("response.output_text.delta") => {
+                            if let Some(delta) = event.get("delta").and_then(|d| d.as_str()) {
+                                accumulated_text.push_str(delta);
                             }
                         }
-                    }
-                    // Also check for response.done which might contain the response directly
-                    else if event.get("type").and_then(|t| t.as_str()) == Some("response.done") {
-                        if let Some(response_obj) = event.get("response") {
-                            if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
-                                final_response = Some(parsed);
+
+                        // Final text for a segment (can use this or accumulated text)
+                        Some("response.output_text.done") => {
+                            // The accumulated text should match this, but we can verify
+                            if let Some(text) = event.get("text").and_then(|t| t.as_str()) {
+                                if accumulated_text.is_empty() {
+                                    accumulated_text = text.to_string();
+                                }
                             }
                         }
-                    }
-                    // Try parsing the event itself as a CodexResponse (some APIs return it directly)
-                    else if event.get("id").is_some() && event.get("output").is_some() {
-                        if let Ok(parsed) = serde_json::from_value::<CodexResponse>(event) {
-                            final_response = Some(parsed);
+
+                        // Full response completed - this is the authoritative response
+                        Some("response.completed") => {
+                            if let Some(response_obj) = event.get("response") {
+                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
+                                    final_response = Some(parsed);
+                                }
+                            }
+                        }
+
+                        // Also check for response.done (alternative event name)
+                        Some("response.done") => {
+                            if let Some(response_obj) = event.get("response") {
+                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
+                                    final_response = Some(parsed);
+                                }
+                            }
+                        }
+
+                        // Handle failed responses
+                        Some("response.failed") => {
+                            if let Some(response_obj) = event.get("response") {
+                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
+                                    return Ok(parsed); // Return immediately on failure
+                                }
+                            }
+                            // Extract error message if available
+                            if let Some(error) = event.get("error") {
+                                let error_msg = error.get("message")
+                                    .and_then(|m| m.as_str())
+                                    .unwrap_or("Unknown error");
+                                return Err(anyhow!("Codex API failed: {}", error_msg));
+                            }
+                        }
+
+                        // Try parsing the event itself as a CodexResponse (some APIs return it directly)
+                        _ => {
+                            if event.get("id").is_some() && event.get("output").is_some() {
+                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(event) {
+                                    final_response = Some(parsed);
+                                }
+                            }
                         }
                     }
                 }

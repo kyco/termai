@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Codex API request structure
 #[derive(Serialize, Debug, Clone)]
 pub struct CodexRequest {
-    /// The model to use (e.g., "gpt-4", "o1-pro")
+    /// The model to use (e.g., "gpt-5.2-codex")
     pub model: String,
 
     /// Instructions/system prompt for the model
@@ -21,13 +21,8 @@ pub struct CodexRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<CodexInput>,
 
-    /// Stream the response
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream: Option<bool>,
-
-    /// Maximum tokens to generate
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_output_tokens: Option<u32>,
+    /// Stream the response (must always be true for Codex API)
+    pub stream: bool,
 
     /// Temperature for sampling
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -131,8 +126,7 @@ impl CodexRequest {
             model,
             instructions: None,
             input: Some(CodexInput::Text(input)),
-            stream: Some(true),
-            max_output_tokens: Some(16000),
+            stream: true,
             temperature: None,
             store: false,
         }
@@ -144,8 +138,7 @@ impl CodexRequest {
             model,
             instructions: None,
             input: Some(CodexInput::Messages(messages)),
-            stream: Some(true),
-            max_output_tokens: Some(16000),
+            stream: true,
             temperature: None,
             store: false,
         }
@@ -154,12 +147,6 @@ impl CodexRequest {
     /// Set the system instructions
     pub fn with_instructions(mut self, instructions: String) -> Self {
         self.instructions = Some(instructions);
-        self
-    }
-
-    /// Set the maximum output tokens
-    pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
-        self.max_output_tokens = Some(max_tokens);
         self
     }
 }
