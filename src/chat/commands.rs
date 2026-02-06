@@ -1,28 +1,91 @@
-//use anyhow::{anyhow, Result};
-
-/// Represents different slash commands available in chat mode
+/// Represents different slash commands available in chat mode, organized by category
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChatCommand {
+    // General
     Help,
-    Save(Option<String>),
-    Context,
-    Clear,
+    Commands,
     Exit,
     #[allow(dead_code)]
     Quit,
+
+    // Session management
+    Save(Option<String>),
+    Clear,
     Retry,
     Branch(Option<String>),
+
+    // Context management
+    Context,
     AddContext(String),
     RemoveContext(String),
+
+    // AI settings
     Model(Option<String>),
     Provider(Option<String>),
-    Tools(Option<bool>), // None = toggle, Some(true) = on, Some(false) = off
+    Tools(Option<bool>),
+    Status,
+    Theme(Option<String>),
+    Streaming(Option<bool>),
+    Settings,
+}
+
+/// Categories for grouping commands in the palette
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandCategory {
+    General,
+    Session,
+    Context,
+    AiSettings,
+}
+
+impl CommandCategory {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::General => "General",
+            Self::Session => "Session",
+            Self::Context => "Context",
+            Self::AiSettings => "AI & Settings",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::General => ">>",
+            Self::Session => "[]",
+            Self::Context => "()",
+            Self::AiSettings => "{}",
+        }
+    }
+
+    /// Return all categories in display order
+    pub fn all() -> &'static [CommandCategory] {
+        &[
+            Self::General,
+            Self::Session,
+            Self::Context,
+            Self::AiSettings,
+        ]
+    }
+}
+
+/// A command entry for display in the palette
+pub struct CommandEntry {
+    pub command: &'static str,
+    pub aliases: &'static str,
+    pub description: &'static str,
+    pub category: CommandCategory,
 }
 
 impl ChatCommand {
-    /// Parse a line of input to determine if it's a slash command
+    /// Parse a line of input to determine if it's a slash command.
+    /// Also supports `?` as a shortcut for opening the command palette.
     pub fn parse(input: &str) -> Option<Self> {
         let input = input.trim();
+
+        // Support `?` as a shortcut for the command palette
+        if input == "?" {
+            return Some(ChatCommand::Commands);
+        }
 
         if !input.starts_with('/') {
             return None;
@@ -34,7 +97,12 @@ impl ChatCommand {
         }
 
         match parts[0].to_lowercase().as_str() {
+            // General
             "help" | "h" => Some(ChatCommand::Help),
+            "commands" | "cmd" => Some(ChatCommand::Commands),
+            "exit" | "quit" | "q" => Some(ChatCommand::Exit),
+
+            // Session
             "save" | "s" => {
                 let name = if parts.len() > 1 {
                     Some(parts[1..].join(" "))
@@ -43,9 +111,7 @@ impl ChatCommand {
                 };
                 Some(ChatCommand::Save(name))
             }
-            "context" | "ctx" => Some(ChatCommand::Context),
             "clear" | "c" => Some(ChatCommand::Clear),
-            "exit" | "quit" | "q" => Some(ChatCommand::Exit),
             "retry" | "r" => Some(ChatCommand::Retry),
             "branch" | "b" => {
                 let name = if parts.len() > 1 {
@@ -55,6 +121,9 @@ impl ChatCommand {
                 };
                 Some(ChatCommand::Branch(name))
             }
+
+            // Context
+            "context" | "ctx" => Some(ChatCommand::Context),
             "add" => {
                 if parts.len() > 1 {
                     Some(ChatCommand::AddContext(parts[1..].join(" ")))
@@ -69,6 +138,8 @@ impl ChatCommand {
                     None
                 }
             }
+
+            // AI settings
             "model" | "m" => {
                 let model = if parts.len() > 1 {
                     Some(parts[1..].join(" "))
@@ -90,13 +161,35 @@ impl ChatCommand {
                     match parts[1].to_lowercase().as_str() {
                         "on" | "true" | "enable" | "enabled" | "1" => Some(true),
                         "off" | "false" | "disable" | "disabled" | "0" => Some(false),
-                        _ => None, // Invalid argument, treat as toggle
+                        _ => None,
                     }
                 } else {
-                    None // No argument = toggle
+                    None
                 };
                 Some(ChatCommand::Tools(setting))
             }
+            "status" => Some(ChatCommand::Status),
+            "theme" => {
+                let theme = if parts.len() > 1 {
+                    Some(parts[1..].join(" "))
+                } else {
+                    None
+                };
+                Some(ChatCommand::Theme(theme))
+            }
+            "streaming" => {
+                let setting = if parts.len() > 1 {
+                    match parts[1].to_lowercase().as_str() {
+                        "on" | "true" | "enable" | "enabled" | "1" => Some(true),
+                        "off" | "false" | "disable" | "disabled" | "0" => Some(false),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                Some(ChatCommand::Streaming(setting))
+            }
+            "settings" | "config" => Some(ChatCommand::Settings),
             _ => None,
         }
     }
@@ -105,43 +198,154 @@ impl ChatCommand {
     #[allow(dead_code)]
     pub fn help_text(&self) -> &'static str {
         match self {
-            ChatCommand::Help => "Show this help message",
-            ChatCommand::Save(_) => "Save current session with optional name",
-            ChatCommand::Context => "Show current context information",
-            ChatCommand::Clear => "Clear conversation history",
+            ChatCommand::Help => "Show quick help",
+            ChatCommand::Commands => "Open command palette with all commands",
             ChatCommand::Exit | ChatCommand::Quit => "Exit chat mode",
+            ChatCommand::Save(_) => "Save current session with optional name",
+            ChatCommand::Clear => "Clear conversation history",
             ChatCommand::Retry => "Regenerate the last AI response",
             ChatCommand::Branch(_) => "Create a new conversation branch",
+            ChatCommand::Context => "Show current context information",
             ChatCommand::AddContext(_) => "Add file or directory to context",
             ChatCommand::RemoveContext(_) => "Remove file or directory from context",
-            ChatCommand::Model(_) => "Switch AI model (e.g., gpt-5.2, gpt-5-mini, claude-3-5-sonnet-20241022)",
-            ChatCommand::Provider(_) => "Switch AI provider (claude or openai)",
-            ChatCommand::Tools(_) => "Toggle or set tool usage (bash, file operations) for OpenAI",
+            ChatCommand::Model(_) => "Switch AI model or show current",
+            ChatCommand::Provider(_) => "Switch AI provider or show current",
+            ChatCommand::Tools(_) => "Toggle tool usage (OpenAI only)",
+            ChatCommand::Status => "Show current session status",
+            ChatCommand::Theme(_) => "Switch display theme or list themes",
+            ChatCommand::Streaming(_) => "Toggle streaming output",
+            ChatCommand::Settings => "Show all current settings",
         }
     }
 
-    /// Get all available commands for help display
-    pub fn all_commands() -> Vec<(&'static str, &'static str)> {
+    /// Get the full command catalogue, organized by category
+    pub fn command_palette() -> Vec<CommandEntry> {
         vec![
-            ("/help, /h", "Show this help message"),
-            (
-                "/save [name], /s",
-                "Save current session with optional name",
-            ),
-            ("/context, /ctx", "Show current context information"),
-            ("/clear, /c", "Clear conversation history"),
-            ("/exit, /quit, /q", "Exit chat mode"),
-            ("/retry, /r", "Regenerate the last AI response"),
-            ("/branch [name], /b", "Create a new conversation branch"),
-            ("/add <path>", "Add file or directory to context"),
-            (
-                "/remove <path>, /rm",
-                "Remove file or directory from context",
-            ),
-            ("/model [name], /m", "Switch AI model or show current model"),
-            ("/provider [name], /p", "Switch AI provider (claude/openai) or show current"),
-            ("/tools [on|off], /t", "Toggle or set tool usage (bash, file ops) for OpenAI"),
+            // General
+            CommandEntry {
+                command: "/help",
+                aliases: "/h",
+                description: "Show quick help",
+                category: CommandCategory::General,
+            },
+            CommandEntry {
+                command: "/commands",
+                aliases: "/cmd, ?",
+                description: "Open this command palette",
+                category: CommandCategory::General,
+            },
+            CommandEntry {
+                command: "/exit",
+                aliases: "/quit, /q",
+                description: "Exit chat mode",
+                category: CommandCategory::General,
+            },
+            // Session
+            CommandEntry {
+                command: "/save [name]",
+                aliases: "/s",
+                description: "Save session with optional name",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/clear",
+                aliases: "/c",
+                description: "Clear conversation history",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/retry",
+                aliases: "/r",
+                description: "Regenerate last AI response",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/branch [name]",
+                aliases: "/b",
+                description: "Create conversation branch",
+                category: CommandCategory::Session,
+            },
+            // Context
+            CommandEntry {
+                command: "/context",
+                aliases: "/ctx",
+                description: "Show current context info",
+                category: CommandCategory::Context,
+            },
+            CommandEntry {
+                command: "/add <path>",
+                aliases: "",
+                description: "Add file/directory to context",
+                category: CommandCategory::Context,
+            },
+            CommandEntry {
+                command: "/remove <path>",
+                aliases: "/rm",
+                description: "Remove from context",
+                category: CommandCategory::Context,
+            },
+            // AI settings
+            CommandEntry {
+                command: "/model [name]",
+                aliases: "/m",
+                description: "Switch model or show current",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/provider [name]",
+                aliases: "/p",
+                description: "Switch provider (claude/openai)",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/tools [on|off]",
+                aliases: "/t",
+                description: "Toggle tool usage (OpenAI)",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/status",
+                aliases: "",
+                description: "Show session status overview",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/theme [name]",
+                aliases: "",
+                description: "Switch theme or list themes",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/streaming [on|off]",
+                aliases: "",
+                description: "Toggle streaming output",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/settings",
+                aliases: "/config",
+                description: "Show all current settings",
+                category: CommandCategory::AiSettings,
+            },
         ]
+    }
+
+    /// Legacy flat list for backward compat (used by /help)
+    pub fn all_commands() -> Vec<(&'static str, &'static str)> {
+        Self::command_palette()
+            .iter()
+            .map(|entry| {
+                if entry.aliases.is_empty() {
+                    (entry.command, entry.description)
+                } else {
+                    // Leak a combined string so we can return &'static str
+                    // This is fine since it's only called for display and the set is fixed
+                    let combined: &'static str =
+                        Box::leak(format!("{}, {}", entry.command, entry.aliases).into_boxed_str());
+                    (combined, entry.description)
+                }
+            })
+            .collect()
     }
 }
 
@@ -194,12 +398,52 @@ mod tests {
             ChatCommand::parse("/provider openai"),
             Some(ChatCommand::Provider(Some("openai".to_string())))
         );
-        assert_eq!(ChatCommand::parse("/provider"), Some(ChatCommand::Provider(None)));
+        assert_eq!(
+            ChatCommand::parse("/provider"),
+            Some(ChatCommand::Provider(None))
+        );
 
-        // Test non-commands
+        // Non-commands
         assert_eq!(ChatCommand::parse("hello world"), None);
         assert_eq!(ChatCommand::parse("not a command"), None);
         assert_eq!(ChatCommand::parse(""), None);
+    }
+
+    #[test]
+    fn test_question_mark_shortcut() {
+        assert_eq!(ChatCommand::parse("?"), Some(ChatCommand::Commands));
+    }
+
+    #[test]
+    fn test_new_commands() {
+        assert_eq!(
+            ChatCommand::parse("/commands"),
+            Some(ChatCommand::Commands)
+        );
+        assert_eq!(ChatCommand::parse("/cmd"), Some(ChatCommand::Commands));
+        assert_eq!(ChatCommand::parse("/status"), Some(ChatCommand::Status));
+        assert_eq!(
+            ChatCommand::parse("/settings"),
+            Some(ChatCommand::Settings)
+        );
+        assert_eq!(ChatCommand::parse("/config"), Some(ChatCommand::Settings));
+        assert_eq!(ChatCommand::parse("/theme"), Some(ChatCommand::Theme(None)));
+        assert_eq!(
+            ChatCommand::parse("/theme dark"),
+            Some(ChatCommand::Theme(Some("dark".to_string())))
+        );
+        assert_eq!(
+            ChatCommand::parse("/streaming on"),
+            Some(ChatCommand::Streaming(Some(true)))
+        );
+        assert_eq!(
+            ChatCommand::parse("/streaming off"),
+            Some(ChatCommand::Streaming(Some(false)))
+        );
+        assert_eq!(
+            ChatCommand::parse("/streaming"),
+            Some(ChatCommand::Streaming(None))
+        );
     }
 
     #[test]
@@ -209,9 +453,26 @@ mod tests {
             _ => panic!("Expected Help command"),
         }
 
+        match InputType::classify("?") {
+            InputType::Command(ChatCommand::Commands) => (),
+            _ => panic!("Expected Commands command from ?"),
+        }
+
         match InputType::classify("Hello, how are you?") {
             InputType::Message(msg) => assert_eq!(msg, "Hello, how are you?"),
             _ => panic!("Expected regular message"),
+        }
+    }
+
+    #[test]
+    fn test_command_palette_has_all_categories() {
+        let palette = ChatCommand::command_palette();
+        for cat in CommandCategory::all() {
+            assert!(
+                palette.iter().any(|e| e.category == *cat),
+                "Missing commands for category {:?}",
+                cat
+            );
         }
     }
 }

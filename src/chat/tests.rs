@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_command_help_text() {
-        assert_eq!(ChatCommand::Help.help_text(), "Show this help message");
+        assert_eq!(ChatCommand::Help.help_text(), "Show quick help");
         assert_eq!(
             ChatCommand::Save(None).help_text(),
             "Save current session with optional name"
@@ -191,7 +191,7 @@ mod tests {
         let welcome = formatter.format_welcome();
 
         assert!(welcome.contains("TermAI Interactive Chat Mode"));
-        assert!(welcome.contains("/help"));
+        assert!(welcome.contains("/commands"));
         assert!(welcome.contains("Type your message"));
         assert!(welcome.contains("┌")); // Check for proper box formatting
         assert!(welcome.contains("└"));

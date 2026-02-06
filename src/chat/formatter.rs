@@ -537,7 +537,7 @@ impl ChatFormatter {
         // Content lines
         let content = vec![
             "Type your message and press Enter to chat",
-            "/help - Show available slash commands",
+            "Type ? or /commands to open command palette",
             "Ctrl+C twice to exit gracefully",
         ];
 
@@ -555,32 +555,183 @@ impl ChatFormatter {
         lines.join("\n")
     }
 
-    /// Format help text for slash commands
+    /// Format help text for slash commands (compact view from /help)
     pub fn format_help(&self, commands: &[(&str, &str)]) -> String {
         let mut help = String::new();
-        help.push_str("┌────────────────────────────────────────────────┐\n");
-        help.push_str("│              📚 Available Commands             │\n");
-        help.push_str("├────────────────────────────────────────────────┤\n");
+        help.push_str("┌────────────────────────────────────────────────────────────┐\n");
+        help.push_str("│                    Available Commands                      │\n");
+        help.push_str("├────────────────────────────────────────────────────────────┤\n");
 
+        let inner_width = 58;
         for (command, description) in commands {
             let formatted_line = format!(" {} - {}", command, description);
-            if formatted_line.len() <= 46 {
+            let display_len = formatted_line.len();
+            if display_len <= inner_width {
                 help.push_str(&format!(
                     "│{}{}│\n",
                     formatted_line,
-                    " ".repeat(48 - formatted_line.len())
+                    " ".repeat(inner_width - display_len)
                 ));
             } else {
-                // Truncate if too long
-                let truncated = &formatted_line[..43];
-                help.push_str(&format!("│{}... │\n", truncated));
+                let truncated = &formatted_line[..inner_width - 3];
+                help.push_str(&format!("│{}...│\n", truncated));
             }
         }
 
-        help.push_str("├────────────────────────────────────────────────┤\n");
-        help.push_str("│ 💡 Tip: Commands can be abbreviated (/h, /s)  │\n");
-        help.push_str("└────────────────────────────────────────────────┘");
+        help.push_str("├────────────────────────────────────────────────────────────┤\n");
+        help.push_str("│ Tip: Type ? or /commands for the full command palette      │\n");
+        help.push_str("└────────────────────────────────────────────────────────────┘");
         help
+    }
+
+    /// Format the rich command palette (from /commands or ?)
+    /// Groups commands by category with a box-drawing UI
+    pub fn format_command_palette(
+        &self,
+        palette: &[crate::chat::commands::CommandEntry],
+    ) -> String {
+        use crate::chat::commands::CommandCategory;
+
+        let outer_width = 62;
+        let inner_width = outer_width - 2; // inside the box borders
+
+        let mut out = String::new();
+
+        // Top border and title
+        out.push_str(&format!("┌{}┐\n", "─".repeat(inner_width)));
+        let title = "Command Palette";
+        let pad_l = (inner_width - title.len()) / 2;
+        let pad_r = inner_width - title.len() - pad_l;
+        out.push_str(&format!(
+            "│{}{}{}│\n",
+            " ".repeat(pad_l),
+            title,
+            " ".repeat(pad_r)
+        ));
+        out.push_str(&format!("╞{}╡\n", "═".repeat(inner_width)));
+
+        for cat in CommandCategory::all() {
+            // Category header
+            let cat_header = format!(" {} {}", cat.icon(), cat.label());
+            let cat_pad = inner_width - cat_header.len();
+            out.push_str(&format!("│{}{}│\n", cat_header, " ".repeat(cat_pad)));
+            out.push_str(&format!("├{}┤\n", "┄".repeat(inner_width)));
+
+            // Commands in this category
+            let entries: Vec<&crate::chat::commands::CommandEntry> =
+                palette.iter().filter(|e| e.category == *cat).collect();
+
+            for entry in &entries {
+                // Command column (left-aligned, fixed width)
+                let cmd_col_width = 24;
+                let cmd_text = if entry.aliases.is_empty() {
+                    entry.command.to_string()
+                } else {
+                    format!("{}, {}", entry.command, entry.aliases)
+                };
+
+                let cmd_display = if cmd_text.len() <= cmd_col_width {
+                    format!("{}{}", cmd_text, " ".repeat(cmd_col_width - cmd_text.len()))
+                } else {
+                    format!("{}...", &cmd_text[..cmd_col_width - 3])
+                };
+
+                // Description column (fills remaining width)
+                let desc_width = inner_width - cmd_col_width - 4; // 4 = "│ " + " │"
+                let desc_display = if entry.description.len() <= desc_width {
+                    format!(
+                        "{}{}",
+                        entry.description,
+                        " ".repeat(desc_width - entry.description.len())
+                    )
+                } else {
+                    format!("{}...", &entry.description[..desc_width - 3])
+                };
+
+                out.push_str(&format!("│ {} {} │\n", cmd_display, desc_display));
+            }
+
+            // Separator between categories (skip after last)
+            if *cat != *CommandCategory::all().last().unwrap() {
+                out.push_str(&format!("├{}┤\n", "─".repeat(inner_width)));
+            }
+        }
+
+        // Footer
+        out.push_str(&format!("├{}┤\n", "─".repeat(inner_width)));
+        let tip = " Tip: Commands accept abbreviated aliases (/h, /s, /m)";
+        let tip_pad = inner_width - tip.len();
+        if tip_pad > 0 {
+            out.push_str(&format!("│{}{}│\n", tip, " ".repeat(tip_pad)));
+        } else {
+            out.push_str(&format!("│{}│\n", &tip[..inner_width]));
+        }
+        let tip2 = " Type ? anytime to reopen this palette";
+        let tip2_pad = inner_width - tip2.len();
+        if tip2_pad > 0 {
+            out.push_str(&format!("│{}{}│\n", tip2, " ".repeat(tip2_pad)));
+        }
+        out.push_str(&format!("└{}┘", "─".repeat(inner_width)));
+
+        out
+    }
+
+    /// Format a settings overview showing all current chat settings
+    pub fn format_settings_overview(
+        &self,
+        provider: &str,
+        model: &str,
+        tools_enabled: bool,
+        streaming_enabled: bool,
+        context_file_count: usize,
+        session_name: &str,
+    ) -> String {
+        let inner_width = 58;
+        let mut out = String::new();
+
+        out.push_str(&format!("┌{}┐\n", "─".repeat(inner_width)));
+        let title = "Current Settings";
+        let pad_l = (inner_width - title.len()) / 2;
+        let pad_r = inner_width - title.len() - pad_l;
+        out.push_str(&format!(
+            "│{}{}{}│\n",
+            " ".repeat(pad_l),
+            title,
+            " ".repeat(pad_r)
+        ));
+        out.push_str(&format!("├{}┤\n", "─".repeat(inner_width)));
+
+        let rows = [
+            ("Provider", provider),
+            ("Model", model),
+            (
+                "Tools",
+                if tools_enabled { "enabled" } else { "disabled" },
+            ),
+            (
+                "Streaming",
+                if streaming_enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+            ),
+            ("Session", session_name),
+        ];
+
+        for (label, value) in &rows {
+            let row = format!(" {:<16} {}", label, value);
+            let pad = inner_width - row.len();
+            out.push_str(&format!("│{}{}│\n", row, " ".repeat(pad)));
+        }
+
+        // Context count
+        let ctx_row = format!(" {:<16} {} file(s)", "Context", context_file_count);
+        let ctx_pad = inner_width - ctx_row.len();
+        out.push_str(&format!("│{}{}│\n", ctx_row, " ".repeat(ctx_pad)));
+
+        out.push_str(&format!("└{}┘", "─".repeat(inner_width)));
+        out
     }
 
     /// Format context information
@@ -679,7 +830,7 @@ mod tests {
         let formatter = ChatFormatter::new();
         let welcome = formatter.format_welcome();
         assert!(welcome.contains("TermAI Interactive Chat Mode"));
-        assert!(welcome.contains("/help"));
+        assert!(welcome.contains("/commands"));
         assert!(welcome.contains("┌")); // Check for proper box formatting
         assert!(welcome.contains("└"));
     }

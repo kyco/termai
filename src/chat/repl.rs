@@ -18,10 +18,29 @@ pub struct ChatHelper {
 impl ChatHelper {
     pub fn new() -> Self {
         let mut commands = HashSet::new();
-        // Add all slash commands for tab completion
+        // All slash commands and their aliases for tab completion
         let command_list = vec![
-            "/help", "/h", "/save", "/s", "/context", "/ctx", "/clear", "/c", "/exit", "/quit",
-            "/q", "/retry", "/r", "/branch", "/b", "/add", "/remove", "/rm",
+            // General
+            "/help", "/h",
+            "/commands", "/cmd",
+            "/exit", "/quit", "/q",
+            // Session
+            "/save", "/s",
+            "/clear", "/c",
+            "/retry", "/r",
+            "/branch", "/b",
+            // Context
+            "/context", "/ctx",
+            "/add",
+            "/remove", "/rm",
+            // AI & settings
+            "/model", "/m",
+            "/provider", "/p",
+            "/tools", "/t",
+            "/status",
+            "/theme",
+            "/streaming",
+            "/settings", "/config",
         ];
 
         for cmd in command_list {

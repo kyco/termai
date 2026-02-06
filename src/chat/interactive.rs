@@ -160,6 +160,11 @@ where
                 let help_text = self.formatter.format_help(&ChatCommand::all_commands());
                 self.repl.print_message(&help_text);
             }
+            ChatCommand::Commands => {
+                let palette = ChatCommand::command_palette();
+                let palette_text = self.formatter.format_command_palette(&palette);
+                self.repl.print_message(&palette_text);
+            }
             ChatCommand::Save(name) => {
                 let session_name = name
                     .unwrap_or_else(|| format!("chat_{}", Local::now().format("%Y%m%d_%H%M%S")));
@@ -226,6 +231,18 @@ where
             }
             ChatCommand::Tools(setting) => {
                 self.handle_tools_command(setting);
+            }
+            ChatCommand::Status => {
+                self.repl.print_message(&self.chat_state.status());
+            }
+            ChatCommand::Theme(theme_name) => {
+                self.handle_theme_command(theme_name);
+            }
+            ChatCommand::Streaming(setting) => {
+                self.handle_streaming_command(setting);
+            }
+            ChatCommand::Settings => {
+                self.display_settings_overview();
             }
         }
         Ok(())
@@ -548,6 +565,69 @@ where
         ));
 
         Ok(())
+    }
+
+    /// Handle /theme command
+    fn handle_theme_command(&mut self, theme_name: Option<String>) {
+        match theme_name {
+            Some(name) => {
+                match self.formatter.set_theme(&name) {
+                    Ok(()) => {
+                        self.repl.print_message(&self.formatter.format_success(
+                            &format!("Switched to '{}' theme", name),
+                        ));
+                    }
+                    Err(e) => {
+                        self.repl.print_message(&self.formatter.format_error(&e));
+                        let themes = self.formatter.available_themes();
+                        self.repl.print_message(&format!(
+                            "Available themes: {}",
+                            themes.join(", ")
+                        ));
+                    }
+                }
+            }
+            None => {
+                let themes = self.formatter.available_themes();
+                self.repl.print_message(&format!(
+                    "Available themes: {}\nUse '/theme <name>' to switch",
+                    themes.join(", ")
+                ));
+            }
+        }
+    }
+
+    /// Handle /streaming command
+    fn handle_streaming_command(&mut self, setting: Option<bool>) {
+        match setting {
+            Some(enabled) => {
+                self.formatter.set_streaming(enabled);
+                let status = if enabled { "enabled" } else { "disabled" };
+                self.repl.print_message(&self.formatter.format_success(
+                    &format!("Streaming output {}", status),
+                ));
+            }
+            None => {
+                // Toggle: we don't track the current state externally, so just
+                // tell the user how to use the command
+                self.repl.print_message(
+                    "Usage: /streaming on  - enable streaming output\n       /streaming off - disable streaming output",
+                );
+            }
+        }
+    }
+
+    /// Display a settings overview panel
+    fn display_settings_overview(&self) {
+        let overview = self.formatter.format_settings_overview(
+            &self.chat_state.provider,
+            &self.chat_state.model,
+            self.chat_state.tools_enabled,
+            true, // streaming default
+            self.context_files.len(),
+            &self.session.name,
+        );
+        self.repl.print_message(&overview);
     }
 
     /// Initialize chat state from current configuration
