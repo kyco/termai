@@ -42,6 +42,7 @@ impl CompletionValues {
             "gpt-5.2-chat-latest".to_string(),
             "gpt-5.2-pro".to_string(),
             // OpenAI Codex models (ChatGPT Plus/Pro via OAuth)
+            "gpt-5.3-codex".to_string(),
             "gpt-5.2-codex".to_string(),
             "gpt-5.1-codex-mini".to_string(),
             "gpt-5.1-codex-max".to_string(),

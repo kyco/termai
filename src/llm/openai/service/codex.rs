@@ -13,7 +13,7 @@ use crate::session::model::session::Session;
 use anyhow::{anyhow, Result};
 
 /// Default model for Codex API
-const DEFAULT_CODEX_MODEL: &str = "gpt-5.2-codex";
+const DEFAULT_CODEX_MODEL: &str = "gpt-5.3-codex";
 
 /// Chat using the Codex API with OAuth authentication
 pub async fn chat(access_token: &str, session: &mut Session, model_param: Option<&str>) -> Result<()> {

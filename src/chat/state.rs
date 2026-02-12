@@ -161,7 +161,7 @@ impl ChatState {
         match provider {
             "claude" => "claude-sonnet-4-20250514".to_string(),
             "openai" => "gpt-5.2".to_string(),
-            "openai-codex" | "codex" => "gpt-5.2-codex".to_string(),
+            "openai-codex" | "codex" => "gpt-5.3-codex".to_string(),
             _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
@@ -201,8 +201,10 @@ impl ChatState {
             "gpt-5.2" => "Most intelligent model, best for complex reasoning and coding",
             "gpt-5.2-pro" => "Extra compute for harder problems; higher latency/cost",
             "gpt-5.2-chat-latest" => "Chat-optimized GPT-5.2 variant (latest)",
+            // GPT-5.3 Codex models (ChatGPT Plus/Pro via OAuth)
+            "gpt-5.3-codex" => "Latest Codex model with enhanced coding capabilities",
             // GPT-5.2 Codex models (ChatGPT Plus/Pro via OAuth)
-            "gpt-5.2-codex" => "Full Codex model for ChatGPT Plus/Pro subscribers",
+            "gpt-5.2-codex" => "Previous generation Codex model for ChatGPT Plus/Pro subscribers",
             "gpt-5.1-codex-mini" => "Faster Codex mini model for quick responses",
             "gpt-5.1-codex-max" => "Maximum capability Codex model for complex tasks",
             // GPT-5 series
