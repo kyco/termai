@@ -12,7 +12,7 @@ pub fn fetch_all_sessions<SR: SessionRepository, MR: MessageRepository>(
     let session_entities = session_repo.fetch_all_sessions().unwrap_or_else(|_| vec![]);
     let sessions = session_entities
         .iter()
-        .map(|s| Session::from(s))
+        .map(Session::from)
         .collect::<Vec<Session>>();
 
     println!("\n");
@@ -46,7 +46,7 @@ pub fn get_most_recent_session<SR: SessionRepository, MR: MessageRepository>(
     // expires_at is updated every time the session is used, so it reflects the last usage time
     let mut sessions = session_entities
         .iter()
-        .map(|s| Session::from(s))
+        .map(Session::from)
         .collect::<Vec<Session>>();
 
     sessions.sort_by(|a, b| b.expires_at.cmp(&a.expires_at));
@@ -102,7 +102,7 @@ pub fn session_add_messages<SR: SessionRepository, MR: MessageRepository>(
         let new_messages = session
             .messages
             .iter()
-            .filter(|message| message.id == "")
+            .filter(|message| message.id.is_empty())
             .collect::<Vec<&Message>>();
         for message in new_messages {
             let message_with_id = message.copy_with_id(generate_uuid_v4().to_string());
@@ -125,10 +125,10 @@ fn session_with_messages<MR: MessageRepository>(
 ) -> Session {
     let messages = message_repository
         .fetch_messages_for_session(&session.id)
-        .unwrap_or(Vec::new())
+        .unwrap_or_default()
         .iter()
-        .map(|m| Message::from(m))
+        .map(Message::from)
         .collect::<Vec<Message>>();
-    let session = session.copy_with_messages(messages);
-    session
+    
+    session.copy_with_messages(messages)
 }

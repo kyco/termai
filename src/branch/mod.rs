@@ -5,10 +5,8 @@
 /// - Compare different approaches and solutions
 /// - Merge successful branches back into main conversations
 /// - Navigate complex problem-solving workflows efficiently
-
 #[allow(dead_code)]
 #[allow(unused_imports)]
-
 pub mod entity;
 pub mod repository;
 pub mod service;

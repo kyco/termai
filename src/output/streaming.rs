@@ -111,6 +111,7 @@ impl StreamingRenderer {
     }
 
     /// Stream code block with enhanced formatting
+    #[allow(clippy::type_complexity)]
     pub async fn stream_code_block(
         &mut self,
         content: &str,
@@ -376,8 +377,10 @@ async fn stream_markdown_content(
                 i += 1;
             }
             
-            if first_content && role_prefix.is_some() {
-                print!("{}", role_prefix.unwrap());
+            if first_content {
+                if let Some(prefix) = role_prefix {
+                    print!("{}", prefix);
+                }
                 first_content = false;
             }
             

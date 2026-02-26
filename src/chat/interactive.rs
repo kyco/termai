@@ -172,7 +172,7 @@ where
                 sessions_service::session_add_messages(
                     self.session_repo,
                     self.message_repo,
-                    &mut self.session,
+                    &self.session,
                 )?;
                 self.repl
                     .print_message(&self.formatter.format_session_saved(&session_name));
@@ -349,7 +349,7 @@ where
                 sessions_service::session_add_messages(
                     self.session_repo,
                     self.message_repo,
-                    &mut self.session,
+                    &self.session,
                 )?;
             }
             Err(e) => {
@@ -444,7 +444,7 @@ where
         }
 
         // Extract content from the path
-        let new_context = extract_content(&Some(path.to_string()), &vec![], &vec![]);
+        let new_context = extract_content(&Some(path.to_string()), &[], &[]);
 
         if let Some(mut files) = new_context {
             // Remove duplicates and add new files
@@ -513,7 +513,7 @@ where
             sessions_service::session_add_messages(
                 self.session_repo,
                 self.message_repo,
-                &mut self.session,
+                &self.session,
             )?;
             self.repl.print_message(
                 &self

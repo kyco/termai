@@ -41,7 +41,7 @@ impl<'a, R: ConfigRepository> TokenManager<'a, R> {
             .ok()
             .and_then(|c| DateTime::parse_from_rfc3339(&c.value).ok())
             .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(|| Utc::now());
+            .unwrap_or_else(Utc::now);
 
         let id_token = config_service::fetch_by_key(self.repo, &ConfigKeys::CodexIdToken.to_key())
             .ok()

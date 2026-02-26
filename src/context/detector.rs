@@ -230,9 +230,9 @@ impl ProjectDetector for GoProjectDetector {
                     path.join(dir)
                 };
                 if dir_path.exists() {
-                    dir_path.read_dir().map_or(false, |mut entries| {
+                    dir_path.read_dir().is_ok_and(|mut entries| {
                         entries.any(|entry| {
-                            entry.map_or(false, |e| {
+                            entry.is_ok_and(|e| {
                                 e.path().extension().and_then(|ext| ext.to_str()) == Some("go")
                             })
                         })
@@ -263,7 +263,7 @@ impl ProjectDetector for GoProjectDetector {
                 // Handle wildcard patterns like cmd/*/main.go
                 if let Ok(entries) = path.join("cmd").read_dir() {
                     for dir_entry in entries.flatten() {
-                        if dir_entry.file_type().map_or(false, |ft| ft.is_dir()) {
+                        if dir_entry.file_type().is_ok_and(|ft| ft.is_dir()) {
                             let main_path = dir_entry.path().join("main.go");
                             if main_path.exists() {
                                 let relative_path = format!(
@@ -549,7 +549,7 @@ impl JavaProjectDetector {
                     if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                         if file_name.contains("Application") && file_name.ends_with(".java") {
                             if let Ok(relative) =
-                                path.strip_prefix(&std::env::current_dir().unwrap_or_default())
+                                path.strip_prefix(std::env::current_dir().unwrap_or_default())
                             {
                                 let relative_str = relative.to_string_lossy().to_string();
                                 entry_points.push(relative_str.clone());

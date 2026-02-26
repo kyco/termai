@@ -152,7 +152,7 @@ impl SyntaxHighlighter {
         }
 
         // Try exact match
-        if let Some(syntax) = self.syntax_set.find_syntax_by_name(&name) {
+        if let Some(syntax) = self.syntax_set.find_syntax_by_name(name) {
             return Some(syntax);
         }
 
@@ -282,12 +282,11 @@ impl SyntaxHighlighter {
         }
 
         // JSON pattern
-        if (code_sample.trim().starts_with('{') && code_sample.trim().ends_with('}')) ||
-           (code_sample.trim().starts_with('[') && code_sample.trim().ends_with(']')) {
-            if code_sample.contains("\":") && code_sample.contains(",") {
+        if ((code_sample.trim().starts_with('{') && code_sample.trim().ends_with('}')) ||
+           (code_sample.trim().starts_with('[') && code_sample.trim().ends_with(']')))
+            && code_sample.contains("\":") && code_sample.contains(",") {
                 return self.syntax_set.find_syntax_by_name("JSON");
             }
-        }
 
         // YAML patterns
         if code_sample.contains("---") || 
@@ -397,11 +396,7 @@ impl SyntaxHighlighter {
         let non_empty_lines = lines.iter().filter(|line| !line.trim().is_empty()).count();
         let comment_lines = self.count_comment_lines(&lines, language);
         
-        let estimated_lang = if let Some(detected) = self.detect_language(code, language) {
-            Some(detected.name.clone())
-        } else {
-            None
-        };
+        let estimated_lang = self.detect_language(code, language).map(|detected| detected.name.clone());
 
         CodeAnalysis {
             total_lines,

@@ -184,8 +184,8 @@ async fn push_stash(git_repo: &GitRepository, args: &crate::args::StashArgs) -> 
     println!("   {}", stash_message.bright_white());
 
     // Confirm stash creation
-    if args.interactive {
-        if !Confirm::new()
+    if args.interactive
+        && !Confirm::new()
             .with_prompt("Create stash with this message?")
             .default(true)
             .interact()?
@@ -193,7 +193,6 @@ async fn push_stash(git_repo: &GitRepository, args: &crate::args::StashArgs) -> 
             println!("{}", "Stash creation cancelled".yellow());
             return Ok(());
         }
-    }
 
     // Create the stash
     println!("\n{}", "🔄 Creating stash...".cyan());
@@ -250,16 +249,15 @@ async fn pop_stash(_git_repo: &GitRepository, args: &crate::args::StashArgs) -> 
     );
     println!("   {} 5 files will be restored", "📁".cyan());
 
-    if args.interactive {
-        if !Confirm::new()
-            .with_prompt(&format!("Apply and remove {}?", stash_ref))
+    if args.interactive
+        && !Confirm::new()
+            .with_prompt(format!("Apply and remove {}?", stash_ref))
             .default(true)
             .interact()?
         {
             println!("{}", "Stash pop cancelled".yellow());
             return Ok(());
         }
-    }
 
     // Apply the stash
     println!("\n{}", "🔄 Applying stash changes...".cyan());
@@ -322,7 +320,7 @@ async fn drop_stash(_git_repo: &GitRepository, args: &crate::args::StashArgs) ->
 
     if args.interactive
         || Confirm::new()
-            .with_prompt(&format!("Are you sure you want to drop {}?", stash_ref))
+            .with_prompt(format!("Are you sure you want to drop {}?", stash_ref))
             .default(false)
             .interact()?
     {
@@ -467,11 +465,11 @@ async fn generate_smart_stash_message(
         .unwrap_or_else(|_| "unknown".to_string());
 
     // Generate message based on changes
-    let message = if status.staged_files.len() > 0 && status.unstaged_files.len() > 0 {
+    let message = if !status.staged_files.is_empty() && !status.unstaged_files.is_empty() {
         "WIP: Mixed staged and unstaged changes"
-    } else if status.staged_files.len() > 0 {
+    } else if !status.staged_files.is_empty() {
         "WIP: Staged changes ready for commit"
-    } else if status.unstaged_files.len() > 0 {
+    } else if !status.unstaged_files.is_empty() {
         "WIP: Unstaged changes in progress"
     } else {
         "WIP: Work in progress"

@@ -58,8 +58,8 @@ impl Session {
         Self {
             id: self.id.clone(),
             name: self.name.clone(),
-            expires_at: self.expires_at.clone(),
-            current: self.current.clone(),
+            expires_at: self.expires_at,
+            current: self.current,
             messages: messages.to_vec(),
             temporary: self.temporary,
             redaction_mapping: self.redaction_mapping.clone(),

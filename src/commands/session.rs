@@ -76,13 +76,10 @@ fn delete_session(repo: &SqliteRepository, session_name: &str) -> Result<()> {
         .context(format!("Session '{}' not found", session_name))
         .map_err(|e| {
             let guidance = format!(
-                "\n{}\n{}\n• {}\n• {}",
+                "\n{}\n{}\n• Run '{}' to see available sessions\n• {}",
                 "💡 Session Troubleshooting:".bright_yellow().bold(),
                 "   The specified session could not be found.".white(),
-                format!(
-                    "Run '{}' to see available sessions",
-                    "termai session list".cyan()
-                ),
+                "termai session list".cyan(),
                 "Check the session name spelling and try again".white()
             );
             anyhow::anyhow!("{}\n{}", e, guidance)

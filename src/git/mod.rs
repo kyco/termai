@@ -13,7 +13,6 @@ pub mod hooks;
 /// - Code review functionality
 /// - Hook management
 /// - Interactive workflows
-
 #[allow(dead_code)]
 pub mod repository;
 #[allow(dead_code)]

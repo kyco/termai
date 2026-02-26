@@ -417,8 +417,8 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
             ResponseOutput::Message { content, .. } => {
                 let message_text: String = content
                     .into_iter()
-                    .filter_map(|item| match item {
-                        ContentItem::OutputText { text, .. } => Some(text),
+                    .map(|item| match item {
+                        ContentItem::OutputText { text, .. } => text,
                     })
                     .collect::<Vec<String>>()
                     .join("\n");
@@ -806,11 +806,7 @@ async fn execute_commit(
 
     // Get the current HEAD commit (parent)
     let parent_commit = if let Ok(head) = repo.head() {
-        if let Ok(commit) = head.peel_to_commit() {
-            Some(commit)
-        } else {
-            None
-        }
+        head.peel_to_commit().ok()
     } else {
         None // First commit
     };
@@ -839,19 +835,13 @@ async fn execute_commit(
 
     println!("{}", "✅ Commit created successfully!".green().bold());
     println!(
-        "{}",
-        format!(
-            "   Commit ID: {}",
-            commit_id.to_string()[..8].bright_yellow()
-        )
+        "   Commit ID: {}",
+        commit_id.to_string()[..8].bright_yellow()
     );
-    println!(
-        "{}",
-        format!("   Message: {}", commit_message.subject.bright_white())
-    );
+    println!("   Message: {}", commit_message.subject.bright_white());
 
     if let Some(ref body) = commit_message.body {
-        println!("{}", format!("   Body: {}", body.dimmed()));
+        println!("   Body: {}", body.dimmed());
     }
 
     Ok(())
