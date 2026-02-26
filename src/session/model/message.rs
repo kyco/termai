@@ -5,8 +5,10 @@ use crate::session::entity::message_entity::MessageEntity;
 
 /// Type of message - standard text or compacted history
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum MessageType {
     /// Standard text message
+    #[default]
     Standard,
     /// Compacted conversation history from OpenAI
     Compaction {
@@ -17,11 +19,6 @@ pub enum MessageType {
     },
 }
 
-impl Default for MessageType {
-    fn default() -> Self {
-        MessageType::Standard
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct Message {
@@ -128,14 +125,14 @@ impl Message {
 }
 
 #[allow(dead_code)]
-pub fn contains_system_prompt(messages: &Vec<Message>) -> bool {
+pub fn contains_system_prompt(messages: &[Message]) -> bool {
     messages.iter().any(|m| m.role == Role::System)
 }
 
 #[allow(dead_code)]
 pub fn messages_with_system_prompt(
     user_prompt: Option<String>,
-    messages: &Vec<Message>,
+    messages: &[Message],
 ) -> Vec<Message> {
     let mut new_messages = Vec::with_capacity(messages.len() + 1);
     let system_prompt = user_prompt.unwrap_or_else(|| SYSTEM_PROMPT.to_string());

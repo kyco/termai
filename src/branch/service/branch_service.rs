@@ -48,7 +48,7 @@ impl BranchService {
 
         // Copy messages if needed
         if let Some(parent_id) = &parent_branch_id {
-            Self::copy_branch_messages_to_point(repo, &parent_id, &branch_id, from_message_index)?;
+            Self::copy_branch_messages_to_point(repo, parent_id, &branch_id, from_message_index)?;
         } else {
             Self::copy_session_messages_to_point(repo, session_id, &branch_id, from_message_index)?;
         }
@@ -146,8 +146,7 @@ impl BranchService {
         }
     }
 
-    /// Internal helper methods
-
+    // Internal helper methods
     fn create_branch_in_db(repo: &mut SqliteRepository, branch: &BranchEntity) -> Result<()> {
         repo.conn.execute(
             "INSERT INTO conversation_branches (id, session_id, parent_branch_id, branch_name, description, created_at, last_activity, status)
@@ -174,7 +173,7 @@ impl BranchService {
         )?;
 
         let rows = stmt.query_map(params![branch_id], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })?;
 
         let mut message_ids = Vec::new();
@@ -455,7 +454,7 @@ impl BranchService {
         let mut children_map: std::collections::HashMap<String, Vec<&BranchEntity>> = std::collections::HashMap::new();
         for branch in branches {
             if let Some(parent_id) = &branch.parent_branch_id {
-                children_map.entry(parent_id.clone()).or_insert_with(Vec::new).push(branch);
+                children_map.entry(parent_id.clone()).or_default().push(branch);
             }
         }
         
@@ -495,7 +494,7 @@ impl BranchService {
         let mut children_map: std::collections::HashMap<String, Vec<&BranchEntity>> = std::collections::HashMap::new();
         for branch in branches {
             if let Some(parent_id) = &branch.parent_branch_id {
-                children_map.entry(parent_id.clone()).or_insert_with(Vec::new).push(branch);
+                children_map.entry(parent_id.clone()).or_default().push(branch);
             }
         }
         

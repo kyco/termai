@@ -237,9 +237,9 @@ COPYRIGHT:
         ];
 
         for candidate in &candidates {
-            let expanded = if candidate.starts_with("~/") {
+            let expanded = if let Some(rest) = candidate.strip_prefix("~/") {
                 if let Some(home) = std::env::var_os("HOME") {
-                    std::path::Path::new(&home).join(&candidate[2..])
+                    std::path::Path::new(&home).join(rest)
                 } else {
                     continue;
                 }
@@ -247,7 +247,7 @@ COPYRIGHT:
                 std::path::PathBuf::from(candidate)
             };
 
-            if expanded.parent().map_or(false, |p| p.exists()) {
+            if expanded.parent().is_some_and(|p| p.exists()) {
                 return Some(expanded);
             }
         }

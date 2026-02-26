@@ -1,8 +1,7 @@
-/// Branch merging and integration module for TermAI
-/// 
-/// This module provides sophisticated merging capabilities for conversation branches,
-/// allowing users to consolidate insights, resolve conflicts, and maintain conversation flow.
-
+// Branch merging and integration module for TermAI
+//
+// This module provides sophisticated merging capabilities for conversation branches,
+// allowing users to consolidate insights, resolve conflicts, and maintain conversation flow.
 use crate::branch::entity::branch_entity::BranchEntity;
 use crate::branch::service::BranchService;
 use crate::branch::comparison::{BranchComparator, BranchComparison};
@@ -301,7 +300,7 @@ impl BranchMerger {
         
         output.push_str(&format!("{}\n", "📋 Merge Preview".bright_green().bold()));
         output.push_str(&format!("{}\n", "═".repeat(15).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         // Source branches
         output.push_str(&format!("{}\n", "Source branches:".bright_cyan()));
@@ -324,7 +323,7 @@ impl BranchMerger {
         };
         output.push_str(&format!("{} {}\n", "Strategy:".bright_cyan(), strategy_desc.bright_white()));
         
-        output.push_str("\n");
+        output.push('\n');
 
         // Conflicts
         if !merge.conflicts.is_empty() {
@@ -349,7 +348,7 @@ impl BranchMerger {
         }
 
         // Resolution plan
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&format!("{}\n", "🎯 Resolution Plan:".bright_yellow().bold()));
         for action in &merge.resolution_plan.suggested_actions {
             output.push_str(&format!("   • {}\n", action));
@@ -564,7 +563,7 @@ impl BranchMerger {
             branch.created_at.format("%Y-%m-%d %H:%M:%S")
         ));
         output.push_str(&format!("Status: {}\n", branch.status));
-        output.push_str("\n");
+        output.push('\n');
         
         for (i, message) in messages.iter().enumerate() {
             output.push_str(&format!("Message {} ({:?}):\n", i + 1, message.role));

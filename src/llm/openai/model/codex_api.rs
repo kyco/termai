@@ -163,8 +163,8 @@ impl CodexResponse {
             if let CodexOutput::Message { content, .. } = output {
                 let texts: Vec<String> = content
                     .iter()
-                    .filter_map(|item| match item {
-                        CodexContentItem::OutputText { text, .. } => Some(text.clone()),
+                    .map(|item| match item {
+                        CodexContentItem::OutputText { text, .. } => text.clone(),
                     })
                     .collect();
                 if !texts.is_empty() {

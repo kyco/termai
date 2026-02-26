@@ -160,7 +160,7 @@ impl ContextChunker {
                 "root".to_string()
             };
 
-            modules.entry(module).or_insert_with(Vec::new).push(file);
+            modules.entry(module).or_default().push(file);
         }
 
         // Create chunks for each module

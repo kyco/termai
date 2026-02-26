@@ -617,11 +617,9 @@ async fn handle_rebase_conflicts(conflicts: &[String], args: &crate::args::Rebas
         println!("   • Consider keeping changes from both sides if they're complementary");
         println!("   • Test the resolution before continuing");
         
-        let suggestions = vec![
-            "Use 'git mergetool' to resolve conflicts interactively",
+        let suggestions = ["Use 'git mergetool' to resolve conflicts interactively",
             "After resolving, stage files with 'git add <file>'",
-            "Continue rebase with 'termai rebase continue'",
-        ];
+            "Continue rebase with 'termai rebase continue'"];
         
         println!("\n{}", "💡 Resolution Steps:".bright_yellow().bold());
         for (i, suggestion) in suggestions.iter().enumerate() {
@@ -635,12 +633,10 @@ async fn handle_rebase_conflicts(conflicts: &[String], args: &crate::args::Rebas
 async fn provide_continue_suggestions(_state: &RebaseState) -> Result<()> {
     println!("\n{}", "🤖 AI Continue Suggestions:".bright_cyan().bold());
     
-    let suggestions = vec![
-        "Verify all conflicts have been resolved",
+    let suggestions = ["Verify all conflicts have been resolved",
         "Check that tests still pass after conflict resolution",
         "Review the merged changes for logical consistency",
-        "Ensure commit messages are still appropriate",
-    ];
+        "Ensure commit messages are still appropriate"];
     
     for (i, suggestion) in suggestions.iter().enumerate() {
         println!("   {}. {}", (i + 1).to_string().bright_yellow(), suggestion);

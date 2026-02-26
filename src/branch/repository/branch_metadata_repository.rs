@@ -30,7 +30,7 @@ impl BranchMetadataRepository {
         )?;
 
         let mut rows = stmt.query_map(params![branch_id, key], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })?;
 
         match rows.next() {
@@ -93,7 +93,7 @@ impl BranchMetadataRepository {
         )?;
 
         let rows = stmt.query_map(params![key, value], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })?;
 
         let mut branch_ids = Vec::new();

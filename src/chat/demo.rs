@@ -11,8 +11,7 @@ pub async fn demo_enhanced_chat_formatting() -> Result<()> {
     let mut formatter = ChatFormatter::new();
     
     // Demo different types of responses that would come from an AI
-    let sample_responses = vec![
-        (
+    let sample_responses = [(
             "Simple response",
             "Hello! I'm your AI assistant. How can I help you today?"
         ),
@@ -120,8 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 > The key is that async operations don't block the thread while waiting!
 
 This makes your applications much more efficient when dealing with I/O-bound workloads."#
-        ),
-    ];
+        )];
 
     // Demonstrate each type of response
     for (i, (description, content)) in sample_responses.iter().enumerate() {

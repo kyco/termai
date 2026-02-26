@@ -313,7 +313,7 @@ async fn delete_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> R
     println!("   If the tag is pushed to remote, you'll need to delete it there too");
 
     if !Confirm::new()
-        .with_prompt(&format!(
+        .with_prompt(format!(
             "Are you sure you want to delete tag '{}'?",
             tag_name
         ))
@@ -368,7 +368,7 @@ async fn show_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> Res
 
     println!("\n{}", "💭 Tag Message:".bright_cyan().bold());
     println!("   feat: major feature update with OAuth2 support");
-    println!("");
+    println!();
     println!("   This release includes:");
     println!("   - OAuth2 authentication integration");
     println!("   - Performance improvements");
@@ -491,8 +491,6 @@ async fn suggest_next_tag(_git_repo: &GitRepository) -> Result<()> {
         "v2.0.0"
     } else if analysis.new_features {
         "v1.3.0"
-    } else if analysis.bug_fixes {
-        "v1.2.1"
     } else {
         "v1.2.1"
     };

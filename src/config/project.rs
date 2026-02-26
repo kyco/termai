@@ -194,14 +194,10 @@ impl ProjectConfigService {
     /// Extract repository name from git URL
     fn extract_repo_name_from_url(&self, url: &str) -> Option<String> {
         // Handle different URL formats
-        let clean_url = if url.ends_with(".git") {
-            &url[..url.len() - 4]
-        } else {
-            url
-        };
+        let clean_url = url.strip_suffix(".git").unwrap_or(url);
         
         // Extract last part of path
-        clean_url.split('/').last().map(|s| s.to_string())
+        clean_url.split('/').next_back().map(|s| s.to_string())
     }
     
     /// Get default context configuration for project type

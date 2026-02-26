@@ -268,8 +268,8 @@ async fn finish_without_tools(api_key: &str, session: &mut Session, model: &Mode
 fn extract_text_from_content(content: Vec<ContentItem>) -> String {
     content
         .into_iter()
-        .filter_map(|item| match item {
-            ContentItem::OutputText { text, .. } => Some(text),
+        .map(|item| match item {
+            ContentItem::OutputText { text, .. } => text,
         })
         .collect::<Vec<String>>()
         .join("\n")

@@ -3,7 +3,6 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use comrak::{markdown_to_html, ComrakOptions};
-use chrono;
 
 use crate::llm::common::model::role::Role;
 use crate::session::model::session::Session;
@@ -352,7 +351,7 @@ impl ConversationExporter {
                 content.push_str(&format!(" - {}", 
                     chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
             }
-            content.push_str("\n");
+            content.push('\n');
 
             // Convert markdown code blocks to plain text
             let plain_content = self.markdown_to_plain_text(&message.content);

@@ -125,7 +125,7 @@ impl SetupWizard {
         );
         println!();
 
-        let providers = vec![Provider::Claude, Provider::OpenAI, Provider::OpenAICodex, Provider::Both];
+        let providers = [Provider::Claude, Provider::OpenAI, Provider::OpenAICodex, Provider::Both];
 
         let selection = Select::with_theme(&self.theme)
             .with_prompt("Which AI provider would you like to use?")

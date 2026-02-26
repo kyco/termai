@@ -144,8 +144,7 @@ fn db_path() -> Result<PathBuf> {
     Ok(default_dir.join("app.db"))
 }
 
-/// Enhanced error handlers for main initialization
-
+// Enhanced error handlers for main initialization
 fn enhance_database_path_error(error: anyhow::Error) -> anyhow::Error {
     let guidance = format!(
         "\n{}\n{}\n• {}\n• {}\n• {}",
