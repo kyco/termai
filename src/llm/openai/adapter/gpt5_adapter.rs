@@ -21,7 +21,7 @@ impl Gpt5Adapter {
         }
     }
 
-    /// Chat Completions API removed - migrated to Responses API
+    // Chat Completions API removed - migrated to Responses API
     /// Call the new Responses API (preferred for GPT-5)
     /// Optimized for reasoning models with better caching and performance
     pub async fn responses(

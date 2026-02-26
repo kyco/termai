@@ -1,7 +1,7 @@
-/// Branch comparison features for TermAI
-///
-/// This module provides sophisticated comparison capabilities between conversation branches,
-/// allowing users to analyze different approaches, solutions, and outcomes side-by-side.
+// Branch comparison features for TermAI
+//
+// This module provides sophisticated comparison capabilities between conversation branches,
+// allowing users to analyze different approaches, solutions, and outcomes side-by-side.
 #[allow(dead_code)]
 use crate::branch::entity::branch_entity::BranchEntity;
 use crate::branch::service::BranchService;

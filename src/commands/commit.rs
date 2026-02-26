@@ -588,7 +588,7 @@ async fn generate_commit_message(
     match generate_ai_commit_message(diff_summary, args, repo).await {
         Ok(message) => Ok(message),
         Err(e) => {
-            println!("{}", format!("⚠️  AI generation failed: {}", e).yellow());
+            println!("⚠️  AI generation failed: {}", e.to_string().yellow());
             println!("{}", "📝 Falling back to heuristic generation...".dimmed());
 
             // Fallback to rule-based generation

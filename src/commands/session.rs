@@ -373,7 +373,7 @@ fn handle_tree_command(
         println!("{}", tree_output);
         
     } else {
-        println!("{}", format!("🌳 Branch Tree for '{}'", session_name).bright_green().bold());
+        println!("🌳 Branch Tree for '{}'", session_name.bright_green().bold());
         println!("{}", "═".repeat(30).white().dimmed());
         println!();
         
@@ -437,7 +437,7 @@ fn handle_branches_command(
         .fetch_session_by_name(session_name)
         .context(format!("Session '{}' not found", session_name))?;
 
-    println!("{}", format!("📋 Branches in '{}'", session_name).bright_green().bold());
+    println!("📋 Branches in '{}'", session_name.bright_green().bold());
     println!("{}", "═".repeat(25).white().dimmed());
     println!();
 
@@ -666,7 +666,7 @@ fn handle_search_command(
         .fetch_session_by_name(session_name)
         .context(format!("Session '{}' not found", session_name))?;
 
-    println!("{}", format!("🔍 Search Results in '{}'", session_name).bright_green().bold());
+    println!("🔍 Search Results in '{}'", session_name.bright_green().bold());
     println!("{}", "═".repeat(30).white().dimmed());
     println!();
     
@@ -756,7 +756,7 @@ fn handle_stats_command(
         .fetch_session_by_name(session_name)
         .context(format!("Session '{}' not found", session_name))?;
 
-    println!("{}", format!("📊 Branch Statistics for '{}'", session_name).bright_green().bold());
+    println!("📊 Branch Statistics for '{}'", session_name.bright_green().bold());
     println!("{}", "═".repeat(35).white().dimmed());
     println!();
 

@@ -273,7 +273,7 @@ fn print_config(repo: &SqliteRepository) -> Result<()> {
     Ok(())
 }
 
-/// Enhanced error handlers that provide actionable guidance messages
+// Enhanced error handlers that provide actionable guidance messages
 fn enhance_setup_error(error: anyhow::Error) -> anyhow::Error {
     let guidance = format!(
         "\n{}\n{}\n• {}\n• {}\n• {}",

@@ -207,7 +207,7 @@ async fn handle_use_preset(
     git_staged: bool,
     variables: &[String],
 ) -> Result<()> {
-    println!("{}", format!("🔍 Using preset: {}", name).bright_blue().bold());
+    println!("🔍 Using preset: {}", name.bright_blue().bold());
     println!();
 
     // Try to load preset (first check built-ins, then user presets)
@@ -787,7 +787,7 @@ async fn handle_search_presets(
     _search_content: bool,
     category: Option<&str>,
 ) -> Result<()> {
-    println!("{}", format!("🔍 Searching presets for: '{}'", query).bright_blue().bold());
+    println!("🔍 Searching presets for: '{}'", query.bright_blue().bold());
     println!();
 
     let results = manager.search_presets(query)
@@ -1093,8 +1093,8 @@ fn format_files_for_template(files: &[Files]) -> String {
     result
 }
 
-/// Helper functions for enhanced preset creation
-/// Detect template variables from content using regex
+// Helper functions for enhanced preset creation
+// Detect template variables from content using regex
 fn detect_template_variables(content: &str) -> Vec<String> {
     use regex::Regex;
     

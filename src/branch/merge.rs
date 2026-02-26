@@ -1,7 +1,7 @@
-/// Branch merging and integration module for TermAI
-/// 
-/// This module provides sophisticated merging capabilities for conversation branches,
-/// allowing users to consolidate insights, resolve conflicts, and maintain conversation flow.
+// Branch merging and integration module for TermAI
+//
+// This module provides sophisticated merging capabilities for conversation branches,
+// allowing users to consolidate insights, resolve conflicts, and maintain conversation flow.
 use crate::branch::entity::branch_entity::BranchEntity;
 use crate::branch::service::BranchService;
 use crate::branch::comparison::{BranchComparator, BranchComparison};

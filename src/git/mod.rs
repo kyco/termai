@@ -4,15 +4,15 @@ pub mod commit;
 pub mod diff;
 #[allow(dead_code)]
 pub mod hooks;
-/// Git integration module for TermAI
-///
-/// This module provides comprehensive Git integration capabilities including:
-/// - Repository detection and operations
-/// - Diff analysis and parsing
-/// - Commit message generation
-/// - Code review functionality
-/// - Hook management
-/// - Interactive workflows
+// Git integration module for TermAI
+//
+// This module provides comprehensive Git integration capabilities including:
+// - Repository detection and operations
+// - Diff analysis and parsing
+// - Commit message generation
+// - Code review functionality
+// - Hook management
+// - Interactive workflows
 #[allow(dead_code)]
 pub mod repository;
 #[allow(dead_code)]

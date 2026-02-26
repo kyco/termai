@@ -146,7 +146,7 @@ impl BranchService {
         }
     }
 
-    /// Internal helper methods
+    // Internal helper methods
     fn create_branch_in_db(repo: &mut SqliteRepository, branch: &BranchEntity) -> Result<()> {
         repo.conn.execute(
             "INSERT INTO conversation_branches (id, session_id, parent_branch_id, branch_name, description, created_at, last_activity, status)
