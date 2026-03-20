@@ -16,7 +16,11 @@ impl CompletionValues {
 
     /// Get available provider names
     pub fn provider_names() -> Vec<String> {
-        vec!["claude".to_string(), "openai".to_string()]
+        vec![
+            "claude".to_string(),
+            "openai".to_string(),
+            "openai-codex".to_string(),
+        ]
     }
 
     /// Get available model names (static list of common models)
@@ -161,6 +165,7 @@ mod tests {
         let providers = CompletionValues::provider_names();
         assert!(providers.contains(&"claude".to_string()));
         assert!(providers.contains(&"openai".to_string()));
+        assert!(providers.contains(&"openai-codex".to_string()));
     }
 
     #[test]

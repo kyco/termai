@@ -151,7 +151,7 @@ _termai_complete() {
             return 0
             ;;
         --provider)
-            COMPREPLY=($(compgen -W "claude openai" -- "$cur"))
+            COMPREPLY=($(compgen -W "claude openai openai-codex" -- "$cur"))
             return 0
             ;;
         --directories|--directory)
@@ -217,7 +217,7 @@ _termai_complete() {
                 ask|chat)
                     _arguments \
                         '--session: :($(termai session list --quiet 2>/dev/null))' \
-                        '--provider: :(claude openai)' \
+                        '--provider: :(claude openai openai-codex)' \
                         '--directory:directory:_files -/' \
                         '--directories:directories:_files -/'
                     ;;
@@ -261,11 +261,11 @@ complete -f -c termai -n '__fish_seen_subcommand_from session; and __fish_seen_s
 
 # Config subcommands
 complete -f -c termai -n '__fish_seen_subcommand_from config' -a 'show set-openai set-claude set-provider reset env'
-complete -f -c termai -n '__fish_seen_subcommand_from config; and __fish_seen_subcommand_from set-provider' -a 'claude openai'
+complete -f -c termai -n '__fish_seen_subcommand_from config; and __fish_seen_subcommand_from set-provider' -a 'claude openai openai-codex'
 
 # Common flags
 complete -c termai -n '__fish_seen_subcommand_from ask chat' -l session -a '(__termai_sessions)' -d 'Session name'
-complete -c termai -n '__fish_seen_subcommand_from ask chat' -l provider -a 'claude openai' -d 'AI provider'
+complete -c termai -n '__fish_seen_subcommand_from ask chat' -l provider -a 'claude openai openai-codex' -d 'AI provider'
 complete -c termai -n '__fish_seen_subcommand_from ask chat' -l directory -d 'Context directory' -x -a '(__fish_complete_directories)'
 complete -c termai -n '__fish_seen_subcommand_from ask chat' -l smart-context -d 'Enable smart context'
 

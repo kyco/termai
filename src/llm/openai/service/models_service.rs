@@ -5,7 +5,7 @@ use crate::config::model::keys::ConfigKeys;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::config_service;
 use crate::llm::openai::adapter::models_adapter::ModelsAdapter;
-use crate::llm::openai::model::models_api::ModelObject;
+use crate::llm::openai::model::models_api::{filter_models_for_provider, ModelObject};
 
 const CACHE_TTL_HOURS: i64 = 24;
 
@@ -39,6 +39,26 @@ impl ModelsService {
         let models = ModelsAdapter::list_chat_models(api_key).await?;
         Self::save_to_cache(repo, &models)?;
         Ok(models)
+    }
+
+    /// Get provider-specific models from cache or API.
+    pub async fn get_models_for_provider<R: ConfigRepository>(
+        repo: &R,
+        api_key: &str,
+        provider: &str,
+    ) -> Result<Vec<ModelObject>> {
+        let models = Self::get_models(repo, api_key).await?;
+        Ok(filter_models_for_provider(&models, provider))
+    }
+
+    /// Force refresh provider-specific models from the API.
+    pub async fn refresh_models_for_provider<R: ConfigRepository>(
+        repo: &R,
+        api_key: &str,
+        provider: &str,
+    ) -> Result<Vec<ModelObject>> {
+        let models = Self::refresh_models(repo, api_key).await?;
+        Ok(filter_models_for_provider(&models, provider))
     }
 
     /// Load models from cache if not expired
@@ -293,5 +313,37 @@ mod tests {
         // Verify cache is cleared (empty string is treated as no cache)
         let cached_after = ModelsService::load_from_cache(&repo).unwrap();
         assert!(cached_after.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_models_for_provider_uses_cached_provider_filter() {
+        let repo = TestRepository::new();
+        let models = vec![
+            ModelObject {
+                id: "gpt-5.3-codex".into(),
+                object: "model".into(),
+                created: 1686935003,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "gpt-5.2".into(),
+                object: "model".into(),
+                created: 1686935002,
+                owned_by: "openai".into(),
+            },
+        ];
+
+        ModelsService::save_to_cache(&repo, &models).unwrap();
+
+        let codex_models = ModelsService::get_models_for_provider(
+            &repo,
+            "sk-not-used-when-cache-is-populated",
+            "openai-codex",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(codex_models.len(), 1);
+        assert_eq!(codex_models[0].id, "gpt-5.3-codex");
     }
 }

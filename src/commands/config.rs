@@ -4,9 +4,12 @@ use crate::config::env::EnvResolver;
 use crate::config::project::ProjectConfigService;
 use crate::config::schema::ProjectConfig;
 use crate::config::service::config_service;
+use crate::llm::openai::model::models_api::ModelObject;
 use crate::repository::db::SqliteRepository;
 use anyhow::{Context, Result};
 use colored::*;
+use dialoguer::{theme::ColorfulTheme, Select};
+use std::collections::HashSet;
 use std::process::Command;
 
 /// Handle config subcommands with enhanced feedback and error handling
@@ -359,7 +362,7 @@ pub async fn handle_config_command(
             crate::commands::codex_auth::handle_codex_status(repo)
         }
         ConfigAction::SetModel { model } => {
-            handle_set_model(repo, model)
+            handle_set_model(repo, model.as_deref()).await
         }
         ConfigAction::ListModels { provider, refresh } => {
             handle_list_models(repo, provider.as_ref(), *refresh).await
@@ -996,42 +999,223 @@ fn show_next_steps() {
     println!("   {}              # Start chatting with project context", "termai chat".cyan());
 }
 
-/// Handle setting the default model
-fn handle_set_model(repo: &SqliteRepository, model: &str) -> Result<()> {
-    use crate::chat::state::ChatState;
-    use crate::completion::values::CompletionValues;
-    use crate::config::model::keys::ConfigKeys;
-    use crate::config::service::config_service;
+struct ModelCatalog {
+    model_names: Vec<String>,
+    live_models: Option<Vec<ModelObject>>,
+    warning: Option<String>,
+}
 
-    // Validate model exists
-    let all_models = CompletionValues::model_names();
-    if !all_models.contains(&model.to_string()) {
-        println!("{}", "❌ Invalid model name".red().bold());
-        println!();
-        println!("{}", "💡 Available models:".bright_yellow().bold());
-        println!("   {}  # List all models", "termai config list-models".cyan());
-        return Ok(());
+fn normalize_provider_name(provider: &str) -> &str {
+    match provider {
+        "openai_codex" | "codex" => "openai-codex",
+        other => other,
+    }
+}
+
+fn fallback_model_names(provider: &str) -> Vec<String> {
+    use crate::chat::state::ChatState;
+
+    let state = ChatState::new(
+        normalize_provider_name(provider).to_string(),
+        "placeholder".to_string(),
+    );
+    dedupe_model_names(state.available_models)
+}
+
+fn dedupe_model_names(model_names: Vec<String>) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut deduped = Vec::new();
+
+    for model_name in model_names {
+        if seen.insert(model_name.clone()) {
+            deduped.push(model_name);
+        }
     }
 
-    // Determine provider for this model
-    let temp_state = ChatState::new("openai".to_string(), "gpt-5.2".to_string());
-    let provider = if model.starts_with("claude") {
+    deduped
+}
+
+fn sort_live_models(models: &mut [ModelObject]) {
+    models.sort_by(|left, right| {
+        right
+            .created
+            .cmp(&left.created)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+}
+
+fn infer_provider_from_model(model: &str) -> &'static str {
+    if model.starts_with("claude") {
         "claude"
     } else if model.contains("codex") {
         "openai-codex"
     } else {
         "openai"
+    }
+}
+
+fn current_provider(repo: &SqliteRepository) -> String {
+    use crate::config::model::keys::ConfigKeys;
+
+    config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key())
+        .map(|config| normalize_provider_name(&config.value).to_string())
+        .unwrap_or_else(|_| "openai".to_string())
+}
+
+fn current_model_for_provider(repo: &SqliteRepository, provider: &str) -> Option<String> {
+    use crate::config::model::keys::ConfigKeys;
+
+    let config_key = match normalize_provider_name(provider) {
+        "claude" => ConfigKeys::ClaudeDefaultModel,
+        "openai-codex" => ConfigKeys::CodexDefaultModel,
+        _ => ConfigKeys::OpenAIDefaultModel,
+    };
+
+    config_service::fetch_by_key(repo, &config_key.to_key())
+        .ok()
+        .map(|config| config.value)
+        .filter(|value| !value.is_empty())
+}
+
+async fn load_model_catalog(
+    repo: &SqliteRepository,
+    provider: &str,
+    refresh: bool,
+) -> Result<ModelCatalog> {
+    use crate::config::model::keys::ConfigKeys;
+    use crate::llm::openai::service::models_service::ModelsService;
+
+    let provider = normalize_provider_name(provider);
+
+    if matches!(provider, "openai" | "openai-codex") {
+        let api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())
+            .ok()
+            .map(|config| config.value)
+            .filter(|value| !value.is_empty());
+
+        if let Some(api_key) = api_key {
+            let fetched_models = if refresh {
+                ModelsService::refresh_models_for_provider(repo, &api_key, provider).await
+            } else {
+                ModelsService::get_models_for_provider(repo, &api_key, provider).await
+            };
+
+            match fetched_models {
+                Ok(mut models) if !models.is_empty() => {
+                    sort_live_models(&mut models);
+                    let model_names = models.iter().map(|model| model.id.clone()).collect();
+                    return Ok(ModelCatalog {
+                        model_names,
+                        live_models: Some(models),
+                        warning: None,
+                    });
+                }
+                Ok(_) => {
+                    return Ok(ModelCatalog {
+                        model_names: fallback_model_names(provider),
+                        live_models: None,
+                        warning: Some(
+                            "OpenAI returned no models for this provider. Using the built-in list."
+                                .to_string(),
+                        ),
+                    });
+                }
+                Err(err) => {
+                    return Ok(ModelCatalog {
+                        model_names: fallback_model_names(provider),
+                        live_models: None,
+                        warning: Some(format!(
+                            "Failed to fetch models from OpenAI: {}. Using the built-in list.",
+                            err
+                        )),
+                    });
+                }
+            }
+        }
+
+        return Ok(ModelCatalog {
+            model_names: fallback_model_names(provider),
+            live_models: None,
+            warning: Some(
+                "No OpenAI API key configured for live model lookup. Using the built-in list."
+                    .to_string(),
+            ),
+        });
+    }
+
+    Ok(ModelCatalog {
+        model_names: fallback_model_names(provider),
+        live_models: None,
+        warning: None,
+    })
+}
+
+/// Handle setting the default model
+async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Result<()> {
+    use crate::chat::state::ChatState;
+    use crate::config::model::keys::ConfigKeys;
+    use crate::config::service::config_service;
+
+    let provider = match model {
+        Some(model_name) => infer_provider_from_model(model_name).to_string(),
+        None => current_provider(repo),
+    };
+
+    let catalog = load_model_catalog(repo, &provider, true).await?;
+
+    let selected_model = match model {
+        Some(model_name) => {
+            if !catalog.model_names.iter().any(|candidate| candidate == model_name) {
+                println!("{}", "❌ Invalid model name".red().bold());
+                println!();
+                println!("{}", "💡 Available models:".bright_yellow().bold());
+                println!("   {}  # Open the model selector", "termai config set-model".cyan());
+                println!("   {}  # List all models", "termai config list-models".cyan());
+                return Ok(());
+            }
+
+            model_name.to_string()
+        }
+        None => {
+            if let Some(warning) = &catalog.warning {
+                println!("{} {}", "⚠️".yellow(), warning.dimmed());
+                println!();
+            }
+
+            if catalog.model_names.is_empty() {
+                println!("{}", "❌ No models available for the current provider".red().bold());
+                return Ok(());
+            }
+
+            let default_selection = current_model_for_provider(repo, &provider)
+                .and_then(|current_model| {
+                    catalog
+                        .model_names
+                        .iter()
+                        .position(|candidate| candidate == &current_model)
+                })
+                .unwrap_or(0);
+
+            let theme = ColorfulTheme::default();
+            let selection = Select::with_theme(&theme)
+                .with_prompt("Select the default model")
+                .items(&catalog.model_names)
+                .default(default_selection)
+                .interact()?;
+
+            catalog.model_names[selection].clone()
+        }
     };
 
     // Get the appropriate config key based on provider
-    let config_key = match provider {
+    let config_key = match provider.as_str() {
         "claude" => ConfigKeys::ClaudeDefaultModel,
         "openai-codex" => ConfigKeys::CodexDefaultModel,
         _ => ConfigKeys::OpenAIDefaultModel,
     };
 
     // Save the model preference
-    config_service::write_config(repo, &config_key.to_key(), model)
+    config_service::write_config(repo, &config_key.to_key(), &selected_model)
         .context("Failed to save model preference")?;
 
     // Also update the provider if it doesn't match
@@ -1040,26 +1224,27 @@ fn handle_set_model(repo: &SqliteRepository, model: &str) -> Result<()> {
         .unwrap_or_default();
 
     if current_provider != provider {
-        config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), provider)
+        config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), &provider)
             .context("Failed to save provider preference")?;
         println!(
             "{} {} (for model {})",
             "✅ Provider updated to".green().bold(),
             provider.bright_cyan().bold(),
-            model.bright_yellow()
+            selected_model.bright_yellow()
         );
     }
 
     println!(
         "{} {}",
         "✅ Default model set to".green().bold(),
-        model.bright_cyan().bold()
+        selected_model.bright_cyan().bold()
     );
 
     // Show model description
+    let temp_state = ChatState::new(provider.clone(), selected_model.clone());
     let description = temp_state.list_models();
     let model_line = description.lines()
-        .find(|line| line.contains(model))
+        .find(|line| line.contains(&selected_model))
         .unwrap_or("");
     if !model_line.is_empty() {
         let desc_part = model_line.split(" - ").nth(1).unwrap_or("");
@@ -1083,9 +1268,6 @@ async fn handle_list_models(
     refresh: bool,
 ) -> Result<()> {
     use crate::args::Provider;
-    use crate::chat::state::ChatState;
-    use crate::config::model::keys::ConfigKeys;
-    use crate::llm::openai::service::models_service::ModelsService;
 
     println!("{}", "🤖 Available Models".bright_blue().bold());
     println!("{}", "═══════════════════".white().dimmed());
@@ -1109,88 +1291,24 @@ async fn handle_list_models(
         };
         println!("{}", provider_display.bright_green().bold());
 
-        // For OpenAI, fetch from API
-        if provider_name == "openai" {
-            let api_key_result =
-                config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key());
+        let catalog = load_model_catalog(repo, provider_name, refresh).await?;
 
-            match api_key_result {
-                Ok(api_key_config) if !api_key_config.value.is_empty() => {
-                    let status_msg = if refresh {
-                        "Refreshing models from OpenAI API..."
-                    } else {
-                        "Fetching models from OpenAI..."
-                    };
-                    println!("   {}", status_msg.dimmed());
-
-                    let models_result = if refresh {
-                        ModelsService::refresh_models(repo, &api_key_config.value).await
-                    } else {
-                        ModelsService::get_models(repo, &api_key_config.value).await
-                    };
-
-                    match models_result {
-                        Ok(models) => {
-                            // Sort models by id for consistent display
-                            let mut sorted_models = models;
-                            sorted_models.sort_by(|a, b| a.id.cmp(&b.id));
-
-                            for model in &sorted_models {
-                                println!(
-                                    "   {} {}",
-                                    format!("• {}", model.id).bright_cyan(),
-                                    format!("(owned by: {})", model.owned_by).dimmed()
-                                );
-                            }
-
-                            if sorted_models.is_empty() {
-                                println!(
-                                    "   {}",
-                                    "No chat models found".yellow()
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            println!(
-                                "   {} {}",
-                                "⚠️  Failed to fetch models:".yellow(),
-                                e.to_string().dimmed()
-                            );
-                            // Fall back to hardcoded list
-                            println!("   {}", "Showing default models:".dimmed());
-                            let state = ChatState::new(
-                                provider_name.to_string(),
-                                "placeholder".to_string(),
-                            );
-                            for line in state.list_models().lines().skip(1) {
-                                if !line.starts_with("Use '/model") {
-                                    println!("{}", line);
-                                }
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    println!(
-                        "   {}",
-                        "⚠️  No API key configured. Using default list.".yellow()
-                    );
-                    let state =
-                        ChatState::new(provider_name.to_string(), "placeholder".to_string());
-                    for line in state.list_models().lines().skip(1) {
-                        if !line.starts_with("Use '/model") {
-                            println!("{}", line);
-                        }
-                    }
-                }
+        if let Some(mut live_models) = catalog.live_models {
+            sort_live_models(&mut live_models);
+            for model in &live_models {
+                println!(
+                    "   {} {}",
+                    format!("• {}", model.id).bright_cyan(),
+                    format!("(owned by: {})", model.owned_by).dimmed()
+                );
             }
         } else {
-            // For Claude and Codex, use hardcoded lists (no public API)
-            let state = ChatState::new(provider_name.to_string(), "placeholder".to_string());
-            for line in state.list_models().lines().skip(1) {
-                if !line.starts_with("Use '/model") {
-                    println!("{}", line);
-                }
+            if let Some(warning) = &catalog.warning {
+                println!("   {} {}", "⚠️".yellow(), warning.dimmed());
+            }
+
+            for model_name in &catalog.model_names {
+                println!("   {}", format!("• {}", model_name).bright_cyan());
             }
         }
         println!();
@@ -1198,7 +1316,11 @@ async fn handle_list_models(
 
     println!("{}", "💡 Set default model:".bright_yellow().bold());
     println!(
-        "   {}  # Set as default",
+        "   {}  # Open the selector",
+        "termai config set-model".cyan()
+    );
+    println!(
+        "   {}  # Set directly by model id",
         "termai config set-model <model>".cyan()
     );
     println!();

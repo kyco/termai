@@ -94,7 +94,7 @@ impl HelpSystem {
         println!("{}", "TIPS:".bright_green().bold());
         println!("   • API keys are stored securely in ~/.config/termai/");
         println!("   • Use 'show' to verify configuration without exposing keys");
-        println!("   • Provider can be 'claude' or 'openai'");
+        println!("   • Provider can be 'claude', 'openai', or 'openai-codex'");
         println!();
     }
 

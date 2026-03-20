@@ -300,6 +300,17 @@ mod tests {
     }
 
     #[test]
+    fn test_provider_switching_to_openai_codex() {
+        let mut state = ChatState::default();
+
+        let result = state.switch_provider("openai-codex".to_string());
+
+        assert!(result.is_ok());
+        assert_eq!(state.provider, "openai-codex");
+        assert!(state.model.contains("codex"));
+    }
+
+    #[test]
     fn test_model_switching() {
         let mut state = ChatState::new("openai".to_string(), "gpt-5.2".to_string());
 

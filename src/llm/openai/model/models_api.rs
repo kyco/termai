@@ -45,12 +45,32 @@ impl ModelObject {
 
         is_chat_family && !is_excluded
     }
+
+    /// Check if this is a Codex model id.
+    pub fn is_codex_model(&self) -> bool {
+        self.id.contains("codex")
+    }
 }
 
 /// Filter a list of models to only chat-capable models
 pub fn filter_chat_models(models: &[ModelObject]) -> Vec<ModelObject> {
     models.iter()
         .filter(|m| m.is_chat_model())
+        .cloned()
+        .collect()
+}
+
+/// Filter models for a specific provider while preserving the original order.
+pub fn filter_models_for_provider(models: &[ModelObject], provider: &str) -> Vec<ModelObject> {
+    models
+        .iter()
+        .filter(|model| match provider {
+            "openai-codex" | "openai_codex" | "codex" => {
+                model.is_chat_model() && model.is_codex_model()
+            }
+            "openai" => model.is_chat_model() && !model.is_codex_model(),
+            _ => false,
+        })
         .cloned()
         .collect()
 }
@@ -140,6 +160,70 @@ mod tests {
         assert!(!chat_model_ids.contains(&"whisper-1"));
         assert!(!chat_model_ids.contains(&"dall-e-3"));
         assert!(!chat_model_ids.contains(&"tts-1"));
+    }
+
+    #[test]
+    fn test_filter_models_for_openai_codex_provider() {
+        let models = vec![
+            ModelObject {
+                id: "gpt-5-codex".into(),
+                object: "model".into(),
+                created: 1686935004,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "gpt-5.2-codex".into(),
+                object: "model".into(),
+                created: 1686935003,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "gpt-5.2".into(),
+                object: "model".into(),
+                created: 1686935002,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "text-embedding-3-small".into(),
+                object: "model".into(),
+                created: 1686935001,
+                owned_by: "openai".into(),
+            },
+        ];
+
+        let codex_models = filter_models_for_provider(&models, "openai-codex");
+        let ids: Vec<&str> = codex_models.iter().map(|m| m.id.as_str()).collect();
+
+        assert_eq!(ids, vec!["gpt-5-codex", "gpt-5.2-codex"]);
+    }
+
+    #[test]
+    fn test_filter_models_for_openai_provider_excludes_codex_models() {
+        let models = vec![
+            ModelObject {
+                id: "gpt-5-codex".into(),
+                object: "model".into(),
+                created: 1686935004,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "gpt-5.2".into(),
+                object: "model".into(),
+                created: 1686935002,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "o3".into(),
+                object: "model".into(),
+                created: 1686935001,
+                owned_by: "openai".into(),
+            },
+        ];
+
+        let openai_models = filter_models_for_provider(&models, "openai");
+        let ids: Vec<&str> = openai_models.iter().map(|m| m.id.as_str()).collect();
+
+        assert_eq!(ids, vec!["gpt-5.2", "o3"]);
     }
 
     #[test]

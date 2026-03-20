@@ -59,20 +59,20 @@ impl SetupWizard {
                 self.save_claude_config(repo, &api_key)?;
                 self.set_provider(repo, "claude")?;
                 // Step 3: Model Selection
-                self.select_and_save_model(repo, "claude")?;
+                self.select_and_save_model(repo, "claude").await?;
             }
             Provider::OpenAI => {
                 let api_key = self.get_openai_api_key().await?;
                 self.save_openai_config(repo, &api_key)?;
                 self.set_provider(repo, "openai")?;
                 // Step 3: Model Selection
-                self.select_and_save_model(repo, "openai")?;
+                self.select_and_save_model(repo, "openai").await?;
             }
             Provider::OpenAICodex => {
                 self.setup_codex_auth(repo).await?;
                 self.set_provider(repo, "openai-codex")?;
                 // Step 3: Model Selection
-                self.select_and_save_model(repo, "openai-codex")?;
+                self.select_and_save_model(repo, "openai-codex").await?;
             }
             Provider::Both => {
                 let claude_key = self.get_claude_api_key().await?;
@@ -84,7 +84,7 @@ impl SetupWizard {
                 let default_provider = self.select_default_provider()?;
                 self.set_provider(repo, &default_provider)?;
                 // Step 3: Model Selection for default provider
-                self.select_and_save_model(repo, &default_provider)?;
+                self.select_and_save_model(repo, &default_provider).await?;
             }
         }
 
@@ -331,8 +331,13 @@ impl SetupWizard {
         Ok(())
     }
 
-    fn select_and_save_model<R: ConfigRepository>(&self, repo: &R, provider: &str) -> Result<()> {
+    async fn select_and_save_model<R: ConfigRepository>(
+        &self,
+        repo: &R,
+        provider: &str,
+    ) -> Result<()> {
         use crate::chat::state::ChatState;
+        use crate::llm::openai::service::models_service::ModelsService;
 
         println!();
         println!(
@@ -344,8 +349,58 @@ impl SetupWizard {
         println!();
 
         // Get models for this provider
-        let state = ChatState::new(provider.to_string(), "placeholder".to_string());
-        let available_models = state.available_models.clone();
+        let available_models = if matches!(provider, "openai" | "openai-codex") {
+            let api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())
+                .ok()
+                .map(|config| config.value)
+                .filter(|value| !value.is_empty());
+
+            match api_key {
+                Some(api_key) => match ModelsService::get_models_for_provider(repo, &api_key, provider).await {
+                    Ok(mut models) if !models.is_empty() => {
+                        models.sort_by(|left, right| {
+                            right
+                                .created
+                                .cmp(&left.created)
+                                .then_with(|| left.id.cmp(&right.id))
+                        });
+                        models.into_iter().map(|model| model.id).collect()
+                    }
+                    Ok(_) => {
+                        println!(
+                            "{}",
+                            "OpenAI returned no models for this provider. Using the built-in list."
+                                .yellow()
+                        );
+                        let state = ChatState::new(provider.to_string(), "placeholder".to_string());
+                        state.available_models
+                    }
+                    Err(err) => {
+                        println!(
+                            "{} {}",
+                            "⚠️  Failed to fetch models from OpenAI:".yellow(),
+                            err.to_string().dimmed()
+                        );
+                        let state = ChatState::new(provider.to_string(), "placeholder".to_string());
+                        state.available_models
+                    }
+                },
+                None => {
+                    if provider == "openai-codex" {
+                        println!(
+                            "{}",
+                            "No OpenAI API key configured for live Codex model lookup. Using the built-in list."
+                                .yellow()
+                        );
+                    }
+                    let state = ChatState::new(provider.to_string(), "placeholder".to_string());
+                    state.available_models
+                }
+            }
+        } else {
+            let state = ChatState::new(provider.to_string(), "placeholder".to_string());
+            state.available_models
+        };
 
         if available_models.is_empty() {
             println!("No models available for this provider.");

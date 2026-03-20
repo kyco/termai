@@ -294,7 +294,7 @@ impl ChatCommand {
             CommandEntry {
                 command: "/provider [name]",
                 aliases: "/p",
-                description: "Switch provider (claude/openai)",
+                description: "Switch provider (claude/openai/openai-codex)",
                 category: CommandCategory::AiSettings,
             },
             CommandEntry {
