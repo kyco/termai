@@ -1,8 +1,9 @@
 /// Handlers for Config and Redact commands - configuration management
-use crate::args::{ConfigAction, ConfigArgs, RedactAction, RedactArgs};
-use crate::config::env::EnvResolver;
-use crate::config::project::ProjectConfigService;
-use crate::config::schema::ProjectConfig;
+use crate::args::{ConfigAction, ConfigArgs, Provider, RedactAction, RedactArgs};
+use crate::config::settings::{
+    migrate_legacy_db_config, ProjectConfig, ProjectContextSettings, ProjectPrivacySettings,
+    ResolvedSettings, SettingsOverrides, SettingsProvider, UserConfig,
+};
 use crate::config::service::config_service;
 use crate::llm::openai::model::models_api::ModelObject;
 use crate::repository::db::SqliteRepository;
@@ -10,6 +11,8 @@ use anyhow::{Context, Result};
 use colored::*;
 use dialoguer::{theme::ColorfulTheme, Select};
 use std::collections::HashSet;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Handle config subcommands with enhanced feedback and error handling
@@ -18,320 +21,28 @@ pub async fn handle_config_command(
     action: &ConfigAction,
     _args: &ConfigArgs,
 ) -> Result<()> {
-    use crate::config::model::keys::ConfigKeys;
-
     match action {
-        ConfigAction::Show => {
-            let configs = config_service::fetch_config(repo)
-                .context("Failed to fetch configuration from database")?;
-
-            println!("{}", "📋 Current Configuration".bright_blue().bold());
-            println!("{}", "═══════════════════════".white().dimmed());
-
-            if configs.is_empty() {
-                println!("{}", "⚠️  No configuration found".yellow());
-                println!();
-                println!("{}", "💡 Quick setup:".bright_yellow().bold());
-                println!("   {}      # Run setup wizard", "termai setup".cyan());
-                return Ok(());
-            }
-
-            // Group and display configs in a user-friendly way
-            let mut has_provider = false;
-            let mut has_apis = false;
-
-            // Show provider first
-            let mut current_provider = String::new();
-            for config in &configs {
-                if config.key == ConfigKeys::ProviderKey.to_key() {
-                    println!(
-                        "{}  {}",
-                        "🤖 Default Provider:".bright_green(),
-                        config.value.bright_cyan()
-                    );
-                    current_provider = config.value.clone();
-                    has_provider = true;
-                }
-            }
-
-            if !has_provider {
-                println!(
-                    "{}  {}",
-                    "🤖 Default Provider:".bright_green(),
-                    "Not set".red()
-                );
-            }
-
-            // Show default model if set
-            let model_key = match current_provider.as_str() {
-                "claude" => ConfigKeys::ClaudeDefaultModel.to_key(),
-                "openai-codex" | "codex" => ConfigKeys::CodexDefaultModel.to_key(),
-                _ => ConfigKeys::OpenAIDefaultModel.to_key(),
-            };
-
-            for config in &configs {
-                if config.key == model_key {
-                    println!(
-                        "{}     {}",
-                        "🎯 Default Model:".bright_green(),
-                        config.value.bright_cyan()
-                    );
-                }
-            }
-
-            println!();
-
-            // Show API configurations
-            for config in &configs {
-                match config.key.as_str() {
-                    key if key == ConfigKeys::ClaudeApiKey.to_key() => {
-                        println!(
-                            "{}    {}",
-                            "🧠 Claude API:".bright_green(),
-                            "✅ Configured".green()
-                        );
-                        has_apis = true;
-                    }
-                    key if key == ConfigKeys::ChatGptApiKey.to_key() => {
-                        println!(
-                            "{}    {}",
-                            "⚡ OpenAI API:".bright_green(),
-                            "✅ Configured".green()
-                        );
-                        has_apis = true;
-                    }
-                    key if key == ConfigKeys::CodexAccessToken.to_key() => {
-                        println!(
-                            "{}  {}",
-                            "🔐 OpenAI Codex:".bright_green(),
-                            "✅ Authenticated".green()
-                        );
-                        has_apis = true;
-                    }
-                    key if key == ConfigKeys::Redacted.to_key() => {
-                        let count = config.value.split(',').filter(|s| !s.is_empty()).count();
-                        println!("{}  {} patterns", "🔒 Redactions:".bright_green(), count);
-                    }
-                    _ => {}
-                }
-            }
-
-            if !has_apis {
-                println!("{}", "⚠️  No API keys configured".yellow());
-                println!();
-                println!("{}", "💡 Add API keys:".bright_yellow().bold());
-                println!(
-                    "   {}   # Add Claude key",
-                    "termai config set-claude <key>".cyan()
-                );
-                println!(
-                    "   {}  # Add OpenAI key",
-                    "termai config set-openai <key>".cyan()
-                );
-            } else {
-                println!();
-                println!("{}", "💡 Ready to chat! Try:".bright_green().bold());
-                println!(
-                    "   {}              # Start interactive session",
-                    "termai chat".cyan()
-                );
-                println!(
-                    "   {}  # Ask a quick question",
-                    "termai ask \"question\"".cyan()
-                );
-            }
-
-            Ok(())
-        }
-        ConfigAction::SetOpenai { api_key } => {
-            if api_key.is_empty() {
-                return Err(anyhow::anyhow!(
-                    "API key cannot be empty\n\n{}",
-                    get_api_key_help("OpenAI")
-                ));
-            }
-
-            config_service::write_config(repo, &ConfigKeys::ChatGptApiKey.to_key(), api_key)
-                .context("Failed to save OpenAI API key")?;
-
-            println!(
-                "{}",
-                "✅ OpenAI API key configured successfully".green().bold()
-            );
-            println!();
-            println!("{}", "💡 Next steps:".bright_yellow().bold());
-            println!(
-                "   {}         # View configuration",
-                "termai config show".cyan()
-            );
-            println!(
-                "   {}   # Set as default provider",
-                "termai config set-provider openai".cyan()
-            );
-            println!("   {}              # Start chatting", "termai chat".cyan());
-
-            Ok(())
-        }
-        ConfigAction::SetClaude { api_key } => {
-            if api_key.is_empty() {
-                return Err(anyhow::anyhow!(
-                    "API key cannot be empty\n\n{}",
-                    get_api_key_help("Claude")
-                ));
-            }
-
-            config_service::write_config(repo, &ConfigKeys::ClaudeApiKey.to_key(), api_key)
-                .context("Failed to save Claude API key")?;
-
-            println!(
-                "{}",
-                "✅ Claude API key configured successfully".green().bold()
-            );
-            println!();
-            println!("{}", "💡 Next steps:".bright_yellow().bold());
-            println!(
-                "   {}         # View configuration",
-                "termai config show".cyan()
-            );
-            println!(
-                "   {}    # Set as default provider",
-                "termai config set-provider claude".cyan()
-            );
-            println!("   {}              # Start chatting", "termai chat".cyan());
-
-            Ok(())
-        }
-        ConfigAction::SetProvider { provider } => {
-            config_service::write_config(
-                repo,
-                &ConfigKeys::ProviderKey.to_key(),
-                provider.to_str(),
-            )
-            .context("Failed to save provider preference")?;
-
-            println!(
-                "{} {}",
-                "✅ Provider set to".green().bold(),
-                provider.to_str().bright_cyan().bold()
-            );
-            println!();
-            println!("{}", "💡 Start using TermAI:".bright_yellow().bold());
-            println!(
-                "   {}              # Start interactive session",
-                "termai chat".cyan()
-            );
-            println!(
-                "   {}  # Ask a quick question",
-                "termai ask \"question\"".cyan()
-            );
-
-            Ok(())
-        }
-        ConfigAction::Reset => {
-            println!("{}", "🔄 Reset Configuration".bright_yellow().bold());
-            println!("{}", "════════════════════".white().dimmed());
-            println!();
-            println!("{}", "⚠️  Configuration reset is being enhanced".yellow());
-            println!();
-            println!("{}", "💡 Manual reset steps:".bright_yellow().bold());
-            println!(
-                "   1. {}        # Delete database",
-                "rm ~/.config/termai/app.db".cyan()
-            );
-            println!(
-                "   2. {}                 # Reconfigure",
-                "termai setup".cyan()
-            );
-            println!();
-            println!(
-                "{}",
-                "⚠️  This will permanently delete all settings and session history".red()
-            );
-
-            Ok(())
-        }
-        ConfigAction::Env => {
-            println!("{}", "🌍 Environment Variables".bright_green().bold());
-            println!("{}", "═══════════════════════".white().dimmed());
-            println!();
-
-            // Show current environment variable values
-            let env_vars = EnvResolver::get_all_set();
-            if env_vars.is_empty() {
-                println!(
-                    "{}",
-                    "📝 No TermAI environment variables are currently set".yellow()
-                );
-                println!();
-            } else {
-                println!(
-                    "{}",
-                    "🔧 Currently Set Environment Variables:"
-                        .bright_cyan()
-                        .bold()
-                );
-                println!();
-                for (var, value) in &env_vars {
-                    // Redact API keys for security
-                    let display_value = if var.contains("API_KEY") {
-                        if value.len() > 8 {
-                            format!("{}...{}", &value[..4], &value[value.len() - 4..])
-                        } else {
-                            "[HIDDEN]".to_string()
-                        }
-                    } else {
-                        value.clone()
-                    };
-                    println!("   {}  {}", var.bright_white(), display_value.cyan());
-                }
-                println!();
-            }
-
-            // Show help information
-            println!(
-                "{}",
-                "📖 Environment Variable Reference:".bright_yellow().bold()
-            );
-            println!("{}", "══════════════════════════════════".white().dimmed());
-            println!();
-
-            for line in EnvResolver::help_text().lines() {
-                if line.trim().is_empty() {
-                    println!();
-                } else if line.starts_with("  ") && line.contains("_") {
-                    // Environment variable names
-                    println!("  {}", line.trim().bright_white());
-                } else if line.starts_with("    ") {
-                    // Descriptions
-                    println!("    {}", line.trim().white().dimmed());
-                } else if line.starts_with("Examples:") {
-                    println!("{}", line.bright_cyan().bold());
-                } else if line.starts_with("  export") {
-                    println!("  {}", line.trim().cyan());
-                } else {
-                    println!("{}", line.bright_yellow().bold());
-                }
-            }
-
-            println!();
-            println!("{}", "💡 Priority Order:".bright_yellow().bold());
-            println!("   1. Command line arguments (highest priority)");
-            println!("   2. Environment variables");
-            println!("   3. Configuration file settings");
-            println!("   4. Default values (lowest priority)");
-            println!();
-            println!("{}", "🔄 Applying Changes:".bright_green().bold());
-            println!(
-                "   {}  # Apply environment changes to current shell",
-                "source ~/.bashrc".cyan()
-            );
-            println!(
-                "   {}            # Test with environment variable",
-                "TERMAI_PROVIDER=claude termai ask \"test\"".cyan()
-            );
-
-            Ok(())
-        }
+        ConfigAction::Show => handle_config_show(repo),
+        ConfigAction::SetOpenai { api_key } => handle_set_api_key(
+            repo,
+            "OpenAI",
+            &crate::config::model::keys::ConfigKeys::ChatGptApiKey.to_key(),
+            api_key,
+            "openai",
+        ),
+        ConfigAction::SetClaude { api_key } => handle_set_api_key(
+            repo,
+            "Claude",
+            &crate::config::model::keys::ConfigKeys::ClaudeApiKey.to_key(),
+            api_key,
+            "claude",
+        ),
+        ConfigAction::SetProvider { provider } => handle_set_provider(*provider),
+        ConfigAction::Reset => handle_removed_config_command(
+            "reset",
+            "Delete ~/.config/termai/config.toml for defaults, then use 'termai auth logout <provider>' if you also want to clear credentials.",
+        ),
+        ConfigAction::Env => handle_supported_env_command(),
         
         // Project configuration commands
         ConfigAction::Init { project_type, template, force } => {
@@ -346,6 +57,7 @@ pub async fn handle_config_command(
         ConfigAction::Edit => {
             handle_config_edit()
         }
+        ConfigAction::Migrate => handle_config_migrate(repo),
         ConfigAction::Export { file, format } => {
             handle_config_export(file.as_deref(), format)
         }
@@ -367,6 +79,385 @@ pub async fn handle_config_command(
         ConfigAction::ListModels { provider, refresh } => {
             handle_list_models(repo, provider.as_ref(), *refresh).await
         }
+    }
+}
+
+fn handle_config_show(repo: &SqliteRepository) -> Result<()> {
+    use crate::config::model::keys::ConfigKeys;
+
+    let settings = ResolvedSettings::load_for_current_dir_with_repo(repo, SettingsOverrides::default())
+        .context("Failed to resolve effective settings")?;
+
+    println!("{}", "📋 Effective Configuration".bright_blue().bold());
+    println!("{}", "═════════════════════════".white().dimmed());
+    println!();
+    println!(
+        "{} {}",
+        "Default provider:".bright_green(),
+        settings.default_provider.as_str().bright_cyan()
+    );
+    println!(
+        "{} {}",
+        "Default model:".bright_green(),
+        settings.selected_model().bright_cyan()
+    );
+    println!(
+        "{} {}",
+        "Smart context:".bright_green(),
+        if settings.smart_context {
+            "enabled".green()
+        } else {
+            "disabled".yellow()
+        }
+    );
+    println!(
+        "{} {}",
+        "Token budget:".bright_green(),
+        settings.token_budget.to_string().bright_white()
+    );
+    println!(
+        "{} {}",
+        "Streaming:".bright_green(),
+        if settings.streaming {
+            "enabled".green()
+        } else {
+            "disabled".yellow()
+        }
+    );
+    println!(
+        "{} {}",
+        "Theme:".bright_green(),
+        settings.theme.bright_white()
+    );
+    println!();
+    println!("{}", "📁 Files".bright_yellow().bold());
+    println!(
+        "   {} {}",
+        "User config:".bright_green(),
+        settings.user_config_path.display().to_string().cyan()
+    );
+    match &settings.project_config_path {
+        Some(path) => println!(
+            "   {} {}",
+            "Project config:".bright_green(),
+            path.display().to_string().cyan()
+        ),
+        None => println!(
+            "   {} {}",
+            "Project config:".bright_green(),
+            "none in current project".dimmed()
+        ),
+    }
+    if let Some(project_type) = &settings.project.project_type {
+        println!(
+            "   {} {}",
+            "Project type:".bright_green(),
+            project_type.bright_white()
+        );
+    }
+    if !settings.project.context.include.is_empty() {
+        println!(
+            "   {} {}",
+            "Context include:".bright_green(),
+            settings.project.context.include.join(", ").bright_white()
+        );
+    }
+    if !settings.project.context.exclude.is_empty() {
+        println!(
+            "   {} {}",
+            "Context exclude:".bright_green(),
+            settings.project.context.exclude.join(", ").bright_white()
+        );
+    }
+    if !settings.project.privacy.redact.is_empty() {
+        println!(
+            "   {} {}",
+            "Project redact:".bright_green(),
+            settings.project.privacy.redact.join(", ").bright_white()
+        );
+    }
+    println!();
+    println!("{}", "🔐 Auth".bright_yellow().bold());
+    println!(
+        "   {} {}",
+        "Claude:".bright_green(),
+        auth_status(repo, &ConfigKeys::ClaudeApiKey.to_key(), false)
+    );
+    println!(
+        "   {} {}",
+        "OpenAI:".bright_green(),
+        auth_status(repo, &ConfigKeys::ChatGptApiKey.to_key(), false)
+    );
+    println!(
+        "   {} {}",
+        "Codex:".bright_green(),
+        auth_status(repo, &ConfigKeys::CodexAccessToken.to_key(), true)
+    );
+    println!();
+    println!("{}", "💡 Primary commands".bright_yellow().bold());
+    println!("   {}", "termai config edit      # Edit user or active project config".cyan());
+    println!("   {}", "termai config validate  # Validate the active project config".cyan());
+    println!("   {}", "termai config migrate   # Import legacy DB defaults into config.toml".cyan());
+    println!("   {}", "termai auth status codex".cyan());
+    println!("   {}", "termai setup".cyan());
+
+    Ok(())
+}
+
+fn handle_set_api_key(
+    repo: &SqliteRepository,
+    provider_name: &str,
+    key: &str,
+    api_key: &str,
+    suggested_provider: &str,
+) -> Result<()> {
+    if api_key.is_empty() {
+        return Err(anyhow::anyhow!(
+            "API key cannot be empty\n\n{}",
+            get_api_key_help(provider_name)
+        ));
+    }
+
+    config_service::write_config(repo, key, api_key)
+        .with_context(|| format!("Failed to save {} API key", provider_name))?;
+
+    println!(
+        "{}",
+        format!("✅ {} API credential configured successfully", provider_name)
+            .green()
+            .bold()
+    );
+    println!();
+    println!("{}", "💡 Next steps".bright_yellow().bold());
+    println!("   {}", "termai config show".cyan());
+    println!("   {}", format!("termai config set-provider {}", suggested_provider).cyan());
+    println!("   {}", format!("termai auth status {}", suggested_provider).cyan());
+
+    Ok(())
+}
+
+fn handle_set_provider(provider: Provider) -> Result<()> {
+    let mut user_config = UserConfig::load()?;
+    user_config.default.provider = settings_provider_from_cli(provider);
+
+    if user_config
+        .default
+        .model
+        .as_deref()
+        .is_some_and(|model| infer_provider_from_model(model) != user_config.default.provider.as_str())
+    {
+        user_config.default.model = None;
+    }
+
+    user_config.save()?;
+
+    println!(
+        "{} {}",
+        "✅ Default provider set to".green().bold(),
+        user_config.default.provider.as_str().bright_cyan().bold()
+    );
+    println!("   {}", "Saved in ~/.config/termai/config.toml".dimmed());
+    Ok(())
+}
+
+fn handle_removed_config_command(command: &str, guidance: &str) -> Result<()> {
+    println!(
+        "{} {}",
+        "⚠️  Deprecated config command:".yellow().bold(),
+        command.bright_white()
+    );
+    println!();
+    println!("{}", guidance.white());
+    println!();
+    println!("{}", "Use 'termai config show' to inspect the current simplified layout.".cyan());
+    Ok(())
+}
+
+fn handle_supported_env_command() -> Result<()> {
+    let supported = [
+        ("OPENAI_API_KEY", std::env::var("OPENAI_API_KEY").ok()),
+        ("CLAUDE_API_KEY", std::env::var("CLAUDE_API_KEY").ok()),
+        ("ANTHROPIC_API_KEY", std::env::var("ANTHROPIC_API_KEY").ok()),
+    ];
+
+    println!("{}", "🌍 Supported Environment Variables".bright_green().bold());
+    println!("{}", "══════════════════════════════════".white().dimmed());
+    println!();
+    println!("{}", "Only auth-related environment variables remain supported in the simplified model.".white());
+    println!("{}", "Behavior defaults now live in TOML config files, not TERMAI_* overrides.".white());
+    println!();
+
+    for (name, value) in supported {
+        let display_value = value
+            .map(|value| redact_env_value(&value))
+            .unwrap_or_else(|| "not set".to_string());
+        println!("   {}  {}", name.bright_white(), display_value.cyan());
+    }
+
+    Ok(())
+}
+
+fn handle_config_migrate(repo: &SqliteRepository) -> Result<()> {
+    let user_config_path = UserConfig::default_path()?;
+    let migrated = migrate_legacy_db_config(repo, &user_config_path)?;
+
+    println!("{}", "🔄 Legacy Config Migration".bright_blue().bold());
+    println!("{}", "══════════════════════════".white().dimmed());
+    println!();
+
+    if migrated {
+        println!(
+            "{} {}",
+            "✅ Wrote simplified user config to".green().bold(),
+            user_config_path.display().to_string().cyan()
+        );
+    } else if user_config_path.exists() {
+        println!("{}", "User config already exists. No migration was needed.".yellow());
+    } else {
+        println!("{}", "No legacy DB defaults were found to migrate.".yellow());
+    }
+
+    if let Some(project_config_path) = active_project_config_path() {
+        let dropped = dropped_project_sections(&project_config_path)?;
+        if !dropped.is_empty() {
+            println!();
+            println!("{}", "⚠️  Dropped project sections detected".yellow().bold());
+            for section in dropped {
+                println!("   • {}", section.bright_yellow());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn auth_status(repo: &SqliteRepository, key: &str, is_oauth: bool) -> ColoredString {
+    if config_service::has_config(repo, key) {
+        if is_oauth {
+            "authenticated".green()
+        } else {
+            "configured".green()
+        }
+    } else {
+        "not configured".red()
+    }
+}
+
+fn settings_provider_from_cli(provider: Provider) -> SettingsProvider {
+    match provider {
+        Provider::Claude => SettingsProvider::Claude,
+        Provider::Openai => SettingsProvider::Openai,
+        Provider::OpenaiCodex => SettingsProvider::Codex,
+    }
+}
+
+fn redact_env_value(value: &str) -> String {
+    if value.len() > 8 {
+        format!("{}...{}", &value[..4], &value[value.len() - 4..])
+    } else if value.is_empty() {
+        "[empty]".to_string()
+    } else {
+        "[set]".to_string()
+    }
+}
+
+fn active_project_config_path() -> Option<PathBuf> {
+    ResolvedSettings::load_for_current_dir(SettingsOverrides::default())
+        .ok()
+        .and_then(|settings| settings.project_config_path)
+        .filter(|path| path.exists())
+}
+
+fn dropped_project_sections(path: &Path) -> Result<Vec<String>> {
+    const DROPPED: &[&str] = &["providers", "git", "output", "templates", "team", "quality", "env"];
+
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read project config: {}", path.display()))?;
+    let parsed: toml::Value = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse project config: {}", path.display()))?;
+
+    let Some(table) = parsed.as_table() else {
+        return Ok(Vec::new());
+    };
+
+    Ok(DROPPED
+        .iter()
+        .filter(|section| table.contains_key(**section))
+        .map(|section| section.to_string())
+        .collect())
+}
+
+fn detect_project_type() -> Option<String> {
+    let current_dir = std::env::current_dir().ok()?;
+    let candidates = [
+        ("Cargo.toml", "rust"),
+        ("package.json", "javascript"),
+        ("pyproject.toml", "python"),
+        ("go.mod", "go"),
+    ];
+
+    candidates
+        .iter()
+        .find(|(marker, _)| current_dir.join(marker).exists())
+        .map(|(_, project_type)| project_type.to_string())
+}
+
+fn default_include_patterns(project_type: Option<&str>) -> Vec<String> {
+    match project_type {
+        Some("rust") => vec!["src/**/*.rs".to_string(), "tests/**/*.rs".to_string()],
+        Some("javascript") => vec![
+            "src/**/*.{js,ts,tsx}".to_string(),
+            "test/**/*.{js,ts,tsx}".to_string(),
+        ],
+        Some("python") => vec!["**/*.py".to_string(), "tests/**/*.py".to_string()],
+        Some("go") => vec!["**/*.go".to_string()],
+        _ => vec!["src/**".to_string()],
+    }
+}
+
+fn default_exclude_patterns(project_type: Option<&str>) -> Vec<String> {
+    let mut patterns = vec![".git/**".to_string()];
+    match project_type {
+        Some("rust") => patterns.push("target/**".to_string()),
+        Some("javascript") => patterns.push("node_modules/**".to_string()),
+        Some("python") => patterns.push("__pycache__/**".to_string()),
+        _ => {}
+    }
+    patterns
+}
+
+fn default_entry_points(project_type: Option<&str>) -> Vec<String> {
+    match project_type {
+        Some("rust") => vec!["src/main.rs".to_string(), "src/lib.rs".to_string()],
+        Some("javascript") => vec!["src/index.ts".to_string(), "src/index.js".to_string()],
+        Some("python") => vec!["main.py".to_string()],
+        Some("go") => vec!["main.go".to_string()],
+        _ => Vec::new(),
+    }
+}
+
+fn open_in_editor(path: &Path) -> Result<()> {
+    let editor = std::env::var("EDITOR")
+        .or_else(|_| std::env::var("VISUAL"))
+        .unwrap_or_else(|_| {
+            if cfg!(target_os = "macos") {
+                "open".to_string()
+            } else if cfg!(target_os = "windows") {
+                "notepad".to_string()
+            } else {
+                "nano".to_string()
+            }
+        });
+
+    let status = Command::new(&editor).arg(path).status();
+    match status {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => Err(anyhow::anyhow!("Editor exited with a non-zero status")),
+        Err(err) => Err(anyhow::anyhow!("Failed to launch editor '{}': {}", editor, err)),
     }
 }
 
@@ -614,200 +705,155 @@ fn remove_redaction_pattern(repo: &SqliteRepository, pattern: &str) -> Result<bo
 
 /// Handle project configuration initialization
 fn handle_config_init(project_type: Option<&str>, template: Option<&str>, force: bool) -> Result<()> {
-    println!("{}", "🏗️  Initialize TermAI Project Configuration".bright_blue().bold());
-    println!("{}", "══════════════════════════════════════════".white().dimmed());
-    println!();
+    let root = std::env::current_dir().context("Failed to determine current working directory")?;
+    let config_path = ProjectConfig::file_path(&root);
 
-    let project_service = ProjectConfigService::new()
-        .context("Failed to initialize project configuration service")?;
-
-    // Check if configuration already exists
-    if project_service.project_config_exists() && !force {
-        let config_path = project_service.get_config_file_path();
+    if config_path.exists() && !force {
         println!("{}", "⚠️  Project configuration already exists".yellow());
-        println!("   File: {}", config_path.display().to_string().cyan());
-        println!();
-        println!("{}", "💡 Options:".bright_yellow().bold());
-        println!("   {}  # Override existing config", "termai config init --force".cyan());
-        println!("   {}     # View current config", "termai config project".cyan());
-        println!("   {}        # Edit current config", "termai config edit".cyan());
+        println!("   {}", config_path.display().to_string().cyan());
+        println!("   {}", "Use 'termai config init --force' to overwrite it.".cyan());
         return Ok(());
     }
 
-    // Use template if specified
     if let Some(template_name) = template {
-        let templates = ProjectConfigService::get_project_type_templates();
-        if let Some(template_config) = templates.get(template_name) {
-            project_service.save_project_config(template_config)
-                .context("Failed to save template configuration")?;
-                
-            println!("✅ Project configuration created from {} template", template_name.bright_cyan());
-            println!("   File: {}", project_service.get_config_file_path().display().to_string().cyan());
-            println!();
-            show_next_steps();
-            return Ok(());
-        } else {
-            println!("{}", "⚠️  Template not found".yellow());
-            println!("Available templates:");
-            for template in templates.keys() {
-                println!("   • {}", template.cyan());
-            }
-            return Ok(());
-        }
+        println!(
+            "{} {}",
+            "⚠️  Project templates were removed in the simplified config model. Ignoring template:".yellow(),
+            template_name.bright_white()
+        );
+        println!();
     }
 
-    // Initialize configuration for detected or specified project type
-    let config = project_service.init_project_config(project_type.map(|s| s.to_string()))
-        .context("Failed to initialize project configuration")?;
+    let resolved_project_type = project_type
+        .map(str::to_string)
+        .or_else(detect_project_type);
+    let project_type_str = resolved_project_type.clone();
 
-    // Save the configuration
-    project_service.save_project_config(&config)
-        .context("Failed to save project configuration")?;
+    let config = ProjectConfig {
+        project_type: resolved_project_type,
+        context: ProjectContextSettings {
+            include: default_include_patterns(project_type_str.as_deref()),
+            exclude: default_exclude_patterns(project_type_str.as_deref()),
+            entry_points: default_entry_points(project_type_str.as_deref()),
+        },
+        privacy: ProjectPrivacySettings {
+            redact: vec!["API_KEY_.*".to_string(), "SECRET_.*".to_string()],
+        },
+        path: Some(config_path.clone()),
+    };
 
-    println!("✅ Project configuration initialized successfully!");
-    
-    if let Some(project) = &config.project {
-        println!("   Project: {}", project.name.bright_cyan());
-        if let Some(proj_type) = &project.project_type {
-            println!("   Type: {}", proj_type.bright_green());
-        }
+    config.save_to_root(&root)?;
+
+    println!("{}", "✅ Project configuration initialized".green().bold());
+    println!("   {}", config_path.display().to_string().cyan());
+    if let Some(project_type) = &config.project_type {
+        println!("   {} {}", "Detected type:".bright_green(), project_type.bright_white());
     }
-    
-    println!("   File: {}", project_service.get_config_file_path().display().to_string().cyan());
     println!();
-    
     show_next_steps();
     Ok(())
 }
 
 /// Handle project configuration display
 fn handle_config_project() -> Result<()> {
+    let Some(project_config_path) = active_project_config_path() else {
+        println!("{}", "⚠️  No active .termai.toml found".yellow());
+        println!("   {}", "Run 'termai config init' in the project root to create one.".cyan());
+        return Ok(());
+    };
+
+    let root = project_config_path
+        .parent()
+        .context("Invalid project configuration path")?;
+    let config = ProjectConfig::load_from_root(root)?;
+
     println!("{}", "📋 Project Configuration".bright_blue().bold());
     println!("{}", "════════════════════════".white().dimmed());
     println!();
-
-    let mut project_service = ProjectConfigService::new()
-        .context("Failed to initialize project configuration service")?;
-
-    if !project_service.project_config_exists() {
-        println!("{}", "⚠️  No project configuration found".yellow());
-        println!();
-        println!("{}", "💡 Initialize project configuration:".bright_yellow().bold());
-        println!("   {}           # Auto-detect project type", "termai config init".cyan());
-        println!("   {} # Specify project type", "termai config init --project-type rust".cyan());
-        return Ok(());
+    println!("{} {}", "File:".bright_green(), project_config_path.display().to_string().cyan());
+    if let Some(project_type) = &config.project_type {
+        println!("{} {}", "Project type:".bright_green(), project_type.bright_white());
     }
-
-    let config = project_service.load_config()
-        .context("Failed to load project configuration")?;
-
-    // Show project metadata
-    if let Some(project) = &config.project {
-        println!("{}  {}", "🏷️  Project Name:".bright_green(), project.name.bright_cyan());
-        if let Some(project_type) = &project.project_type {
-            println!("{}      {}", "🎯 Project Type:".bright_green(), project_type.bright_cyan());
+    println!(
+        "{} {}",
+        "Include:".bright_green(),
+        if config.context.include.is_empty() {
+            "[none]".dimmed().to_string()
+        } else {
+            config.context.include.join(", ")
         }
-        if let Some(description) = &project.description {
-            println!("{}   {}", "📝 Description:".bright_green(), description);
+    );
+    println!(
+        "{} {}",
+        "Exclude:".bright_green(),
+        if config.context.exclude.is_empty() {
+            "[none]".dimmed().to_string()
+        } else {
+            config.context.exclude.join(", ")
         }
-        println!();
-    }
-
-    // Show context configuration
-    if let Some(context) = &config.context {
-        println!("{}", "📁 Context Configuration".bright_yellow().bold());
-        println!("   Max tokens: {}", context.max_tokens.unwrap_or(8000).to_string().cyan());
-        
-        if let Some(include) = &context.include {
-            println!("   Include patterns: {} patterns", include.len().to_string().cyan());
-            for pattern in include.iter().take(3) {
-                println!("     • {}", pattern.dimmed());
-            }
-            if include.len() > 3 {
-                println!("     ... and {} more", (include.len() - 3).to_string().dimmed());
-            }
+    );
+    println!(
+        "{} {}",
+        "Entry points:".bright_green(),
+        if config.context.entry_points.is_empty() {
+            "[none]".dimmed().to_string()
+        } else {
+            config.context.entry_points.join(", ")
         }
-        
-        if let Some(exclude) = &context.exclude {
-            println!("   Exclude patterns: {} patterns", exclude.len().to_string().cyan());
+    );
+    println!(
+        "{} {}",
+        "Redact:".bright_green(),
+        if config.privacy.redact.is_empty() {
+            "[none]".dimmed().to_string()
+        } else {
+            config.privacy.redact.join(", ")
         }
-        println!();
-    }
-
-    // Show provider configuration
-    if let Some(providers) = &config.providers {
-        println!("{}", "🤖 Provider Configuration".bright_yellow().bold());
-        if let Some(default) = &providers.default {
-            println!("   Default provider: {}", default.bright_cyan());
-        }
-        if let Some(fallback) = &providers.fallback {
-            println!("   Fallback provider: {}", fallback.bright_cyan());
-        }
-        println!();
-    }
-
-    // Show file location
-    println!("{}      {}", "📄 Config File:".bright_green(), 
-             project_service.get_config_file_path().display().to_string().cyan());
-
-    println!();
-    println!("{}", "💡 Management commands:".bright_yellow().bold());
-    println!("   {}       # Validate configuration", "termai config validate".cyan());
-    println!("   {}          # Edit configuration", "termai config edit".cyan());
-    println!("   {}      # Export configuration", "termai config export".cyan());
+    );
 
     Ok(())
 }
 
 /// Handle project configuration validation
 fn handle_config_validate() -> Result<()> {
+    let Some(project_config_path) = active_project_config_path() else {
+        println!("{}", "⚠️  No active .termai.toml found".yellow());
+        println!("   {}", "Run 'termai config init' in the project root to create one.".cyan());
+        return Ok(());
+    };
+
+    let root = project_config_path
+        .parent()
+        .context("Invalid project configuration path")?;
+    let config = ProjectConfig::load_from_root(root)
+        .with_context(|| format!("Failed to load {}", project_config_path.display()))?;
+
     println!("{}", "✅ Validate Project Configuration".bright_blue().bold());
     println!("{}", "══════════════════════════════════".white().dimmed());
     println!();
+    println!("{} {}", "File:".bright_green(), project_config_path.display().to_string().cyan());
 
-    let mut project_service = ProjectConfigService::new()
-        .context("Failed to initialize project configuration service")?;
-
-    if !project_service.project_config_exists() {
-        println!("{}", "⚠️  No project configuration found".yellow());
-        println!("   Run {} to create one", "termai config init".cyan());
-        return Ok(());
-    }
-
-    let config = project_service.load_config()
-        .context("Failed to load project configuration")?;
-
-    let validation = config.validate();
-    
-    if validation.is_valid {
-        println!("{}", "✅ Configuration is valid!".green().bold());
-    } else {
-        println!("{}", "❌ Configuration has errors:".red().bold());
-        for error in &validation.errors {
-            println!("   • {}: {}", error.field.bright_red(), error.message);
-            if let Some(suggestion) = &error.suggestion {
-                println!("     💡 {}", suggestion.dimmed());
-            }
+    let dropped = dropped_project_sections(&project_config_path)?;
+    let mut has_warnings = false;
+    if !dropped.is_empty() {
+        has_warnings = true;
+        println!();
+        println!("{}", "⚠️  Dropped sections".yellow().bold());
+        for section in dropped {
+            println!("   • {}", section.bright_yellow());
         }
     }
 
-    if !validation.warnings.is_empty() {
+    if config.context.include.is_empty() {
+        has_warnings = true;
         println!();
-        println!("{}", "⚠️  Warnings:".yellow().bold());
-        for warning in &validation.warnings {
-            println!("   • {}: {}", warning.field.bright_yellow(), warning.message);
-            if let Some(suggestion) = &warning.suggestion {
-                println!("     💡 {}", suggestion.dimmed());
-            }
-        }
+        println!("{}", "⚠️  No include patterns configured".yellow());
     }
 
-    if validation.is_valid && validation.warnings.is_empty() {
-        println!("   All checks passed!");
-        println!();
-        println!("{}", "🚀 Ready to use:".bright_green().bold());
-        println!("   {}              # Start chatting", "termai chat".cyan());
-        println!("   {}  # Ask with context", "termai ask \"question\" src/".cyan());
+    println!();
+    println!("{}", "✅ Simplified project config parsed successfully.".green().bold());
+    if !has_warnings {
+        println!("{}", "No structural issues detected.".green());
     }
 
     Ok(())
@@ -815,185 +861,44 @@ fn handle_config_validate() -> Result<()> {
 
 /// Handle project configuration editing
 fn handle_config_edit() -> Result<()> {
-    let project_service = ProjectConfigService::new()
-        .context("Failed to initialize project configuration service")?;
+    let target_path = if let Some(project_config_path) = active_project_config_path() {
+        project_config_path
+    } else {
+        let user_config = UserConfig::load()?;
+        user_config.save()?;
+        UserConfig::default_path()?
+    };
 
-    let config_path = project_service.get_config_file_path();
-
-    if !project_service.project_config_exists() {
-        println!("{}", "⚠️  No project configuration found".yellow());
-        println!("   Run {} to create one first", "termai config init".cyan());
-        return Ok(());
-    }
-
-    // Try to find a suitable editor
-    let editor = std::env::var("EDITOR")
-        .or_else(|_| std::env::var("VISUAL"))
-        .unwrap_or_else(|_| {
-            if cfg!(target_os = "macos") {
-                "open".to_string()
-            } else if cfg!(target_os = "windows") {
-                "notepad".to_string()
-            } else {
-                "nano".to_string()
-            }
-        });
-
-    println!("📝 Opening configuration in {}", editor.bright_cyan());
-    println!("   File: {}", config_path.display().to_string().dimmed());
-
-    let mut command = Command::new(&editor);
-    command.arg(&config_path);
-
-    match command.status() {
-        Ok(status) if status.success() => {
-            println!();
-            println!("{}", "✅ Configuration edited successfully".green());
-            println!("   Run {} to validate changes", "termai config validate".cyan());
-        }
-        Ok(_) => {
-            println!("{}", "⚠️  Editor exited with non-zero status".yellow());
-        }
-        Err(e) => {
-            println!("{}", format!("❌ Failed to open editor: {}", e).red());
-            println!("   Try setting EDITOR environment variable");
-            println!("   Example: {} termai config edit", "EDITOR=vim".cyan());
-        }
-    }
-
+    println!("{} {}", "📝 Opening".bright_blue().bold(), target_path.display().to_string().cyan());
+    open_in_editor(&target_path)?;
+    println!("   {}", "Run 'termai config validate' if you edited a project config.".dimmed());
     Ok(())
 }
 
 /// Handle project configuration export
 fn handle_config_export(file: Option<&str>, format: &str) -> Result<()> {
-    println!("{}", "📤 Export Project Configuration".bright_blue().bold());
-    println!("{}", "═══════════════════════════════".white().dimmed());
-    println!();
-
-    let mut project_service = ProjectConfigService::new()
-        .context("Failed to initialize project configuration service")?;
-
-    if !project_service.project_config_exists() {
-        println!("{}", "⚠️  No project configuration found".yellow());
-        return Ok(());
-    }
-
-    let config = project_service.load_config()
-        .context("Failed to load project configuration")?;
-
-    let output_file = file.unwrap_or("termai-config-export.toml");
-
-    match format {
-        "toml" => {
-            let content = toml::to_string_pretty(&config)
-                .context("Failed to serialize configuration to TOML")?;
-            std::fs::write(output_file, content)
-                .context("Failed to write configuration file")?;
-        }
-        "json" => {
-            let content = serde_json::to_string_pretty(&config)
-                .context("Failed to serialize configuration to JSON")?;
-            std::fs::write(output_file, content)
-                .context("Failed to write configuration file")?;
-        }
-        "yaml" => {
-            let content = serde_yaml::to_string(&config)
-                .context("Failed to serialize configuration to YAML")?;
-            std::fs::write(output_file, content)
-                .context("Failed to write configuration file")?;
-        }
-        _ => {
-            return Err(anyhow::anyhow!(
-                "Unsupported format: {}. Supported: toml, json, yaml",
-                format
-            ));
-        }
-    }
-
-    println!("✅ Configuration exported successfully");
-    println!("   File: {}", output_file.bright_cyan());
-    println!("   Format: {}", format.bright_green());
-
-    Ok(())
+    let _ = file;
+    let _ = format;
+    handle_removed_config_command(
+        "export",
+        "Export/import were removed. The simplified config model uses plain TOML files you can copy directly.",
+    )
 }
 
 /// Handle project configuration import
 fn handle_config_import(file: &str, merge: bool) -> Result<()> {
-    println!("{}", "📥 Import Project Configuration".bright_blue().bold());
-    println!("{}", "═══════════════════════════════".white().dimmed());
-    println!();
-
-    let project_service = ProjectConfigService::new()
-        .context("Failed to initialize project configuration service")?;
-
-    if !std::path::Path::new(file).exists() {
-        return Err(anyhow::anyhow!("Import file not found: {}", file));
-    }
-
-    let content = std::fs::read_to_string(file)
-        .context("Failed to read import file")?;
-
-    // Determine format from file extension
-    let imported_config: ProjectConfig = if file.ends_with(".json") {
-        serde_json::from_str(&content)
-            .context("Failed to parse JSON configuration")?
-    } else if file.ends_with(".yaml") || file.ends_with(".yml") {
-        serde_yaml::from_str(&content)
-            .context("Failed to parse YAML configuration")?
-    } else {
-        // Default to TOML
-        toml::from_str(&content)
-            .context("Failed to parse TOML configuration")?
-    };
-
-    let final_config = if merge && project_service.project_config_exists() {
-        // Merge with existing configuration
-        let _existing_config = project_service.load_config_file(&project_service.get_config_file_path())
-            .context("Failed to load existing configuration")?;
-        
-        // Simple merge - imported config takes priority
-        // In a full implementation, this would be more sophisticated
-        imported_config // For now, just replace
-    } else {
-        imported_config
-    };
-
-    // Validate before saving
-    let validation = final_config.validate();
-    if !validation.is_valid {
-        println!("{}", "❌ Import validation failed:".red().bold());
-        for error in &validation.errors {
-            println!("   • {}: {}", error.field.bright_red(), error.message);
-        }
-        return Ok(());
-    }
-
-    project_service.save_project_config(&final_config)
-        .context("Failed to save imported configuration")?;
-
-    println!("✅ Configuration imported successfully");
-    println!("   From: {}", file.bright_cyan());
-    if merge {
-        println!("   Mode: Merged with existing configuration");
-    } else {
-        println!("   Mode: Replaced existing configuration");
-    }
-
-    if !validation.warnings.is_empty() {
-        println!();
-        println!("{}", "⚠️  Import warnings:".yellow().bold());
-        for warning in &validation.warnings {
-            println!("   • {}: {}", warning.field.bright_yellow(), warning.message);
-        }
-    }
-
-    Ok(())
+    let _ = file;
+    let _ = merge;
+    handle_removed_config_command(
+        "import",
+        "Export/import were removed. Edit ~/.config/termai/config.toml or .termai.toml directly instead.",
+    )
 }
 
 /// Show next steps after configuration initialization
 fn show_next_steps() {
     println!("{}", "💡 Next steps:".bright_yellow().bold());
-    println!("   {}     # View configuration", "termai config project".cyan());
+    println!("   {}        # View effective settings", "termai config show".cyan());
     println!("   {}       # Validate configuration", "termai config validate".cyan());
     println!("   {}          # Edit configuration", "termai config edit".cyan());
     println!("   {}              # Start chatting with project context", "termai chat".cyan());
@@ -1007,7 +912,7 @@ struct ModelCatalog {
 
 fn normalize_provider_name(provider: &str) -> &str {
     match provider {
-        "openai_codex" | "codex" => "openai-codex",
+        "openai-codex" | "openai_codex" => "codex",
         other => other,
     }
 }
@@ -1048,33 +953,28 @@ fn infer_provider_from_model(model: &str) -> &'static str {
     if model.starts_with("claude") {
         "claude"
     } else if model.contains("codex") {
-        "openai-codex"
+        "codex"
     } else {
         "openai"
     }
 }
 
 fn current_provider(repo: &SqliteRepository) -> String {
-    use crate::config::model::keys::ConfigKeys;
-
-    config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key())
-        .map(|config| normalize_provider_name(&config.value).to_string())
-        .unwrap_or_else(|_| "openai".to_string())
+    ResolvedSettings::load_for_current_dir_with_repo(repo, SettingsOverrides::default())
+        .map(|settings| settings.default_provider.as_str().to_string())
+        .unwrap_or_else(|_| SettingsProvider::default().as_str().to_string())
 }
 
 fn current_model_for_provider(repo: &SqliteRepository, provider: &str) -> Option<String> {
-    use crate::config::model::keys::ConfigKeys;
-
-    let config_key = match normalize_provider_name(provider) {
-        "claude" => ConfigKeys::ClaudeDefaultModel,
-        "openai-codex" => ConfigKeys::CodexDefaultModel,
-        _ => ConfigKeys::OpenAIDefaultModel,
-    };
-
-    config_service::fetch_by_key(repo, &config_key.to_key())
+    ResolvedSettings::load_for_current_dir_with_repo(repo, SettingsOverrides::default())
         .ok()
-        .map(|config| config.value)
-        .filter(|value| !value.is_empty())
+        .and_then(|settings| {
+            if settings.default_provider.as_str() == normalize_provider_name(provider) {
+                Some(settings.selected_model())
+            } else {
+                None
+            }
+        })
 }
 
 async fn load_model_catalog(
@@ -1087,7 +987,7 @@ async fn load_model_catalog(
 
     let provider = normalize_provider_name(provider);
 
-    if matches!(provider, "openai" | "openai-codex") {
+    if matches!(provider, "openai" | "codex") {
         let api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())
             .ok()
             .map(|config| config.value)
@@ -1153,8 +1053,6 @@ async fn load_model_catalog(
 /// Handle setting the default model
 async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Result<()> {
     use crate::chat::state::ChatState;
-    use crate::config::model::keys::ConfigKeys;
-    use crate::config::service::config_service;
 
     let provider = match model {
         Some(model_name) => infer_provider_from_model(model_name).to_string(),
@@ -1207,32 +1105,14 @@ async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Resul
         }
     };
 
-    // Get the appropriate config key based on provider
-    let config_key = match provider.as_str() {
-        "claude" => ConfigKeys::ClaudeDefaultModel,
-        "openai-codex" => ConfigKeys::CodexDefaultModel,
-        _ => ConfigKeys::OpenAIDefaultModel,
+    let mut user_config = UserConfig::load()?;
+    user_config.default.provider = match normalize_provider_name(&provider) {
+        "claude" => SettingsProvider::Claude,
+        "codex" => SettingsProvider::Codex,
+        _ => SettingsProvider::Openai,
     };
-
-    // Save the model preference
-    config_service::write_config(repo, &config_key.to_key(), &selected_model)
-        .context("Failed to save model preference")?;
-
-    // Also update the provider if it doesn't match
-    let current_provider = config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key())
-        .map(|c| c.value)
-        .unwrap_or_default();
-
-    if current_provider != provider {
-        config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), &provider)
-            .context("Failed to save provider preference")?;
-        println!(
-            "{} {} (for model {})",
-            "✅ Provider updated to".green().bold(),
-            provider.bright_cyan().bold(),
-            selected_model.bright_yellow()
-        );
-    }
+    user_config.default.model = Some(selected_model.clone());
+    user_config.save()?;
 
     println!(
         "{} {}",
@@ -1277,8 +1157,8 @@ async fn handle_list_models(
     let providers_to_show: Vec<&str> = match provider {
         Some(Provider::Claude) => vec!["claude"],
         Some(Provider::Openai) => vec!["openai"],
-        Some(Provider::OpenaiCodex) => vec!["openai-codex"],
-        None => vec!["claude", "openai", "openai-codex"],
+        Some(Provider::OpenaiCodex) => vec!["codex"],
+        None => vec!["claude", "openai", "codex"],
     };
 
     for provider_name in providers_to_show {
@@ -1286,7 +1166,7 @@ async fn handle_list_models(
         let provider_display = match provider_name {
             "claude" => "🧠 Claude (Anthropic)",
             "openai" => "⚡ OpenAI (API Key)",
-            "openai-codex" => "🔐 OpenAI Codex (ChatGPT Plus/Pro)",
+            "codex" => "🔐 OpenAI Codex (ChatGPT Plus/Pro)",
             _ => provider_name,
         };
         println!("{}", provider_display.bright_green().bold());

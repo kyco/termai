@@ -26,6 +26,9 @@ impl CommandDiscovery {
                 Commands::Config { action: _, args: _ } => {
                     suggestions.extend(Self::config_command_suggestions(error_context));
                 }
+                Commands::Auth { action: _ } => {
+                    suggestions.extend(Self::auth_command_suggestions(error_context));
+                }
                 Commands::Sessions { action: _, args: _ } => {
                     suggestions.extend(Self::session_command_suggestions(error_context));
                 }
@@ -277,12 +280,24 @@ impl CommandDiscovery {
     fn config_command_suggestions(_error_context: &str) -> Vec<String> {
         vec![
             "View current settings: termai config show".to_string(),
-            "Set API keys: termai config set-claude KEY or termai config set-openai KEY"
-                .to_string(),
-            "Set default provider: termai config set-provider claude".to_string(),
-            "View environment variables: termai config env".to_string(),
-            "Reset all settings: termai config reset".to_string(),
+            "Edit your user or active project config: termai config edit".to_string(),
+            "Create a project config in the repo root: termai config init".to_string(),
+            "Validate the active project config: termai config validate".to_string(),
+            "Migrate legacy DB defaults into ~/.config/termai/config.toml: termai config migrate".to_string(),
         ]
+    }
+
+    fn auth_command_suggestions(error_context: &str) -> Vec<String> {
+        let mut suggestions = vec![
+            "Use 'termai auth --help' to see the primary authentication flow".to_string(),
+            "Check Codex authentication with 'termai auth status codex'".to_string(),
+        ];
+
+        if error_context.contains("provider") {
+            suggestions.push("Supported auth providers are claude, openai, and codex".to_string());
+        }
+
+        suggestions
     }
 
     fn session_command_suggestions(_error_context: &str) -> Vec<String> {

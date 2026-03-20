@@ -1,5 +1,6 @@
 use crate::config::model::keys::ConfigKeys;
 use crate::config::repository::ConfigRepository;
+use crate::config::settings::{SettingsProvider, UserConfig};
 use crate::config::service::config_service;
 use crate::setup::validator::{ApiKeyValidator, ClaudeValidator, OpenAIValidator};
 use anyhow::Result;
@@ -57,22 +58,16 @@ impl SetupWizard {
             Provider::Claude => {
                 let api_key = self.get_claude_api_key().await?;
                 self.save_claude_config(repo, &api_key)?;
-                self.set_provider(repo, "claude")?;
-                // Step 3: Model Selection
                 self.select_and_save_model(repo, "claude").await?;
             }
             Provider::OpenAI => {
                 let api_key = self.get_openai_api_key().await?;
                 self.save_openai_config(repo, &api_key)?;
-                self.set_provider(repo, "openai")?;
-                // Step 3: Model Selection
                 self.select_and_save_model(repo, "openai").await?;
             }
             Provider::OpenAICodex => {
                 self.setup_codex_auth(repo).await?;
-                self.set_provider(repo, "openai-codex")?;
-                // Step 3: Model Selection
-                self.select_and_save_model(repo, "openai-codex").await?;
+                self.select_and_save_model(repo, "codex").await?;
             }
             Provider::Both => {
                 let claude_key = self.get_claude_api_key().await?;
@@ -82,8 +77,6 @@ impl SetupWizard {
 
                 // Ask which to use as default
                 let default_provider = self.select_default_provider()?;
-                self.set_provider(repo, &default_provider)?;
-                // Step 3: Model Selection for default provider
                 self.select_and_save_model(repo, &default_provider).await?;
             }
         }
@@ -326,8 +319,14 @@ impl SetupWizard {
         Ok(())
     }
 
-    fn set_provider<R: ConfigRepository>(&self, repo: &R, provider: &str) -> Result<()> {
-        config_service::write_config(repo, &ConfigKeys::ProviderKey.to_key(), provider)?;
+    fn set_provider(&self, provider: &str) -> Result<()> {
+        let mut user_config = UserConfig::load()?;
+        user_config.default.provider = match provider {
+            "claude" => SettingsProvider::Claude,
+            "codex" => SettingsProvider::Codex,
+            _ => SettingsProvider::Openai,
+        };
+        user_config.save()?;
         Ok(())
     }
 
@@ -349,7 +348,7 @@ impl SetupWizard {
         println!();
 
         // Get models for this provider
-        let available_models = if matches!(provider, "openai" | "openai-codex") {
+        let available_models = if matches!(provider, "openai" | "codex") {
             let api_key = config_service::fetch_by_key(repo, &ConfigKeys::ChatGptApiKey.to_key())
                 .ok()
                 .map(|config| config.value)
@@ -386,7 +385,7 @@ impl SetupWizard {
                     }
                 },
                 None => {
-                    if provider == "openai-codex" {
+                    if provider == "codex" {
                         println!(
                             "{}",
                             "No OpenAI API key configured for live Codex model lookup. Using the built-in list."
@@ -427,14 +426,10 @@ impl SetupWizard {
 
         let selected_model = &available_models[selection];
 
-        // Save the model preference
-        let config_key = match provider {
-            "claude" => ConfigKeys::ClaudeDefaultModel,
-            "openai-codex" | "codex" => ConfigKeys::CodexDefaultModel,
-            _ => ConfigKeys::OpenAIDefaultModel,
-        };
-
-        config_service::write_config(repo, &config_key.to_key(), selected_model)?;
+        self.set_provider(provider)?;
+        let mut user_config = UserConfig::load()?;
+        user_config.default.model = Some(selected_model.clone());
+        user_config.save()?;
 
         println!(
             "✅ Default model set to: {}",
@@ -501,7 +496,7 @@ impl SetupWizard {
         println!("To re-run setup anytime: {}", "termai setup".bright_cyan());
         println!(
             "To reset configuration: {}",
-            "termai config reset".bright_cyan()
+            "remove ~/.config/termai/config.toml".bright_cyan()
         );
         println!();
 
@@ -606,10 +601,19 @@ impl SetupWizard {
         println!("{}", "📋 Current Configuration".bright_blue().bold());
         println!();
 
-        // Show provider
-        if let Ok(provider) = config_service::fetch_by_key(repo, &ConfigKeys::ProviderKey.to_key())
-        {
-            println!("Default Provider: {}", provider.value.bright_cyan());
+        if let Ok(user_config) = UserConfig::load() {
+            println!(
+                "Default Provider: {}",
+                user_config.default.provider.as_str().bright_cyan()
+            );
+            println!(
+                "Default Model: {}",
+                user_config
+                    .default
+                    .model
+                    .unwrap_or_else(|| user_config.default.provider.recommended_model().to_string())
+                    .bright_cyan()
+            );
         }
 
         // Show configured APIs (without revealing keys)

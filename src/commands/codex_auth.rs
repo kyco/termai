@@ -72,7 +72,7 @@ pub async fn handle_login_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
     println!("{}", "You can now use Codex as your AI provider:".white());
     println!(
         "   {}",
-        "termai config set-provider openai-codex".cyan()
+        "termai config set-provider codex".cyan()
     );
     println!("   {}", "termai chat".cyan());
     println!();
@@ -105,7 +105,7 @@ pub fn handle_logout_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
     );
     println!(
         "Run '{}' to authenticate again.",
-        "termai config login-codex".cyan()
+        "termai auth login codex".cyan()
     );
 
     Ok(())
@@ -128,7 +128,7 @@ pub fn handle_codex_status<R: ConfigRepository>(repo: &R) -> Result<()> {
             println!();
             println!(
                 "Run '{}' to authenticate with your ChatGPT Plus/Pro subscription.",
-                "termai config login-codex".cyan()
+                "termai auth login codex".cyan()
             );
         }
         AuthStatus::Authenticated { expires_at } => {
@@ -181,7 +181,7 @@ pub fn handle_codex_status<R: ConfigRepository>(repo: &R) -> Result<()> {
                 println!();
                 println!(
                     "Run '{}' to re-authenticate.",
-                    "termai config login-codex".cyan()
+                    "termai auth login codex".cyan()
                 );
             }
         }

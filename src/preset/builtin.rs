@@ -109,12 +109,7 @@ Please provide the code you'd like me to review.
             category: "development".to_string(),
             version: "1.0".to_string(),
             template,
-            config: PresetConfig {
-                provider: Some("claude".to_string()),
-                max_tokens: Some(4000),
-                temperature: Some(0.3),
-                ..Default::default()
-            },
+            config: PresetConfig::default(),
         }
     }
     
@@ -196,12 +191,7 @@ Please provide the code you'd like me to document.
             category: "writing".to_string(),
             version: "1.0".to_string(),
             template,
-            config: PresetConfig {
-                provider: Some("claude".to_string()),
-                max_tokens: Some(3000),
-                temperature: Some(0.4),
-                ..Default::default()
-            },
+            config: PresetConfig::default(),
         }
     }
     
@@ -283,12 +273,7 @@ Please provide the code you'd like me to test.
             category: "testing".to_string(),
             version: "1.0".to_string(),
             template,
-            config: PresetConfig {
-                provider: Some("claude".to_string()),
-                max_tokens: Some(3500),
-                temperature: Some(0.2),
-                ..Default::default()
-            },
+            config: PresetConfig::default(),
         }
     }
     
@@ -368,12 +353,7 @@ Please provide the code or error information you'd like me to debug.
             category: "debugging".to_string(),
             version: "1.0".to_string(),
             template,
-            config: PresetConfig {
-                provider: Some("claude".to_string()),
-                max_tokens: Some(3500),
-                temperature: Some(0.3),
-                ..Default::default()
-            },
+            config: PresetConfig::default(),
         }
     }
     
@@ -455,12 +435,7 @@ Please provide the code you'd like me to refactor.
             category: "development".to_string(),
             version: "1.0".to_string(),
             template,
-            config: PresetConfig {
-                provider: Some("claude".to_string()),
-                max_tokens: Some(4000),
-                temperature: Some(0.4),
-                ..Default::default()
-            },
+            config: PresetConfig::default(),
         }
     }
 }

@@ -83,6 +83,9 @@ impl ArgumentValidator {
                 } => {
                     // Config commands are generally safe, minimal validation needed
                 }
+                Commands::Auth { action: _action } => {
+                    // Authentication commands are generally safe, minimal validation needed
+                }
                 Commands::Sessions {
                     args: _session_args,
                     action: _action,

@@ -83,8 +83,30 @@ impl ContextConfig {
 
     /// Find and load configuration from project directory
     pub fn discover_config(project_path: &Path) -> Result<Self> {
-        let config_file = project_path.join(".termai.toml");
-        Self::load_from_file(&config_file)
+        let project_config = crate::config::settings::ProjectConfig::load_from_root(project_path)?;
+        let mut config = Self::default();
+
+        if !project_config.context.include.is_empty() {
+            config.context.include = project_config.context.include;
+        }
+
+        if !project_config.context.exclude.is_empty() {
+            config.context.exclude = project_config.context.exclude;
+        }
+
+        if let Some(project_type) = project_config.project_type {
+            config.project = Some(ProjectSettings {
+                project_type: Some(project_type),
+                entry_points: project_config.context.entry_points,
+            });
+        } else if !project_config.context.entry_points.is_empty() {
+            config.project = Some(ProjectSettings {
+                project_type: None,
+                entry_points: project_config.context.entry_points,
+            });
+        }
+
+        Ok(config)
     }
 
     /// Get project type from configuration

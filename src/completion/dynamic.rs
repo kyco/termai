@@ -16,6 +16,7 @@ impl DynamicCompleter {
         }
 
         match args[0].as_str() {
+            "auth" => Self::complete_auth_command(&args[1..]),
             "session" => Self::complete_session_command(repo, &args[1..]),
             "config" => Self::complete_config_command(&args[1..]),
             "ask" | "chat" => Self::complete_context_command(&args[1..]),
@@ -30,6 +31,7 @@ impl DynamicCompleter {
             "setup".to_string(),
             "chat".to_string(),
             "ask".to_string(),
+            "auth".to_string(),
             "session".to_string(),
             "config".to_string(),
             "redact".to_string(),
@@ -66,16 +68,33 @@ impl DynamicCompleter {
         if args.is_empty() {
             return Ok(vec![
                 "show".to_string(),
-                "set-openai".to_string(),
-                "set-claude".to_string(),
-                "set-provider".to_string(),
-                "reset".to_string(),
-                "env".to_string(),
+                "edit".to_string(),
+                "validate".to_string(),
+                "init".to_string(),
+                "migrate".to_string(),
+                "set-model".to_string(),
+                "list-models".to_string(),
             ]);
         }
 
         match args[0].as_str() {
-            "set-provider" => Ok(CompletionValues::provider_names()),
+            "set-provider" => Ok(Self::provider_names()),
+            _ => Ok(Vec::new()),
+        }
+    }
+
+    /// Complete auth subcommands
+    fn complete_auth_command(args: &[String]) -> Result<Vec<String>> {
+        if args.is_empty() {
+            return Ok(vec![
+                "login".to_string(),
+                "logout".to_string(),
+                "status".to_string(),
+            ]);
+        }
+
+        match args[0].as_str() {
+            "login" | "logout" | "status" => Ok(Self::provider_names()),
             _ => Ok(Vec::new()),
         }
     }
@@ -105,6 +124,14 @@ impl DynamicCompleter {
         } else {
             Ok(Vec::new())
         }
+    }
+
+    fn provider_names() -> Vec<String> {
+        vec![
+            "claude".to_string(),
+            "openai".to_string(),
+            "codex".to_string(),
+        ]
     }
 
     /// Print completions to stdout (for shell integration)
@@ -151,7 +178,7 @@ _termai_complete() {
             return 0
             ;;
         --provider)
-            COMPREPLY=($(compgen -W "claude openai openai-codex" -- "$cur"))
+            COMPREPLY=($(compgen -W "claude openai codex" -- "$cur"))
             return 0
             ;;
         --directories|--directory)
@@ -196,6 +223,7 @@ _termai_complete() {
                 'setup:Interactive setup wizard'
                 'chat:Start interactive conversation'
                 'ask:Ask a one-shot question'
+                'auth:Manage provider authentication'
                 'session:Manage conversation sessions'
                 'config:Manage configuration'
                 'redact:Manage redaction patterns'
@@ -214,10 +242,15 @@ _termai_complete() {
                     _arguments \
                         '1: :(show set-openai set-claude set-provider reset env)'
                     ;;
+                auth)
+                    _arguments \
+                        '1: :(login logout status)' \
+                        '2: :(claude openai codex)'
+                    ;;
                 ask|chat)
                     _arguments \
                         '--session: :($(termai session list --quiet 2>/dev/null))' \
-                        '--provider: :(claude openai openai-codex)' \
+                        '--provider: :(claude openai codex)' \
                         '--directory:directory:_files -/' \
                         '--directories:directories:_files -/'
                     ;;
@@ -252,7 +285,7 @@ function __termai_sessions
 end
 
 # Main completions
-complete -f -c termai -n '__fish_use_subcommand' -a 'setup chat ask session config redact completion'
+complete -f -c termai -n '__fish_use_subcommand' -a 'setup chat ask auth session config redact completion'
 complete -f -c termai -n '__fish_use_subcommand' -s h -l help -d 'Show help information'
 
 # Session subcommands
@@ -261,11 +294,15 @@ complete -f -c termai -n '__fish_seen_subcommand_from session; and __fish_seen_s
 
 # Config subcommands
 complete -f -c termai -n '__fish_seen_subcommand_from config' -a 'show set-openai set-claude set-provider reset env'
-complete -f -c termai -n '__fish_seen_subcommand_from config; and __fish_seen_subcommand_from set-provider' -a 'claude openai openai-codex'
+complete -f -c termai -n '__fish_seen_subcommand_from config; and __fish_seen_subcommand_from set-provider' -a 'claude openai codex'
+
+# Auth subcommands
+complete -f -c termai -n '__fish_seen_subcommand_from auth' -a 'login logout status'
+complete -f -c termai -n '__fish_seen_subcommand_from auth; and __fish_seen_subcommand_from login logout status' -a 'claude openai codex'
 
 # Common flags
 complete -c termai -n '__fish_seen_subcommand_from ask chat' -l session -a '(__termai_sessions)' -d 'Session name'
-complete -c termai -n '__fish_seen_subcommand_from ask chat' -l provider -a 'claude openai openai-codex' -d 'AI provider'
+complete -c termai -n '__fish_seen_subcommand_from ask chat' -l provider -a 'claude openai codex' -d 'AI provider'
 complete -c termai -n '__fish_seen_subcommand_from ask chat' -l directory -d 'Context directory' -x -a '(__fish_complete_directories)'
 complete -c termai -n '__fish_seen_subcommand_from ask chat' -l smart-context -d 'Enable smart context'
 
@@ -278,21 +315,41 @@ complete -c termai -a '(__termai_complete)'
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository::db::SqliteRepository;
+    use tempfile::TempDir;
+
+    fn test_repo() -> (TempDir, SqliteRepository) {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("completion.db");
+        let repo = SqliteRepository::new(db_path.to_str().unwrap()).unwrap();
+        (temp_dir, repo)
+    }
 
     #[test]
     fn test_top_level_commands() {
         let commands = DynamicCompleter::top_level_commands();
         assert!(commands.contains(&"setup".to_string()));
         assert!(commands.contains(&"chat".to_string()));
+        assert!(commands.contains(&"auth".to_string()));
         assert!(commands.contains(&"session".to_string()));
     }
 
     #[test]
-    fn test_complete_empty_args() {
-        // This test would need a mock repository
-        let _args: Vec<String> = vec![];
-        // Can't easily test without a real repo, but we can test the structure
-        assert_eq!(DynamicCompleter::top_level_commands().len(), 7);
+    fn test_auth_completion_paths() {
+        let (_temp_dir, repo) = test_repo();
+
+        let top_level = DynamicCompleter::complete(&repo, &["auth".to_string()]).unwrap();
+        assert_eq!(
+            top_level,
+            vec!["login".to_string(), "logout".to_string(), "status".to_string()]
+        );
+
+        let provider_completion =
+            DynamicCompleter::complete(&repo, &["auth".to_string(), "login".to_string()])
+                .unwrap();
+        assert!(provider_completion.contains(&"codex".to_string()));
+        assert!(provider_completion.contains(&"claude".to_string()));
+        assert!(provider_completion.contains(&"openai".to_string()));
     }
 
     #[test]

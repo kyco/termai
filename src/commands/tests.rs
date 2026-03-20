@@ -2,8 +2,8 @@
 mod tests {
     use super::super::{dispatch_command, handle_legacy_patterns};
     use crate::args::{
-        Args, AskArgs, ChatArgs, Commands, CompletionAction, ConfigAction, ConfigArgs, Provider,
-        RedactAction, SessionAction, SetupArgs,
+        Args, AskArgs, AuthAction, ChatArgs, Commands, CompletionAction, ConfigAction,
+        ConfigArgs, Provider, RedactAction, SessionAction, SetupArgs,
     };
     use crate::config::entity::config_entity::ConfigEntity;
     use crate::config::repository::ConfigRepository;
@@ -12,6 +12,7 @@ mod tests {
     use crate::session::repository::{MessageRepository, SessionRepository};
     use anyhow::Result;
     use chrono::NaiveDateTime;
+    use clap::Parser;
     use rusqlite::Connection;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
@@ -396,6 +397,38 @@ mod tests {
     }
 
     #[test]
+    fn test_auth_command_parsing_and_compatibility_shims() {
+        let auth_args = Args::try_parse_from(["termai", "auth", "login", "codex"]).unwrap();
+        match auth_args.command {
+            Some(Commands::Auth {
+                action: AuthAction::Login(args),
+            }) => {
+                assert_eq!(args.provider, Provider::OpenaiCodex);
+            }
+            _ => panic!("Expected auth login codex command"),
+        }
+
+        let shim_args = Args::try_parse_from(["termai", "config", "login-codex"]).unwrap();
+        match shim_args.command {
+            Some(Commands::Config { action, .. }) => {
+                assert!(matches!(action, ConfigAction::LoginCodex));
+            }
+            _ => panic!("Expected config login-codex compatibility shim"),
+        }
+    }
+
+    #[test]
+    fn test_config_migrate_command_parsing() {
+        let args = Args::try_parse_from(["termai", "config", "migrate"]).unwrap();
+        match args.command {
+            Some(Commands::Config { action, .. }) => {
+                assert!(matches!(action, ConfigAction::Migrate));
+            }
+            _ => panic!("Expected config migrate command"),
+        }
+    }
+
+    #[test]
     fn test_session_action_enum() {
         let list_action = SessionAction::List;
         match list_action {
@@ -484,9 +517,12 @@ mod tests {
     fn test_provider_enum() {
         assert_eq!(Provider::Claude.to_str(), "claude");
         assert_eq!(Provider::Openai.to_str(), "openai");
+        assert_eq!(Provider::OpenaiCodex.to_str(), "codex");
 
         assert_eq!(Provider::new("claude"), Provider::Claude);
         assert_eq!(Provider::new("openai"), Provider::Openai);
+        assert_eq!(Provider::new("codex"), Provider::OpenaiCodex);
+        assert_eq!(Provider::new("openai-codex"), Provider::OpenaiCodex);
         assert_eq!(Provider::new("unknown"), Provider::Claude); // Default fallback
     }
 

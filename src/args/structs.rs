@@ -1,6 +1,5 @@
 /// Dedicated argument structures for each subcommand
 /// Provides better type safety and organization compared to inline field definitions
-use crate::config::env::EnvResolver;
 use clap::Args;
 
 /// Arguments for the setup wizard command
@@ -75,37 +74,7 @@ pub struct ChatArgs {
 
 impl ChatArgs {
     /// Apply environment variable fallbacks to chat arguments
-    pub fn with_env_fallbacks(mut self) -> Self {
-        // Apply system prompt from environment if not provided
-        if self.system_prompt.is_none() {
-            self.system_prompt = EnvResolver::system_prompt();
-        }
-
-        // Apply session name from environment if not provided
-        if self.session.is_none() {
-            self.session = EnvResolver::session();
-        }
-
-        // Apply smart context setting from environment if not explicitly set
-        if !self.smart_context {
-            self.smart_context = EnvResolver::smart_context_enabled();
-        }
-
-        // Apply max context tokens from environment if not provided
-        if self.max_context_tokens.is_none() {
-            self.max_context_tokens = EnvResolver::max_context_tokens();
-        }
-
-        // Apply directories from environment if none provided
-        if self.directories.is_empty() {
-            self.directories.extend(EnvResolver::context_directories());
-        }
-
-        // Apply exclude patterns from environment if none provided
-        if self.exclude.is_empty() {
-            self.exclude.extend(EnvResolver::exclude_patterns());
-        }
-
+    pub fn with_env_fallbacks(self) -> Self {
         self
     }
 }
@@ -162,37 +131,7 @@ pub struct AskArgs {
 
 impl AskArgs {
     /// Apply environment variable fallbacks to ask arguments
-    pub fn with_env_fallbacks(mut self) -> Self {
-        // Apply system prompt from environment if not provided
-        if self.system_prompt.is_none() {
-            self.system_prompt = EnvResolver::system_prompt();
-        }
-
-        // Apply session name from environment if not provided
-        if self.session.is_none() {
-            self.session = EnvResolver::session();
-        }
-
-        // Apply smart context setting from environment if not explicitly set
-        if !self.smart_context {
-            self.smart_context = EnvResolver::smart_context_enabled();
-        }
-
-        // Apply max context tokens from environment if not provided
-        if self.max_context_tokens.is_none() {
-            self.max_context_tokens = EnvResolver::max_context_tokens();
-        }
-
-        // Apply directories from environment if none provided
-        if self.directories.is_empty() {
-            self.directories.extend(EnvResolver::context_directories());
-        }
-
-        // Apply exclude patterns from environment if none provided
-        if self.exclude.is_empty() {
-            self.exclude.extend(EnvResolver::exclude_patterns());
-        }
-
+    pub fn with_env_fallbacks(self) -> Self {
         self
     }
 }

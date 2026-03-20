@@ -55,7 +55,7 @@ impl CodexAdapter {
             // Check for specific error cases
             if status.as_u16() == 401 {
                 return Err(anyhow!(
-                    "Authentication failed. Your Codex session may have expired. Run 'termai config login-codex' to re-authenticate."
+                    "Authentication failed. Your Codex session may have expired. Run 'termai auth login codex' to re-authenticate."
                 ));
             }
 

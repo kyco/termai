@@ -19,7 +19,7 @@ impl CompletionValues {
         vec![
             "claude".to_string(),
             "openai".to_string(),
-            "openai-codex".to_string(),
+            "codex".to_string(),
         ]
     }
 
@@ -165,7 +165,7 @@ mod tests {
         let providers = CompletionValues::provider_names();
         assert!(providers.contains(&"claude".to_string()));
         assert!(providers.contains(&"openai".to_string()));
-        assert!(providers.contains(&"openai-codex".to_string()));
+        assert!(providers.contains(&"codex".to_string()));
     }
 
     #[test]

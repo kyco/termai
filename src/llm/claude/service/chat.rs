@@ -9,8 +9,19 @@ use crate::session::model::message::Message;
 use crate::session::model::session::Session;
 use anyhow::{Result, anyhow};
 
+#[allow(dead_code)]
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
-    let model = "claude-opus-4-1-20250805".to_string();
+    chat_with_model(api_key, session, None).await
+}
+
+pub async fn chat_with_model(
+    api_key: &str,
+    session: &mut Session,
+    model_param: Option<&str>,
+) -> Result<()> {
+    let model = model_param
+        .unwrap_or("claude-sonnet-4-20250514")
+        .to_string();
 
     // Check total input size to prevent hanging on extremely large inputs
     let total_input_size: usize = session

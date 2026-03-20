@@ -25,31 +25,8 @@ pub struct Preset {
 }
 
 /// Configuration options for preset execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PresetConfig {
-    /// Preferred AI provider
-    pub provider: Option<String>,
-    /// Token limits
-    pub max_tokens: Option<usize>,
-    /// Temperature setting
-    pub temperature: Option<f32>,
-    /// Context discovery settings
-    pub smart_context: Option<bool>,
-    /// Session settings
-    pub session: Option<String>,
-}
-
-impl Default for PresetConfig {
-    fn default() -> Self {
-        Self {
-            provider: None,
-            max_tokens: None,
-            temperature: None,
-            smart_context: None,
-            session: None,
-        }
-    }
-}
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PresetConfig {}
 
 /// Manager for preset operations
 pub struct PresetManager {

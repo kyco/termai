@@ -3,6 +3,7 @@
 /// This module provides a clean separation of command logic from argument parsing,
 /// making it easier to test, maintain, and extend the CLI functionality.
 pub mod ask;
+pub mod auth;
 pub mod branch;
 pub mod chat;
 pub mod codex_auth;
@@ -54,6 +55,13 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
                 .await
                 .context("❌ Configuration command failed")
                 .map_err(|e| enhance_config_error(e, action))?;
+            Ok(true)
+        }
+        Some(Commands::Auth { action }) => {
+            auth::handle_auth_command(repo, action)
+                .await
+                .context("❌ Authentication command failed")
+                .map_err(|e| enhance_auth_error(e, action))?;
             Ok(true)
         }
         Some(Commands::Redact {
@@ -225,13 +233,13 @@ pub fn handle_legacy_patterns(args: &Args, repo: &SqliteRepository) -> Result<bo
     let mut handled = false;
 
     if args.is_chat_gpt_api_key() {
-        eprintln!("⚠️  Warning: --chat-gpt-api-key is deprecated. Use 'termai config set-openai <key>' instead.");
+        eprintln!("⚠️  Warning: --chat-gpt-api-key is deprecated. Use 'termai auth login openai' instead.");
         crate::config::service::open_ai_config::write_open_ai_key(repo, args)?;
         handled = true;
     }
 
     if args.is_claude_api_key() {
-        eprintln!("⚠️  Warning: --claude-api-key is deprecated. Use 'termai config set-claude <key>' instead.");
+        eprintln!("⚠️  Warning: --claude-api-key is deprecated. Use 'termai auth login claude' instead.");
         crate::config::service::claude_config::write_claude_key(repo, args)?;
         handled = true;
     }
@@ -249,8 +257,16 @@ pub fn handle_legacy_patterns(args: &Args, repo: &SqliteRepository) -> Result<bo
     }
 
     if args.is_provider() {
-        eprintln!("⚠️  Warning: --provider is deprecated. Use 'termai config set-provider <provider>' instead.");
-        crate::config::service::provider_config::write_provider_key(repo, args)?;
+        eprintln!("⚠️  Warning: --provider is deprecated. Use 'termai config edit' or 'termai config set-provider <provider>' instead.");
+        if let Some(provider) = args.provider {
+            let mut user_config = crate::config::settings::UserConfig::load()?;
+            user_config.default.provider = match provider {
+                crate::args::Provider::Claude => crate::config::settings::SettingsProvider::Claude,
+                crate::args::Provider::Openai => crate::config::settings::SettingsProvider::Openai,
+                crate::args::Provider::OpenaiCodex => crate::config::settings::SettingsProvider::Codex,
+            };
+            user_config.save()?;
+        }
         handled = true;
     }
 
@@ -282,7 +298,7 @@ fn enhance_setup_error(error: anyhow::Error) -> anyhow::Error {
         "   The setup wizard encountered an issue. Try these steps:".white(),
         "Run 'termai config show' to check current configuration".cyan(),
         "Ensure you have a stable internet connection for API validation".cyan(),
-        "Try running 'termai config reset' if configuration is corrupted".cyan()
+        "Delete ~/.config/termai/config.toml if you need to reset durable defaults".cyan()
     );
     anyhow::anyhow!("{}\n{}", error, guidance)
 }
@@ -365,6 +381,31 @@ fn enhance_completion_error(error: anyhow::Error) -> anyhow::Error {
         "Try a different shell format (bash, zsh, fish, powershell)".cyan(),
         "Ensure you have write permissions to save completion scripts".cyan()
     );
+    anyhow::anyhow!("{}\n{}", error, guidance)
+}
+
+fn enhance_auth_error(error: anyhow::Error, action: &crate::args::AuthAction) -> anyhow::Error {
+    let guidance = match action {
+        crate::args::AuthAction::Login(_) => format!(
+            "\n{}\n{}\n• {}\n• {}",
+            "💡 Authentication Troubleshooting:".bright_yellow().bold(),
+            "   Authentication login failed. Try these steps:".white(),
+            "Check your network connection and browser access".cyan(),
+            "Use 'termai auth status <provider>' to confirm current state".cyan()
+        ),
+        crate::args::AuthAction::Logout(_) => format!(
+            "\n{}\n{}\n• {}",
+            "💡 Authentication Troubleshooting:".bright_yellow().bold(),
+            "   Authentication logout failed. Try these steps:".white(),
+            "Run 'termai auth status <provider>' to verify the active session".cyan()
+        ),
+        crate::args::AuthAction::Status(_) => format!(
+            "\n{}\n{}\n• {}",
+            "💡 Authentication Troubleshooting:".bright_yellow().bold(),
+            "   Authentication status lookup failed. Try these steps:".white(),
+            "Check that the local configuration database is available".cyan()
+        ),
+    };
     anyhow::anyhow!("{}\n{}", error, guidance)
 }
 

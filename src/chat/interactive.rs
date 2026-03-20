@@ -8,6 +8,7 @@ use crate::chat::formatter::ChatFormatter;
 use crate::chat::repl::ChatRepl;
 use crate::chat::state::ChatState;
 use crate::config::repository::ConfigRepository;
+use crate::config::settings::{ResolvedSettings, SettingsOverrides, SettingsProvider, UserConfig};
 use crate::llm::common::model::role::Role;
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
@@ -59,7 +60,7 @@ where
         let formatter = ChatFormatter::new();
         
         // Initialize chat state with current provider and model from config
-        let chat_state = Self::initialize_chat_state(config_repo)?;
+        let chat_state = Self::initialize_chat_state(sqlite_repo)?;
 
         Ok(Self {
             repl,
@@ -387,7 +388,12 @@ where
                     self.config_repo,
                     &ConfigKeys::ClaudeApiKey.to_key(),
                 )?;
-                claude::service::chat::chat(&api_key.value, &mut self.session).await?;
+                claude::service::chat::chat_with_model(
+                    &api_key.value,
+                    &mut self.session,
+                    Some(&self.chat_state.model),
+                )
+                .await?;
             }
             "openai" => {
                 let api_key = config_service::fetch_by_key(
@@ -397,7 +403,12 @@ where
                 if self.chat_state.tools_enabled {
                     openai::service::chat::chat_with_tools(&api_key.value, &mut self.session).await?;
                 } else {
-                    openai::service::chat::chat(&api_key.value, &mut self.session).await?;
+                    openai::service::chat::chat_with_model(
+                        &api_key.value,
+                        &mut self.session,
+                        Some(&self.chat_state.model),
+                    )
+                    .await?;
                 }
             }
             "openai-codex" | "openai_codex" | "codex" => {
@@ -409,7 +420,7 @@ where
                     .get_valid_token()
                     .await?
                     .ok_or_else(|| anyhow!(
-                        "Not authenticated with Codex. Run 'termai config login-codex' to authenticate."
+                        "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
                     ))?;
 
                 openai::service::codex::chat(&access_token, &mut self.session, Some(&self.chat_state.model)).await?;
@@ -631,43 +642,13 @@ where
     }
 
     /// Initialize chat state from current configuration
-    fn initialize_chat_state(config_repo: &R) -> Result<ChatState> {
-        use crate::args::Provider;
-        use crate::config::model::keys::ConfigKeys;
-        use crate::config::service::config_service;
-
-        // Get current provider from config
-        let provider_config = config_service::fetch_by_key(
-            config_repo,
-            &ConfigKeys::ProviderKey.to_key()
-        )?;
-        let provider = Provider::new(&provider_config.value);
-
-        let provider_str = match provider {
-            Provider::Claude => "claude",
-            Provider::Openai => "openai",
-            Provider::OpenaiCodex => "openai-codex",
-        };
-
-        // Get saved default model for this provider, or use hardcoded default
-        let model_config_key = match provider {
-            Provider::Claude => ConfigKeys::ClaudeDefaultModel,
-            Provider::Openai => ConfigKeys::OpenAIDefaultModel,
-            Provider::OpenaiCodex => ConfigKeys::CodexDefaultModel,
-        };
-
-        let default_model = config_service::fetch_by_key(config_repo, &model_config_key.to_key())
-            .map(|c| c.value)
-            .unwrap_or_else(|_| {
-                // Fallback to hardcoded defaults
-                match provider {
-                    Provider::Claude => "claude-sonnet-4-20250514".to_string(),
-                    Provider::Openai => "gpt-5.2".to_string(),
-                    Provider::OpenaiCodex => "gpt-5.2-codex".to_string(),
-                }
-            });
-
-        let chat_state = ChatState::new(provider_str.to_string(), default_model);
+    fn initialize_chat_state(sqlite_repo: &SqliteRepository) -> Result<ChatState> {
+        let settings =
+            ResolvedSettings::load_for_current_dir_with_repo(sqlite_repo, SettingsOverrides::default())?;
+        let chat_state = ChatState::new(
+            settings.default_provider.as_str().to_string(),
+            settings.selected_model(),
+        );
 
         Ok(chat_state)
     }
@@ -726,23 +707,15 @@ where
 
     /// Update configuration to reflect current chat state
     async fn update_config_from_state(&self) -> Result<()> {
-        use crate::args::Provider;
-        use crate::config::model::keys::ConfigKeys;
-        use crate::config::service::config_service;
-
-        let provider = match self.chat_state.provider.as_str() {
-            "claude" => Provider::Claude,
-            "openai" => Provider::Openai,
-            "openai-codex" | "openai_codex" | "codex" => Provider::OpenaiCodex,
+        let mut user_config = UserConfig::load()?;
+        user_config.default.provider = match self.chat_state.provider.as_str() {
+            "claude" => SettingsProvider::Claude,
+            "openai" => SettingsProvider::Openai,
+            "codex" | "openai-codex" | "openai_codex" => SettingsProvider::Codex,
             _ => return Err(anyhow!("Unknown provider: {}", self.chat_state.provider)),
         };
-
-        // Update provider in config
-        config_service::write_config(
-            self.config_repo,
-            &ConfigKeys::ProviderKey.to_key(),
-            provider.to_str(),
-        )?;
+        user_config.default.model = Some(self.chat_state.model.clone());
+        user_config.save()?;
 
         Ok(())
     }

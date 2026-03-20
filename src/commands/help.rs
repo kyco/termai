@@ -53,20 +53,20 @@ impl HelpSystem {
             "show".bright_white().bold()
         );
         println!(
-            "   {}    Set OpenAI API key",
-            "set-openai <key>".bright_white().bold()
+            "   {}          Edit user or active project config",
+            "edit".bright_white().bold()
         );
         println!(
-            "   {}    Set Claude API key",
-            "set-claude <key>".bright_white().bold()
+            "   {}      Validate the active project config",
+            "validate".bright_white().bold()
         );
         println!(
-            "   {} Set default provider",
-            "set-provider <name>".bright_white().bold()
+            "   {}           Create .termai.toml in the repo root",
+            "init".bright_white().bold()
         );
         println!(
-            "   {}         Reset all configuration",
-            "reset".bright_white().bold()
+            "   {}        Import legacy DB defaults into config.toml",
+            "migrate".bright_white().bold()
         );
         println!();
         println!("{}", "EXAMPLES:".bright_yellow().bold());
@@ -75,26 +75,87 @@ impl HelpSystem {
             "termai config show".cyan()
         );
         println!(
-            "   {}   # Set OpenAI key",
-            "termai config set-openai sk-...".cyan()
+            "   {}                 # Edit your settings",
+            "termai config edit".cyan()
         );
         println!(
-            "   {}   # Set Claude key",
-            "termai config set-claude sk-ant-...".cyan()
+            "   {}             # Create project config",
+            "termai config init --project-type rust".cyan()
         );
         println!(
-            "   {}      # Use Claude by default",
-            "termai config set-provider claude".cyan()
+            "   {}             # Validate project config",
+            "termai config validate".cyan()
         );
         println!(
-            "   {}                # Clear all settings",
-            "termai config reset".cyan()
+            "   {}             # Migrate legacy defaults",
+            "termai config migrate".cyan()
         );
         println!();
         println!("{}", "TIPS:".bright_green().bold());
-        println!("   • API keys are stored securely in ~/.config/termai/");
-        println!("   • Use 'show' to verify configuration without exposing keys");
-        println!("   • Provider can be 'claude', 'openai', or 'openai-codex'");
+        println!("   • Durable defaults live in ~/.config/termai/config.toml");
+        println!("   • Repo-specific context/privacy rules live in .termai.toml");
+        println!("   • Secrets and Codex OAuth stay in the auth/state store");
+        println!("   • Use 'termai auth' for provider credential management");
+        println!();
+    }
+
+    /// Show contextual help for the auth command
+    pub fn show_auth_help() {
+        println!("{}", "🔐 Authentication Help".bright_cyan().bold());
+        println!("{}", "══════════════════════".white().dimmed());
+        println!();
+        println!("{}", "DESCRIPTION:".bright_yellow().bold());
+        println!("   Manage provider authentication from one place");
+        println!();
+        println!("{}", "USAGE:".bright_yellow().bold());
+        println!("   {}", "termai auth <COMMAND> <PROVIDER>".cyan());
+        println!();
+        println!("{}", "COMMANDS:".bright_yellow().bold());
+        println!(
+            "   {}  Start authentication for a provider",
+            "login".bright_white().bold()
+        );
+        println!(
+            "   {}  Clear or revoke provider authentication",
+            "logout".bright_white().bold()
+        );
+        println!(
+            "   {}  Show the current authentication state",
+            "status".bright_white().bold()
+        );
+        println!();
+        println!("{}", "PROVIDERS:".bright_yellow().bold());
+        println!(
+            "   {}       Anthropic Claude API keys",
+            "claude".bright_white().bold()
+        );
+        println!(
+            "   {}        OpenAI API keys",
+            "openai".bright_white().bold()
+        );
+        println!(
+            "   {}          OpenAI Codex OAuth",
+            "codex".bright_white().bold()
+        );
+        println!();
+        println!("{}", "EXAMPLES:".bright_yellow().bold());
+        println!(
+            "   {}               # Check Codex state",
+            "termai auth status codex".cyan()
+        );
+        println!(
+            "   {}               # Check OpenAI key state",
+            "termai auth status openai".cyan()
+        );
+        println!(
+            "   {}               # Check Claude key state",
+            "termai auth status claude".cyan()
+        );
+        println!();
+        println!("{}", "TIPS:".bright_green().bold());
+        println!("   • Codex uses OAuth; Claude and OpenAI use stored API keys");
+        println!("   • Use config commands if you need to update raw stored keys");
+        println!("   • Hidden config auth shims remain for compatibility");
         println!();
     }
 
@@ -366,6 +427,10 @@ impl HelpSystem {
             "config".bright_white().bold()
         );
         println!(
+            "   {}      Manage provider authentication",
+            "auth".bright_white().bold()
+        );
+        println!(
             "   {}     Manage redaction patterns",
             "redact".bright_white().bold()
         );
@@ -394,6 +459,10 @@ impl HelpSystem {
         println!(
             "   {}     # Configuration help",
             "termai config --help".cyan()
+        );
+        println!(
+            "   {}         # Authentication help",
+            "termai auth --help".cyan()
         );
         println!(
             "   {}       # Chat session help",

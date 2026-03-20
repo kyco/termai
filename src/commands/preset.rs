@@ -449,36 +449,9 @@ async fn handle_create_preset(
 
     // Step 4: Configuration
     println!();
-    println!("{}", "📝 Step 4: Configuration (Optional)".bright_yellow().bold());
-    
-    let mut config = crate::preset::manager::PresetConfig::default();
-    
-    if Confirm::new()
-        .with_prompt("Configure advanced options?")
-        .default(false)
-        .interact()? {
-        
-        let providers = vec!["auto", "claude", "openai"];
-        let provider_selection = Select::new()
-            .with_prompt("🤖 Preferred AI provider")
-            .items(&providers)
-            .interact()?;
-        config.provider = Some(providers[provider_selection].to_string());
-        
-        let max_tokens: usize = Input::new()
-            .with_prompt("📊 Max tokens (0 for default)")
-            .default(0)
-            .interact()?;
-        if max_tokens > 0 {
-            config.max_tokens = Some(max_tokens);
-        }
-        
-        let temperature: f32 = Input::new()
-            .with_prompt("🌡️  Temperature (0.0-1.0)")
-            .default(0.3)
-            .interact()?;
-        config.temperature = Some(temperature.clamp(0.0, 1.0));
-    }
+    println!("{}", "📝 Step 4: Workflow Metadata".bright_yellow().bold());
+    println!("{}", "Preset runtime settings were removed from the simplified model.".dimmed());
+    let config = crate::preset::manager::PresetConfig::default();
 
     // Create template
     let template = Template::new(
@@ -1538,62 +1511,10 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
 
 /// Edit preset configuration
 fn edit_preset_configuration(preset: &mut crate::preset::manager::Preset) -> Result<bool> {
-    use dialoguer::{Input, Select};
-    
+    let _ = preset;
+
     println!("{}", "📝 Editing Configuration".bright_yellow().bold());
-    
-    let mut changes_made = false;
-    
-    // Edit provider
-    let providers = vec!["auto", "claude", "openai"];
-    let current_provider = preset.config.provider.as_deref().unwrap_or("auto");
-    let current_provider_index = providers.iter()
-        .position(|&p| p == current_provider)
-        .unwrap_or(0);
-    
-    let provider_selection = Select::new()
-        .with_prompt("🤖 Preferred AI provider")
-        .default(current_provider_index)
-        .items(&providers)
-        .interact()?;
-    
-    let new_provider = providers[provider_selection].to_string();
-    if Some(&new_provider) != preset.config.provider.as_ref() {
-        preset.config.provider = Some(new_provider);
-        changes_made = true;
-    }
-    
-    // Edit max tokens
-    let current_max_tokens = preset.config.max_tokens.unwrap_or(0);
-    let new_max_tokens: usize = Input::new()
-        .with_prompt("📊 Max tokens (0 for default)")
-        .default(current_max_tokens)
-        .interact()?;
-    
-    let new_max_tokens_option = if new_max_tokens == 0 { None } else { Some(new_max_tokens) };
-    if new_max_tokens_option != preset.config.max_tokens {
-        preset.config.max_tokens = new_max_tokens_option;
-        changes_made = true;
-    }
-    
-    // Edit temperature
-    let current_temperature = preset.config.temperature.unwrap_or(0.3);
-    let new_temperature: f32 = Input::new()
-        .with_prompt("🌡️  Temperature (0.0-1.0)")
-        .default(current_temperature)
-        .interact()?;
-    
-    let clamped_temperature = new_temperature.clamp(0.0, 1.0);
-    if Some(clamped_temperature) != preset.config.temperature {
-        preset.config.temperature = Some(clamped_temperature);
-        changes_made = true;
-    }
-    
-    if changes_made {
-        println!("✅ Configuration updated");
-    } else {
-        println!("ℹ️  No configuration changes made");
-    }
-    
-    Ok(changes_made)
+    println!("{}", "Preset runtime configuration was removed from the simplified model.".dimmed());
+    println!("{}", "Presets now only store prompt templates, variables, and workflow metadata.".dimmed());
+    Ok(false)
 }

@@ -71,6 +71,12 @@ pub enum Commands {
         action: ConfigAction,
     },
 
+    /// Manage provider authentication
+    Auth {
+        #[command(subcommand)]
+        action: AuthAction,
+    },
+
     /// Manage redaction patterns for privacy
     Redact {
         #[command(flatten)]
@@ -158,17 +164,22 @@ pub enum ConfigAction {
     /// Show current configuration
     Show,
     /// Set OpenAI API key
+    #[command(hide = true)]
     SetOpenai { api_key: String },
     /// Set Claude API key  
+    #[command(hide = true)]
     SetClaude { api_key: String },
     /// Set default provider
+    #[command(hide = true)]
     SetProvider {
         #[arg(value_enum)]
         provider: Provider,
     },
     /// Reset all configuration (clears API keys and settings)
+    #[command(hide = true)]
     Reset,
     /// Show environment variable help and current values
+    #[command(hide = true)]
     Env,
     
     // Project configuration commands
@@ -185,12 +196,16 @@ pub enum ConfigAction {
         force: bool,
     },
     /// Show project configuration details
+    #[command(hide = true)]
     Project,
     /// Validate project configuration
     Validate,
     /// Edit project configuration in default editor
     Edit,
+    /// Migrate legacy configuration into the simplified TOML model
+    Migrate,
     /// Export project configuration to file
+    #[command(hide = true)]
     Export {
         /// Output file path
         #[arg(long)]
@@ -200,6 +215,7 @@ pub enum ConfigAction {
         format: String,
     },
     /// Import project configuration from file
+    #[command(hide = true)]
     Import {
         /// Input file path
         file: String,
@@ -208,12 +224,15 @@ pub enum ConfigAction {
         merge: bool,
     },
     /// Login to OpenAI Codex using OAuth (ChatGPT Plus/Pro)
+    #[command(hide = true)]
     #[command(name = "login-codex")]
     LoginCodex,
     /// Logout from OpenAI Codex (clear OAuth tokens)
+    #[command(hide = true)]
     #[command(name = "logout-codex")]
     LogoutCodex,
     /// Show OpenAI Codex authentication status
+    #[command(hide = true)]
     #[command(name = "codex-status")]
     CodexStatus,
     /// Set default model for current provider
@@ -232,6 +251,23 @@ pub enum ConfigAction {
         #[arg(long)]
         refresh: bool,
     },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum AuthAction {
+    /// Log in to a provider
+    Login(AuthProviderArgs),
+    /// Log out from a provider
+    Logout(AuthProviderArgs),
+    /// Show authentication status for a provider
+    Status(AuthProviderArgs),
+}
+
+#[derive(clap::Args, Debug, Clone)]
+pub struct AuthProviderArgs {
+    /// Provider to manage authentication for
+    #[arg(value_enum)]
+    pub provider: Provider,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -457,11 +493,12 @@ pub enum Provider {
     Openai,
     Claude,
     /// OpenAI Codex - uses OAuth with ChatGPT Plus/Pro subscription
-    #[value(name = "openai-codex")]
+    #[value(name = "codex", alias = "openai-codex", alias = "openai_codex")]
     OpenaiCodex,
 }
 
 impl Provider {
+    #[allow(dead_code)]
     pub fn new(s: &str) -> Provider {
         match s {
             "openai" => Provider::Openai,
@@ -470,11 +507,12 @@ impl Provider {
         }
     }
 
+    #[allow(dead_code)]
     pub fn to_str(self) -> &'static str {
         match self {
             Provider::Openai => "openai",
             Provider::Claude => "claude",
-            Provider::OpenaiCodex => "openai-codex",
+            Provider::OpenaiCodex => "codex",
         }
     }
 }

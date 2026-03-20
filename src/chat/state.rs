@@ -148,7 +148,7 @@ impl ChatState {
                 .into_iter()
                 .filter(|m| (m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") || m.starts_with("computer-use")) && !m.contains("codex"))
                 .collect(),
-            "openai-codex" | "codex" => all_models
+            "codex" | "openai-codex" | "openai_codex" => all_models
                 .into_iter()
                 .filter(|m| m.contains("codex"))
                 .collect(),
@@ -161,7 +161,7 @@ impl ChatState {
         match provider {
             "claude" => "claude-sonnet-4-20250514".to_string(),
             "openai" => "gpt-5.2".to_string(),
-            "openai-codex" | "codex" => "gpt-5.3-codex".to_string(),
+            "codex" | "openai-codex" | "openai_codex" => "gpt-5.3-codex".to_string(),
             _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
@@ -171,7 +171,7 @@ impl ChatState {
         if model.starts_with("claude") {
             "claude".to_string()
         } else if model.contains("codex") {
-            "openai-codex".to_string()
+            "codex".to_string()
         } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") || model.starts_with("o4") || model.starts_with("computer-use") {
             "openai".to_string()
         } else {
@@ -303,10 +303,10 @@ mod tests {
     fn test_provider_switching_to_openai_codex() {
         let mut state = ChatState::default();
 
-        let result = state.switch_provider("openai-codex".to_string());
+        let result = state.switch_provider("codex".to_string());
 
         assert!(result.is_ok());
-        assert_eq!(state.provider, "openai-codex");
+        assert_eq!(state.provider, "codex");
         assert!(state.model.contains("codex"));
     }
 
@@ -327,6 +327,11 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(state.model, "claude-sonnet-4-20250514");
         assert_eq!(state.provider, "claude"); // Provider should automatically switch
+
+        let result = state.switch_model("gpt-5.3-codex".to_string());
+        assert!(result.is_ok());
+        assert_eq!(state.model, "gpt-5.3-codex");
+        assert_eq!(state.provider, "codex");
     }
 
     #[test]

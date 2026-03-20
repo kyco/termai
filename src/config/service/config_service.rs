@@ -43,7 +43,6 @@ pub fn fetch_with_env_fallback<R: ConfigRepository>(repo: &R, key: &str) -> Resu
     let env_value = match key {
         key if key == ConfigKeys::ClaudeApiKey.to_key() => EnvResolver::claude_api_key(),
         key if key == ConfigKeys::ChatGptApiKey.to_key() => EnvResolver::openai_api_key(),
-        key if key == ConfigKeys::ProviderKey.to_key() => EnvResolver::provider(),
         _ => None,
     };
 
@@ -70,7 +69,6 @@ pub fn has_config<R: ConfigRepository>(repo: &R, key: &str) -> bool {
     match key {
         key if key == ConfigKeys::ClaudeApiKey.to_key() => EnvResolver::claude_api_key().is_some(),
         key if key == ConfigKeys::ChatGptApiKey.to_key() => EnvResolver::openai_api_key().is_some(),
-        key if key == ConfigKeys::ProviderKey.to_key() => EnvResolver::provider().is_some(),
         _ => false,
     }
 }

@@ -19,13 +19,22 @@ use crate::session::model::session::Session;
 use anyhow::{Result, anyhow};
 
 /// Chat without tools - simple request/response
+#[allow(dead_code)]
 pub async fn chat(api_key: &str, session: &mut Session) -> Result<()> {
-    chat_internal(api_key, session, false).await
+    chat_with_model(api_key, session, None).await
+}
+
+pub async fn chat_with_model(
+    api_key: &str,
+    session: &mut Session,
+    model_param: Option<&str>,
+) -> Result<()> {
+    chat_internal(api_key, session, false, model_param).await
 }
 
 /// Chat with tools enabled - allows model to execute bash, read/write files, etc.
 pub async fn chat_with_tools(api_key: &str, session: &mut Session) -> Result<()> {
-    chat_internal(api_key, session, true).await
+    chat_internal(api_key, session, true, None).await
 }
 
 /// Maximum characters for tool output before truncation
@@ -50,13 +59,20 @@ fn truncate_tool_output(output: &str) -> String {
 }
 
 /// Internal chat implementation that optionally enables tools
-async fn chat_internal(api_key: &str, session: &mut Session, enable_tools: bool) -> Result<()> {
-    let model = Model::Gpt5; // Default to GPT-5.2 for best performance
+async fn chat_internal(
+    api_key: &str,
+    session: &mut Session,
+    enable_tools: bool,
+    model_param: Option<&str>,
+) -> Result<()> {
+    let model_name = model_param
+        .map(str::to_string)
+        .unwrap_or_else(|| Model::Gpt5.to_string());
     let executor = ToolExecutor::new(std::env::current_dir()?);
 
     // Check and perform compaction if needed (before the main loop)
     if compaction::needs_compaction(session) {
-        compaction::try_compact_session(api_key, session, &model.to_string()).await;
+        compaction::try_compact_session(api_key, session, &model_name).await;
     }
 
     let mut iteration = 0;
@@ -65,7 +81,7 @@ async fn chat_internal(api_key: &str, session: &mut Session, enable_tools: bool)
         iteration += 1;
         if iteration > MAX_TOOL_ITERATIONS {
             // Force a final response without tools
-            return finish_without_tools(api_key, session, &model).await;
+            return finish_without_tools(api_key, session, &model_name).await;
         }
 
         // Check if we have any compaction items (requires extended input format)
@@ -91,7 +107,7 @@ async fn chat_internal(api_key: &str, session: &mut Session, enable_tools: bool)
                 }
             }).collect();
 
-            ResponsesRequest::from_extended(model.to_string(), extended_items)
+            ResponsesRequest::from_extended(model_name.clone(), extended_items)
         } else {
             // Standard message format
             let input_messages: Vec<InputMessage> = session
@@ -119,10 +135,10 @@ async fn chat_internal(api_key: &str, session: &mut Session, enable_tools: bool)
             // Create the request
             if input_messages.len() == 1 && input_messages[0].role == "user" {
                 // For single user message, use simple text input
-                ResponsesRequest::simple(model.to_string(), input_messages[0].content.clone())
+                ResponsesRequest::simple(model_name.clone(), input_messages[0].content.clone())
             } else {
                 // For conversation, use messages format
-                ResponsesRequest::from_messages(model.to_string(), input_messages)
+                ResponsesRequest::from_messages(model_name.clone(), input_messages)
             }
         };
 
@@ -217,7 +233,7 @@ async fn chat_internal(api_key: &str, session: &mut Session, enable_tools: bool)
 }
 
 /// Force a final response without tools when iteration limit is exceeded
-async fn finish_without_tools(api_key: &str, session: &mut Session, model: &Model) -> Result<()> {
+async fn finish_without_tools(api_key: &str, session: &mut Session, model: &str) -> Result<()> {
     // Add a message asking the model to summarize
     session.messages.push(Message::new(
         "".to_string(),

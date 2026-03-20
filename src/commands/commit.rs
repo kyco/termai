@@ -1,5 +1,6 @@
 /// Git commit message generation command handler
 use crate::args::CommitArgs;
+use crate::config::settings::{ResolvedSettings, SettingsOverrides, SettingsProvider};
 use crate::config::model::keys::ConfigKeys;
 use crate::config::service::config_service;
 use crate::git::{diff::DiffAnalyzer, repository::GitRepository};
@@ -221,13 +222,9 @@ async fn generate_ai_commit_message(
     args: &CommitArgs,
     repo: &SqliteRepository,
 ) -> Result<crate::git::commit::CommitMessage> {
-    // Get provider configuration
-    let provider = config_service::fetch_with_env_fallback(repo, &ConfigKeys::ProviderKey.to_key())
-        .unwrap_or_else(|_| crate::config::entity::config_entity::ConfigEntity {
-            id: None,
-            key: ConfigKeys::ProviderKey.to_key(),
-            value: "claude".to_string(),
-        });
+    let settings =
+        ResolvedSettings::load_for_current_dir_with_repo(repo, SettingsOverrides::default())?;
+    let selected_model = settings.selected_model();
 
     // Create detailed diff analysis for AI
     let diff_context = create_diff_context_for_ai(diff_summary);
@@ -236,26 +233,37 @@ async fn generate_ai_commit_message(
     let prompt = create_commit_message_prompt(diff_summary, args, &diff_context);
 
     // Call appropriate AI service
-    eprintln!("DEBUG: Using provider: {}", provider.value);
-    let ai_response = match provider.value.as_str() {
-        "claude" => {
+    eprintln!("DEBUG: Using provider: {}", settings.default_provider.as_str());
+    let ai_response = match settings.default_provider {
+        SettingsProvider::Claude => {
             eprintln!("DEBUG: Getting Claude API key");
             let api_key =
                 config_service::fetch_with_env_fallback(repo, &ConfigKeys::ClaudeApiKey.to_key())
                     .context("Claude API key not configured")?;
             eprintln!("DEBUG: Calling Claude API");
-            generate_with_claude(&prompt, &api_key.value).await?
+            generate_with_claude(&prompt, &api_key.value, &selected_model).await?
         }
-        "openai" => {
+        SettingsProvider::Openai => {
             eprintln!("DEBUG: Getting OpenAI API key");
             let api_key =
                 config_service::fetch_with_env_fallback(repo, &ConfigKeys::ChatGptApiKey.to_key())
                     .context("OpenAI API key not configured")?;
             eprintln!("DEBUG: Calling OpenAI API (falling back to Chat Completions API)");
             // For now, fall back to a simple implementation that doesn't hang
-            generate_with_openai_fallback(&prompt, &api_key.value).await?
+            generate_with_openai_fallback(&prompt, &api_key.value, &selected_model).await?
         }
-        _ => bail!("Unsupported provider: {}", provider.value),
+        SettingsProvider::Codex => {
+            eprintln!("DEBUG: Getting Codex access token");
+            let token_manager = crate::auth::token_manager::TokenManager::new(repo);
+            let access_token = token_manager
+                .get_valid_token()
+                .await?
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
+                ))?;
+            eprintln!("DEBUG: Calling Codex API");
+            generate_with_codex(&prompt, &access_token, &selected_model).await?
+        }
     };
     eprintln!("DEBUG: AI response received");
 
@@ -353,9 +361,9 @@ fn create_commit_message_prompt(
 }
 
 /// Generate commit message using Claude
-async fn generate_with_claude(prompt: &str, api_key: &str) -> Result<String> {
+async fn generate_with_claude(prompt: &str, api_key: &str, model: &str) -> Result<String> {
     let request = ChatCompletionRequest {
-        model: "claude-opus-4-1-20250805".to_string(),
+        model: model.to_string(),
         max_tokens: 1000,
         messages: vec![
             ChatMessage {
@@ -435,7 +443,7 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
 }
 
 /// Fallback OpenAI implementation using standard Chat Completions API
-async fn generate_with_openai_fallback(prompt: &str, api_key: &str) -> Result<String> {
+async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str) -> Result<String> {
     eprintln!("DEBUG: Using OpenAI Chat Completions fallback");
     use reqwest::Client;
     use serde_json::json;
@@ -443,7 +451,7 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str) -> Result<St
     let client = Client::new();
     
     let request_body = json!({
-        "model": "gpt-5.2",
+        "model": model,
         "messages": [
             {"role": "system", "content": "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis."},
             {"role": "user", "content": prompt}
@@ -483,6 +491,28 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str) -> Result<St
     }
 
     bail!("No response content from OpenAI Chat Completions API")
+}
+
+async fn generate_with_codex(prompt: &str, access_token: &str, model: &str) -> Result<String> {
+    let mut session = crate::session::model::session::Session::new_temporary();
+    session.messages.push(crate::session::model::message::Message::new(
+        "".to_string(),
+        Role::System,
+        "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis.".to_string(),
+    ));
+    session.messages.push(crate::session::model::message::Message::new(
+        "".to_string(),
+        Role::User,
+        prompt.to_string(),
+    ));
+
+    crate::llm::openai::service::codex::chat(access_token, &mut session, Some(model)).await?;
+
+    if let Some(last_message) = session.messages.last() {
+        return Ok(last_message.content.clone());
+    }
+
+    bail!("No response content from Codex")
 }
 
 /// Parse AI response into structured commit message

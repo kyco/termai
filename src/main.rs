@@ -121,6 +121,14 @@ async fn main() -> Result<()> {
         "   {}              # View configuration",
         "termai config show".cyan()
     );
+    println!(
+        "   {}      # Check provider authentication",
+        "termai auth status codex".cyan()
+    );
+    println!(
+        "   {}       # Manage provider logins",
+        "termai auth login codex".cyan()
+    );
     println!();
     println!(
         "Use {} for detailed command information.",

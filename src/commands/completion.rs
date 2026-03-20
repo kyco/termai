@@ -217,6 +217,7 @@ fn print_completion_instructions(shell: &str, config_file: &str, command: &str) 
     );
     println!("   {}", "termai <TAB><TAB>".cyan());
     println!("   {}", "termai config <TAB><TAB>".cyan());
+    println!("   {}", "termai auth <TAB><TAB>".cyan());
     println!("   {}", "termai session <TAB><TAB>".cyan());
 }
 
@@ -303,7 +304,7 @@ fn print_enhanced_completion_instructions(shell: &str) {
     );
     println!(
         "   • {} - Complete provider names",
-        "termai config set-provider <TAB>".bright_white()
+        "termai auth login <TAB>".bright_white()
     );
     println!(
         "   • {} - Common exclude patterns",

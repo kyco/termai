@@ -121,7 +121,7 @@ impl<'a, R: ConfigRepository> TokenManager<'a, R> {
         }
 
         // Token expired and no refresh token available
-        Err(anyhow!("Access token expired and no refresh token available. Please run 'termai config login-codex' to re-authenticate."))
+        Err(anyhow!("Access token expired and no refresh token available. Please run 'termai auth login codex' to re-authenticate."))
     }
 
     /// Check if the user is authenticated with valid tokens

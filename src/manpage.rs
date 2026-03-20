@@ -100,8 +100,7 @@ FILES:
 ENVIRONMENT:
     OPENAI_API_KEY          OpenAI API key
     CLAUDE_API_KEY          Claude API key  
-    TERMAI_PROVIDER         Default provider (claude|openai)
-    TERMAI_SMART_CONTEXT    Enable smart context (true|false)
+    ANTHROPIC_API_KEY       Alternative Claude API key name
 
 EXIT STATUS:
     0    Success
