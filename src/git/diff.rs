@@ -534,14 +534,13 @@ impl DiffSummary {
                 if let Some(path) = &file.new_path {
                     if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
                         // Public API files that might indicate breaking changes
-                        if matches!(extension, "rs" | "ts" | "js" | "py" | "go" | "java") {
-                            if path.to_string_lossy().contains("lib")
+                        if matches!(extension, "rs" | "ts" | "js" | "py" | "go" | "java")
+                            && (path.to_string_lossy().contains("lib")
                                 || path.to_string_lossy().contains("api")
-                                || path.to_string_lossy().contains("public")
+                                || path.to_string_lossy().contains("public"))
                             {
                                 return true;
                             }
-                        }
                     }
                 }
             }

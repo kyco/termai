@@ -212,7 +212,7 @@ async fn suggest_presets_for_context(files: &[Files]) -> Result<Vec<(String, Str
         }
     }
 
-    if has_tests || (has_code && !has_tests) {
+    if has_tests || has_code {
         for preset in &builtin_presets {
             if preset.name == "Test Generator" {
                 let reason = if has_tests {

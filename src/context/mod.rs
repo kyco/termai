@@ -223,7 +223,7 @@ impl SmartContext {
         if path
             .file_name()
             .and_then(|name| name.to_str())
-            .map_or(false, |name| name.starts_with('.'))
+            .is_some_and(|name| name.starts_with('.'))
         {
             // Allow if explicitly in include patterns
             if !self

@@ -127,12 +127,11 @@ pub async fn smart_extract_content_with_preview(
                         std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
                         let mut input = String::new();
-                        if std::io::stdin().read_line(&mut input).is_ok() {
-                            if !input.trim().to_lowercase().starts_with('y') {
+                        if std::io::stdin().read_line(&mut input).is_ok()
+                            && !input.trim().to_lowercase().starts_with('y') {
                                 println!("Smart context selection cancelled. Using manual extraction fallback.");
                                 return extract_content(&Some(".".to_string()), &[], exclude);
                             }
-                        }
                     }
 
                     // Convert to Files format and return
@@ -162,6 +161,7 @@ pub async fn smart_extract_content(
 
 /// Enhanced extract_content that can optionally use smart context discovery
 #[allow(dead_code)]
+#[allow(clippy::too_many_arguments)]
 pub async fn extract_content_with_smart_fallback(
     dir: &Option<String>,
     dirs: &[String],
@@ -304,8 +304,8 @@ pub async fn smart_extract_with_chunking(
                             std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
                             let mut input = String::new();
-                            if std::io::stdin().read_line(&mut input).is_ok() {
-                                if input.trim().to_lowercase().starts_with('n') {
+                            if std::io::stdin().read_line(&mut input).is_ok()
+                                && input.trim().to_lowercase().starts_with('n') {
                                     println!("Chunked analysis cancelled. Using regular smart context with truncation.");
                                     if let Ok(selected_scores) =
                                         smart_context.optimizer.optimize_files(&filtered_scores)
@@ -317,7 +317,6 @@ pub async fn smart_extract_with_chunking(
                                         }
                                     }
                                 }
-                            }
                         }
 
                         // Return the first chunk (usually Overview) to start the conversation
@@ -344,11 +343,10 @@ pub async fn smart_extract_with_chunking(
                         std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
                         let mut input = String::new();
-                        if std::io::stdin().read_line(&mut input).is_ok() {
-                            if !input.trim().to_lowercase().starts_with('y') {
+                        if std::io::stdin().read_line(&mut input).is_ok()
+                            && !input.trim().to_lowercase().starts_with('y') {
                                 return extract_content(&Some(".".to_string()), &[], exclude);
                             }
-                        }
                     }
 
                     if let Ok(files) = smart_context.scores_to_files(&selected_scores).await {

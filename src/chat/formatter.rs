@@ -406,24 +406,21 @@ impl ChatFormatter {
         let trimmed = line.trim();
         
         // Handle headers - improved styling with better visual separation
-        if trimmed.starts_with("### ") {
-            let title = &trimmed[4..]; // Remove "### "
+        if let Some(title) = trimmed.strip_prefix("### ") {
+            // Remove "### "
             return format!("🔷 {}", title).bright_cyan().bold().to_string().into();
-        } else if trimmed.starts_with("##") {
-            let title = if trimmed.starts_with("## ") {
-                &trimmed[3..] // Remove "## "
-            } else {
-                &trimmed[2..] // Remove "##"
-            };
+        } else if let Some(title) = trimmed.strip_prefix("## ") {
             return format!("🔵 {}", title.trim()).bright_blue().bold().to_string().into();
-        } else if trimmed.starts_with("# ") {
-            let title = &trimmed[2..]; // Remove "# "
+        } else if let Some(title) = trimmed.strip_prefix("##") {
+            return format!("🔵 {}", title.trim()).bright_blue().bold().to_string().into();
+        } else if let Some(title) = trimmed.strip_prefix("# ") {
+            // Remove "# "
             return format!("🟢 {}", title).bright_green().bold().to_string().into();
         }
         
         // Handle lists
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            return format!("  • {}", &trimmed[2..]).bright_yellow().to_string().into();
+        if let Some(item) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+            return format!("  • {}", item).bright_yellow().to_string().into();
         }
         
         // Handle numbered lists
@@ -434,8 +431,8 @@ impl ChatFormatter {
         }
         
         // Handle blockquotes
-        if trimmed.starts_with("> ") {
-            return format!("│ {}", &trimmed[2..]).bright_magenta().italic().to_string().into();
+        if let Some(quote) = trimmed.strip_prefix("> ") {
+            return format!("│ {}", quote).bright_magenta().italic().to_string().into();
         }
         
         // Handle bold and italic
@@ -738,7 +735,7 @@ impl ChatFormatter {
     pub fn format_context_info(&self, context_size: usize, files: &[String]) -> String {
         let mut info = String::new();
         info.push_str(
-            &format!("📁 Context Information:\n")
+            &"📁 Context Information:\n".to_string()
                 .bright_blue()
                 .bold()
                 .to_string(),

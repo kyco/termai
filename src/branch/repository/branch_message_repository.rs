@@ -63,7 +63,7 @@ impl BranchMessageRepository {
         )?;
 
         let rows = stmt.query_map(params![branch_id], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })?;
 
         let mut message_ids = Vec::new();
@@ -139,7 +139,7 @@ impl BranchMessageRepository {
         )?;
 
         let rows = stmt.query_map(params![message_id], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })?;
 
         let mut branch_ids = Vec::new();

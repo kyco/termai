@@ -57,7 +57,7 @@ impl HookManager {
             }
 
             // Backup existing hook
-            let backup_path = hook_path.with_extension(&format!("{}.backup", hook_name));
+            let backup_path = hook_path.with_extension(format!("{}.backup", hook_name));
             fs::copy(&hook_path, &backup_path).context("Failed to backup existing hook")?;
             println!(
                 "{}",
@@ -115,10 +115,10 @@ impl HookManager {
         fs::remove_file(&hook_path).context("Failed to remove hook")?;
 
         // Restore backup if exists
-        let backup_path = hook_path.with_extension(&format!("{}.backup", hook_name));
+        let backup_path = hook_path.with_extension(format!("{}.backup", hook_name));
         if backup_path.exists() {
             fs::rename(&backup_path, &hook_path).context("Failed to restore backup hook")?;
-            println!("{}", format!("📋 Restored backup hook").green());
+            println!("{}", "📋 Restored backup hook".to_string().green());
         }
 
         println!(
@@ -140,7 +140,7 @@ impl HookManager {
         };
 
         let backup_path =
-            hook_path.with_extension(&format!("{}.backup", self.hook_type_to_name(&hook_type)));
+            hook_path.with_extension(format!("{}.backup", self.hook_type_to_name(&hook_type)));
         let existing_hook = backup_path.exists();
 
         Ok(HookStatus {
@@ -293,8 +293,7 @@ exit 0
                 termai_path
             ),
 
-            HookType::CommitMsg => format!(
-                r#"#!/bin/bash
+            HookType::CommitMsg => r#"#!/bin/bash
 # TermAI Git Hook - Commit Message
 # This hook validates and can enhance commit messages
 
@@ -313,8 +312,7 @@ else
 fi
 
 exit 0
-"#
-            ),
+"#.to_string(),
 
             HookType::PrePush => format!(
                 r#"#!/bin/bash
@@ -340,8 +338,7 @@ exit 0
                 termai_path
             ),
 
-            HookType::PostCommit => format!(
-                r#"#!/bin/bash
+            HookType::PostCommit => r#"#!/bin/bash
 # TermAI Git Hook - Post-commit
 # This hook provides post-commit insights and suggestions
 
@@ -360,8 +357,7 @@ echo "   Message: $commit_msg"
 echo "💡 Tip: Use 'termai branch-summary' to analyze your branch"
 
 exit 0
-"#
-            ),
+"#.to_string(),
         };
 
         Ok(script)

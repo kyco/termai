@@ -109,6 +109,7 @@ impl AllowedToolReference {
 
 /// Preamble configuration for tool calls
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub struct PreambleConfig {
     /// Whether to enable preambles (explanations before tool calls)
     pub enabled: bool,
@@ -117,14 +118,6 @@ pub struct PreambleConfig {
     pub instruction: Option<String>,
 }
 
-impl Default for PreambleConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            instruction: None,
-        }
-    }
-}
 
 #[allow(dead_code)]
 impl PreambleConfig {

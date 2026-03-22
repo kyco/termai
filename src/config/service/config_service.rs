@@ -5,10 +5,7 @@ use crate::config::repository::ConfigRepository;
 use anyhow::{anyhow, Result};
 
 pub fn write_config<R: ConfigRepository>(repo: &R, key: &str, value: &str) -> Result<()> {
-    let config = match repo.fetch_by_key(key) {
-        Ok(config) => Some(config),
-        Err(_) => None,
-    };
+    let config = repo.fetch_by_key(key).ok();
 
     let _ = match config {
         Some(c) => repo.update_config(c.id.unwrap_or_default(), key, value),

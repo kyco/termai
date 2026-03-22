@@ -90,15 +90,15 @@ impl ContextConfig {
     /// Get project type from configuration
     pub fn get_project_type(&self) -> Option<ProjectType> {
         self.project.as_ref().and_then(|p| {
-            p.project_type.as_ref().and_then(|t| match t.as_str() {
-                "rust" => Some(ProjectType::Rust),
-                "javascript" | "js" | "typescript" | "ts" => Some(ProjectType::JavaScript),
-                "python" | "py" => Some(ProjectType::Python),
-                "go" | "golang" => Some(ProjectType::Go),
-                "kotlin" | "kt" => Some(ProjectType::Kotlin),
-                "java" => Some(ProjectType::Java),
-                "git" => Some(ProjectType::Git),
-                _ => Some(ProjectType::Generic),
+            p.project_type.as_ref().map(|t| match t.as_str() {
+                "rust" => ProjectType::Rust,
+                "javascript" | "js" | "typescript" | "ts" => ProjectType::JavaScript,
+                "python" | "py" => ProjectType::Python,
+                "go" | "golang" => ProjectType::Go,
+                "kotlin" | "kt" => ProjectType::Kotlin,
+                "java" => ProjectType::Java,
+                "git" => ProjectType::Git,
+                _ => ProjectType::Generic,
             })
         })
     }

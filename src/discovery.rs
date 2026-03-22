@@ -416,7 +416,7 @@ impl CommandDiscovery {
 
         // Check git status
         if let Ok(output) = std::process::Command::new("git")
-            .args(&["status", "--porcelain"])
+            .args(["status", "--porcelain"])
             .output()
         {
             if !output.stdout.is_empty() {

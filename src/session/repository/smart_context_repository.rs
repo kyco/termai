@@ -193,6 +193,7 @@ impl SmartContextRepository for SmartContextRepositoryImpl {
 }
 
 /// Helper function to create a new SmartContextEntity with generated ID
+#[allow(clippy::too_many_arguments)]
 pub fn create_smart_context_entity(
     session_id: String,
     project_path: String,

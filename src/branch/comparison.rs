@@ -1,9 +1,8 @@
-/// Branch comparison features for TermAI
+// Branch comparison features for TermAI
+//
+// This module provides sophisticated comparison capabilities between conversation branches,
+// allowing users to analyze different approaches, solutions, and outcomes side-by-side.
 #[allow(dead_code)]
-/// 
-/// This module provides sophisticated comparison capabilities between conversation branches,
-/// allowing users to analyze different approaches, solutions, and outcomes side-by-side.
-
 use crate::branch::entity::branch_entity::BranchEntity;
 use crate::branch::service::BranchService;
 use crate::repository::db::SqliteRepository;
@@ -168,7 +167,7 @@ impl BranchComparator {
         // Header
         output.push_str(&format!("{}\n", "📊 Side-by-Side Branch Comparison".bright_green().bold()));
         output.push_str(&format!("{}\n", "═".repeat(40).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         // Branch headers
         let branch_names: Vec<String> = comparison.branches.iter()
@@ -269,7 +268,7 @@ impl BranchComparator {
         
         output.push_str(&format!("{}\n", "📋 Comparison Summary".bright_yellow().bold()));
         output.push_str(&format!("{}\n", "═".repeat(20).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         let summary = &comparison.summary;
         
@@ -282,7 +281,7 @@ impl BranchComparator {
             "Overall similarity:".bright_cyan(), 
             summary.similarity_percentage
         ));
-        output.push_str("\n");
+        output.push('\n');
 
         // Quality scores
         if !summary.quality_scores.is_empty() {
@@ -305,7 +304,7 @@ impl BranchComparator {
                     }
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Unique insights
@@ -327,7 +326,7 @@ impl BranchComparator {
                     insight.description
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Recommendations
@@ -647,7 +646,7 @@ impl QuickCompare {
         let mut output = String::new();
         output.push_str(&format!("{}\n", "🎯 Branch Outcomes Comparison".bright_green().bold()));
         output.push_str(&format!("{}\n", "═".repeat(30).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         for (i, branch) in comparison.branches.iter().enumerate() {
             let branch_name = branch.branch_name.as_deref().unwrap_or("unnamed");
@@ -678,7 +677,7 @@ impl QuickCompare {
                 output.push_str(&format!("   {} {}\n", "Description:".dimmed(), description.dimmed()));
             }
             
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Add recommendations

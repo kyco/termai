@@ -129,8 +129,8 @@ impl Gpt5Config {
     pub fn describe(&self) -> String {
         format!(
             "GPT-5 Config: reasoning={}, verbosity={}, api={}, preambles={}, storage={}, zdr={}",
-            self.reasoning_effort.to_string(),
-            self.verbosity.to_string(),
+            self.reasoning_effort,
+            self.verbosity,
             if self.prefer_responses_api { "responses" } else { "chat" },
             self.preambles.enabled,
             self.store_conversations,

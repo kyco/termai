@@ -192,7 +192,7 @@ impl FileAnalyzer {
         };
 
         // Normalize score to 0-1 range
-        let relevance_score = (base_score / 10.0_f32).min(1.0).max(0.0);
+        let relevance_score = (base_score / 10.0_f32).clamp(0.0, 1.0);
 
         Ok(FileScore {
             path: path.to_string_lossy().to_string(),
@@ -207,7 +207,7 @@ impl FileAnalyzer {
     /// Determine the type of a file based on extension and name
     fn determine_file_type(&self, path: &Path) -> FileType {
         if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
-            if let Some(&ref file_type) = self.extension_map.get(extension) {
+            if let Some(file_type) = self.extension_map.get(extension) {
                 return file_type.clone();
             }
         }
@@ -311,8 +311,8 @@ impl FileAnalyzer {
             let ref_count = reference_counts.get(file_path).unwrap_or(&0);
 
             // High reference count indicates an important file
-            if *ref_count >= 3 {
-                if !file_score
+            if *ref_count >= 3
+                && !file_score
                     .importance_factors
                     .contains(&ImportanceFactor::HighlyReferenced)
                 {
@@ -321,7 +321,6 @@ impl FileAnalyzer {
                         .push(ImportanceFactor::HighlyReferenced);
                     file_score.relevance_score = (file_score.relevance_score + 0.3).min(1.0);
                 }
-            }
 
             // Files that others depend on but have few dependencies themselves (root files)
             if *ref_count >= 2 {
@@ -329,8 +328,8 @@ impl FileAnalyzer {
                     .get(file_path)
                     .map(|deps| deps.len())
                     .unwrap_or(0);
-                if own_deps <= 1 {
-                    if !file_score
+                if own_deps <= 1
+                    && !file_score
                         .importance_factors
                         .contains(&ImportanceFactor::DependencyRoot)
                     {
@@ -339,7 +338,6 @@ impl FileAnalyzer {
                             .push(ImportanceFactor::DependencyRoot);
                         file_score.relevance_score = (file_score.relevance_score + 0.2).min(1.0);
                     }
-                }
             }
         }
 

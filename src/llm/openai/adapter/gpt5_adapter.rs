@@ -21,8 +21,7 @@ impl Gpt5Adapter {
         }
     }
 
-    /// Chat Completions API removed - migrated to Responses API
-
+    // Chat Completions API removed - migrated to Responses API
     /// Call the new Responses API (preferred for GPT-5)
     /// Optimized for reasoning models with better caching and performance
     pub async fn responses(
@@ -103,9 +102,9 @@ impl Gpt5Adapter {
         response.output.iter()
             .find_map(|output| match output {
                 crate::llm::openai::model::responses_api::ResponseOutput::Message { content, .. } => {
-                    content.iter().find_map(|item| match item {
-                        crate::llm::openai::model::responses_api::ContentItem::OutputText { text, .. } => Some(text.clone()),
-                    })
+                    content.iter().map(|item| match item {
+                        crate::llm::openai::model::responses_api::ContentItem::OutputText { text, .. } => text.clone(),
+                    }).next()
                 }
                 _ => None,
             })

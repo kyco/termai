@@ -26,6 +26,7 @@ pub struct Preset {
 
 /// Configuration options for preset execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct PresetConfig {
     /// Preferred AI provider
     pub provider: Option<String>,
@@ -39,17 +40,6 @@ pub struct PresetConfig {
     pub session: Option<String>,
 }
 
-impl Default for PresetConfig {
-    fn default() -> Self {
-        Self {
-            provider: None,
-            max_tokens: None,
-            temperature: None,
-            smart_context: None,
-            session: None,
-        }
-    }
-}
 
 /// Manager for preset operations
 pub struct PresetManager {
@@ -127,7 +117,7 @@ impl PresetManager {
             let entry = entry?;
             let path = entry.path();
             
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "yaml" || ext == "yml") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "yaml" || ext == "yml") {
                 match self.load_preset_info(&path) {
                     Ok(mut info) => {
                         info.is_builtin = is_builtin;

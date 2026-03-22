@@ -4,20 +4,17 @@ use serde::{Serialize, Deserialize};
 /// Determines how many output tokens are generated
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Verbosity {
     /// Concise answers, minimal commentary
     Low,
     /// Balanced explanations (default)
+    #[default]
     Medium,
     /// Thorough explanations and extensive details
     High,
 }
 
-impl Default for Verbosity {
-    fn default() -> Self {
-        Verbosity::Medium
-    }
-}
 
 #[allow(dead_code)]
 impl Verbosity {
@@ -30,14 +27,6 @@ impl Verbosity {
         }
     }
 
-    pub fn to_string(&self) -> String {
-        match self {
-            Verbosity::Low => "low".to_string(),
-            Verbosity::Medium => "medium".to_string(),
-            Verbosity::High => "high".to_string(),
-        }
-    }
-
     /// Returns a description of what this verbosity level does
     pub fn description(&self) -> &'static str {
         match self {
@@ -45,5 +34,16 @@ impl Verbosity {
             Verbosity::Medium => "Balanced explanations (default)",
             Verbosity::High => "Thorough explanations and extensive details",
         }
+    }
+}
+
+impl std::fmt::Display for Verbosity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Verbosity::Low => "low",
+            Verbosity::Medium => "medium",
+            Verbosity::High => "high",
+        };
+        write!(f, "{}", s)
     }
 }

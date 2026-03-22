@@ -22,6 +22,7 @@ pub struct SessionSmartContext {
 impl SessionSmartContext {
     /// Create a new SessionSmartContext from discovery parameters
     #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         session_id: String,
         project_path: String,
