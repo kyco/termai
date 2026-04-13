@@ -320,7 +320,7 @@ mod tests {
         let repo = TestRepository::new();
         let models = vec![
             ModelObject {
-                id: "gpt-5.3-codex".into(),
+                id: "gpt-5.4".into(),
                 object: "model".into(),
                 created: 1686935003,
                 owned_by: "openai".into(),
@@ -344,6 +344,6 @@ mod tests {
         .unwrap();
 
         assert_eq!(codex_models.len(), 1);
-        assert_eq!(codex_models[0].id, "gpt-5.3-codex");
+        assert_eq!(codex_models[0].id, "gpt-5.4");
     }
 }

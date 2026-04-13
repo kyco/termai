@@ -1,4 +1,7 @@
 use crate::completion::values::CompletionValues;
+use crate::llm::openai::model::models_api::{
+    infer_provider_from_model_id, model_matches_provider_alias,
+};
 use serde::{Serialize, Deserialize};
 
 /// Current chat session state including model and provider settings
@@ -137,23 +140,10 @@ impl ChatState {
 
     /// Get models available for a specific provider
     fn get_models_for_provider(provider: &str) -> Vec<String> {
-        let all_models = CompletionValues::model_names();
-
-        match provider {
-            "claude" => all_models
-                .into_iter()
-                .filter(|m| m.starts_with("claude"))
-                .collect(),
-            "openai" => all_models
-                .into_iter()
-                .filter(|m| (m.starts_with("gpt") || m.starts_with("o1") || m.starts_with("o3") || m.starts_with("o4") || m.starts_with("computer-use")) && !m.contains("codex"))
-                .collect(),
-            "codex" | "openai-codex" | "openai_codex" => all_models
-                .into_iter()
-                .filter(|m| m.contains("codex"))
-                .collect(),
-            _ => Vec::new(),
-        }
+        CompletionValues::model_names()
+            .into_iter()
+            .filter(|model| model_matches_provider_alias(model, provider))
+            .collect()
     }
 
     /// Get default model for a provider
@@ -161,22 +151,16 @@ impl ChatState {
         match provider {
             "claude" => "claude-sonnet-4-20250514".to_string(),
             "openai" => "gpt-5.2".to_string(),
-            "codex" | "openai-codex" | "openai_codex" => "gpt-5.3-codex".to_string(),
+            "codex" | "openai-codex" | "openai_codex" => "gpt-5.4".to_string(),
             _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
 
     /// Determine which provider a model belongs to
     fn get_provider_for_model(&self, model: &str) -> String {
-        if model.starts_with("claude") {
-            "claude".to_string()
-        } else if model.contains("codex") {
-            "codex".to_string()
-        } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") || model.starts_with("o4") || model.starts_with("computer-use") {
-            "openai".to_string()
-        } else {
-            "unknown".to_string()
-        }
+        infer_provider_from_model_id(model)
+            .unwrap_or("unknown")
+            .to_string()
     }
 
     /// List available models with descriptions
@@ -197,6 +181,11 @@ impl ChatState {
     /// Get a description for a model
     fn get_model_description(&self, model: &str) -> &'static str {
         match model {
+            // GPT-5.4 Codex-default models (ChatGPT Plus/Pro via OAuth)
+            "gpt-5.4" => "Default Codex model for coding and multi-step agent workflows",
+            "gpt-5.4-pro" => "Higher-compute GPT-5.4 variant for tougher problems",
+            "gpt-5.4-mini" => "Faster GPT-5.4 variant for high-volume coding workflows",
+            "gpt-5.4-nano" => "Small GPT-5.4 variant for simple, high-throughput tasks",
             // GPT-5.2 series
             "gpt-5.2" => "Most intelligent model, best for complex reasoning and coding",
             "gpt-5.2-pro" => "Extra compute for harder problems; higher latency/cost",
@@ -307,7 +296,8 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(state.provider, "codex");
-        assert!(state.model.contains("codex"));
+        assert_eq!(state.model, "gpt-5.4");
+        assert!(state.available_models.contains(&"gpt-5.4".to_string()));
     }
 
     #[test]
@@ -328,9 +318,9 @@ mod tests {
         assert_eq!(state.model, "claude-sonnet-4-20250514");
         assert_eq!(state.provider, "claude"); // Provider should automatically switch
 
-        let result = state.switch_model("gpt-5.3-codex".to_string());
+        let result = state.switch_model("gpt-5.4".to_string());
         assert!(result.is_ok());
-        assert_eq!(state.model, "gpt-5.3-codex");
+        assert_eq!(state.model, "gpt-5.4");
         assert_eq!(state.provider, "codex");
     }
 

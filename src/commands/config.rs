@@ -5,7 +5,7 @@ use crate::config::settings::{
     ResolvedSettings, SettingsOverrides, SettingsProvider, UserConfig,
 };
 use crate::config::service::config_service;
-use crate::llm::openai::model::models_api::ModelObject;
+use crate::llm::openai::model::models_api::{infer_provider_from_model_id, ModelObject};
 use crate::repository::db::SqliteRepository;
 use anyhow::{Context, Result};
 use colored::*;
@@ -950,13 +950,7 @@ fn sort_live_models(models: &mut [ModelObject]) {
 }
 
 fn infer_provider_from_model(model: &str) -> &'static str {
-    if model.starts_with("claude") {
-        "claude"
-    } else if model.contains("codex") {
-        "codex"
-    } else {
-        "openai"
-    }
+    infer_provider_from_model_id(model).unwrap_or("openai")
 }
 
 fn current_provider(repo: &SqliteRepository) -> String {

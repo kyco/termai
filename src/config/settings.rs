@@ -1,6 +1,7 @@
 use crate::config::model::keys::ConfigKeys;
 use crate::config::repository::ConfigRepository;
 use crate::config::service::config_service;
+use crate::llm::openai::model::models_api::model_matches_provider_alias;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -42,7 +43,7 @@ impl SettingsProvider {
         match self {
             Self::Claude => "claude-sonnet-4-20250514",
             Self::Openai => "gpt-5.2",
-            Self::Codex => "gpt-5.3-codex",
+            Self::Codex => "gpt-5.4",
         }
     }
 }
@@ -428,17 +429,7 @@ fn load_legacy_default_model<R: ConfigRepository>(
 }
 
 fn model_matches_provider(model: &str, provider: &SettingsProvider) -> bool {
-    match provider {
-        SettingsProvider::Claude => model.starts_with("claude"),
-        SettingsProvider::Openai => {
-            !model.contains("codex")
-                && (model.starts_with("gpt")
-                    || model.starts_with('o')
-                    || model.starts_with("chatgpt")
-                    || model.starts_with("computer-use"))
-        }
-        SettingsProvider::Codex => model.contains("codex"),
-    }
+    model_matches_provider_alias(model, provider.as_str())
 }
 
 fn default_version() -> u32 {
@@ -583,5 +574,51 @@ type = "python"
 
         assert_eq!(config.project_type.as_deref(), None);
         assert!(config.context.include.is_empty());
+    }
+
+    #[test]
+    fn test_codex_recommended_model_uses_gpt_5_4() {
+        assert_eq!(SettingsProvider::Codex.recommended_model(), "gpt-5.4");
+    }
+
+    #[test]
+    fn test_model_matches_provider_accepts_gpt_5_4_for_codex_only() {
+        assert!(model_matches_provider("gpt-5.4", &SettingsProvider::Codex));
+        assert!(!model_matches_provider("gpt-5.4", &SettingsProvider::Openai));
+        assert!(model_matches_provider(
+            "gpt-5.3-codex",
+            &SettingsProvider::Codex
+        ));
+    }
+
+    #[test]
+    fn test_resolved_settings_keeps_codex_gpt_5_4_model() {
+        let temp_dir = TempDir::new().unwrap();
+        let user_config_path = temp_dir.path().join("config.toml");
+
+        std::fs::write(
+            &user_config_path,
+            r#"
+version = 1
+
+[default]
+provider = "codex"
+model = "gpt-5.4"
+"#,
+        )
+        .unwrap();
+
+        let settings = ResolvedSettings::load(
+            ResolvedSettingsPaths {
+                user_config_path,
+                project_root: None,
+            },
+            SettingsOverrides::default(),
+        )
+        .unwrap();
+
+        assert_eq!(settings.default_provider, SettingsProvider::Codex);
+        assert_eq!(settings.default_model.as_deref(), Some("gpt-5.4"));
+        assert_eq!(settings.selected_model(), "gpt-5.4");
     }
 }

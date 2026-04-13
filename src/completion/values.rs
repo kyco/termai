@@ -41,6 +41,11 @@ impl CompletionValues {
             "claude-3-opus-20240229".to_string(),
             "claude-3-sonnet-20240229".to_string(),
             "claude-3-haiku-20240307".to_string(),
+            // GPT-5.4 series routed through Codex OAuth in TermAI
+            "gpt-5.4".to_string(),
+            "gpt-5.4-pro".to_string(),
+            "gpt-5.4-mini".to_string(),
+            "gpt-5.4-nano".to_string(),
             // OpenAI GPT-5.2 series
             "gpt-5.2".to_string(),
             "gpt-5.2-chat-latest".to_string(),

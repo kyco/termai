@@ -1,5 +1,67 @@
 use serde::{Deserialize, Serialize};
 
+pub fn normalize_provider_alias(provider: &str) -> &str {
+    match provider {
+        "openai-codex" | "openai_codex" => "codex",
+        other => other,
+    }
+}
+
+pub fn is_chat_model_id(id: &str) -> bool {
+    let is_chat_family = id.starts_with("gpt")
+        || id.starts_with("o1")
+        || id.starts_with("o3")
+        || id.starts_with("o4")
+        || id.starts_with("chatgpt");
+
+    let is_excluded = id.contains("embedding")
+        || id.contains("whisper")
+        || id.contains("tts")
+        || id.contains("dall-e")
+        || id.contains("davinci")
+        || id.contains("babbage")
+        || id.contains("curie")
+        || id.contains("ada")
+        || id.contains("moderation")
+        || id.contains("realtime")
+        || id.contains("transcription")
+        || id.contains("audio");
+
+    is_chat_family && !is_excluded
+}
+
+pub fn is_codex_provider_model_id(id: &str) -> bool {
+    matches!(
+        id,
+        "gpt-5.4" | "gpt-5.4-pro" | "gpt-5.4-mini" | "gpt-5.4-nano"
+    ) || id.contains("codex")
+}
+
+pub fn is_openai_provider_model_id(id: &str) -> bool {
+    is_chat_model_id(id) && !is_codex_provider_model_id(id)
+}
+
+pub fn infer_provider_from_model_id(id: &str) -> Option<&'static str> {
+    if id.starts_with("claude") {
+        Some("claude")
+    } else if is_chat_model_id(id) && is_codex_provider_model_id(id) {
+        Some("codex")
+    } else if is_openai_provider_model_id(id) {
+        Some("openai")
+    } else {
+        None
+    }
+}
+
+pub fn model_matches_provider_alias(id: &str, provider: &str) -> bool {
+    match normalize_provider_alias(provider) {
+        "claude" => id.starts_with("claude"),
+        "codex" => is_chat_model_id(id) && is_codex_provider_model_id(id),
+        "openai" => is_openai_provider_model_id(id),
+        _ => false,
+    }
+}
+
 /// Response from GET /v1/models
 #[derive(Debug, Deserialize)]
 pub struct ModelsListResponse {
@@ -20,35 +82,7 @@ pub struct ModelObject {
 impl ModelObject {
     /// Check if this is a chat-capable model (not embedding, whisper, tts, etc.)
     pub fn is_chat_model(&self) -> bool {
-        let id = &self.id;
-
-        // Include GPT models, O-series reasoning models
-        let is_chat_family = id.starts_with("gpt")
-            || id.starts_with("o1")
-            || id.starts_with("o3")
-            || id.starts_with("o4")
-            || id.starts_with("chatgpt");
-
-        // Exclude non-chat models
-        let is_excluded = id.contains("embedding")
-            || id.contains("whisper")
-            || id.contains("tts")
-            || id.contains("dall-e")
-            || id.contains("davinci")
-            || id.contains("babbage")
-            || id.contains("curie")
-            || id.contains("ada")
-            || id.contains("moderation")
-            || id.contains("realtime")
-            || id.contains("transcription")
-            || id.contains("audio");
-
-        is_chat_family && !is_excluded
-    }
-
-    /// Check if this is a Codex model id.
-    pub fn is_codex_model(&self) -> bool {
-        self.id.contains("codex")
+        is_chat_model_id(&self.id)
     }
 }
 
@@ -64,13 +98,7 @@ pub fn filter_chat_models(models: &[ModelObject]) -> Vec<ModelObject> {
 pub fn filter_models_for_provider(models: &[ModelObject], provider: &str) -> Vec<ModelObject> {
     models
         .iter()
-        .filter(|model| match provider {
-            "openai-codex" | "openai_codex" | "codex" => {
-                model.is_chat_model() && model.is_codex_model()
-            }
-            "openai" => model.is_chat_model() && !model.is_codex_model(),
-            _ => false,
-        })
+        .filter(|model| model_matches_provider_alias(&model.id, provider))
         .cloned()
         .collect()
 }
@@ -166,19 +194,19 @@ mod tests {
     fn test_filter_models_for_openai_codex_provider() {
         let models = vec![
             ModelObject {
-                id: "gpt-5-codex".into(),
+                id: "gpt-5.4".into(),
                 object: "model".into(),
                 created: 1686935004,
                 owned_by: "openai".into(),
             },
             ModelObject {
-                id: "gpt-5.2-codex".into(),
+                id: "gpt-5.4-mini".into(),
                 object: "model".into(),
                 created: 1686935003,
                 owned_by: "openai".into(),
             },
             ModelObject {
-                id: "gpt-5.2".into(),
+                id: "gpt-5.2-codex".into(),
                 object: "model".into(),
                 created: 1686935002,
                 owned_by: "openai".into(),
@@ -194,14 +222,14 @@ mod tests {
         let codex_models = filter_models_for_provider(&models, "openai-codex");
         let ids: Vec<&str> = codex_models.iter().map(|m| m.id.as_str()).collect();
 
-        assert_eq!(ids, vec!["gpt-5-codex", "gpt-5.2-codex"]);
+        assert_eq!(ids, vec!["gpt-5.4", "gpt-5.4-mini", "gpt-5.2-codex"]);
     }
 
     #[test]
     fn test_filter_models_for_openai_provider_excludes_codex_models() {
         let models = vec![
             ModelObject {
-                id: "gpt-5-codex".into(),
+                id: "gpt-5.4".into(),
                 object: "model".into(),
                 created: 1686935004,
                 owned_by: "openai".into(),
@@ -224,6 +252,13 @@ mod tests {
         let ids: Vec<&str> = openai_models.iter().map(|m| m.id.as_str()).collect();
 
         assert_eq!(ids, vec!["gpt-5.2", "o3"]);
+    }
+
+    #[test]
+    fn test_infer_provider_treats_gpt_5_4_as_codex() {
+        assert_eq!(infer_provider_from_model_id("gpt-5.4"), Some("codex"));
+        assert_eq!(infer_provider_from_model_id("gpt-5.3-codex"), Some("codex"));
+        assert_eq!(infer_provider_from_model_id("gpt-5.2"), Some("openai"));
     }
 
     #[test]

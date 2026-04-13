@@ -12,6 +12,8 @@ TermAI supports three authentication methods for OpenAI:
 
 The Codex OAuth flow uses the same authentication mechanism as OpenAI's official Codex CLI, enabling users to leverage their existing ChatGPT subscription.
 
+The Codex provider is transport-based, not tied to a specific model-name suffix. It defaults to `gpt-5.4`, and legacy `*-codex` model ids remain accepted for backward compatibility.
+
 ## OAuth Configuration
 
 ### Endpoints
@@ -165,7 +167,7 @@ The setup wizard (`termai setup`) includes Codex as a provider option:
 ? Which AI provider would you like to use?
     Claude (Anthropic) - Best for analysis & coding
     OpenAI (API Key) - Versatile general purpose
-  > OpenAI Codex (ChatGPT Plus/Pro) - Use your subscription
+  > OpenAI Codex (ChatGPT Plus/Pro) - OAuth provider, defaults to gpt-5.4
     Both providers (recommended)
 ```
 

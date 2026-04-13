@@ -85,6 +85,46 @@ fn test_thinking_timer() {
     assert!(!running.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+#[test]
+fn test_config_show_preserves_codex_gpt_5_4_defaults() {
+    let temp_dir = TempDir::new().unwrap();
+    let home_dir = temp_dir.path();
+    let xdg_config_home = home_dir.join(".config");
+    let config_contents = r#"
+version = 1
+
+[default]
+provider = "codex"
+model = "gpt-5.4"
+"#;
+
+    let config_dirs = vec![
+        xdg_config_home.join("termai"),
+        home_dir
+            .join("Library")
+            .join("Application Support")
+            .join("termai"),
+    ];
+
+    for config_dir in &config_dirs {
+        fs::create_dir_all(config_dir).unwrap();
+        fs::write(config_dir.join("config.toml"), config_contents).unwrap();
+    }
+
+    let mut cmd = cargo_bin_cmd!("termai");
+    cmd.env("HOME", home_dir.to_str().unwrap())
+        .env("XDG_CONFIG_HOME", xdg_config_home.to_str().unwrap())
+        .current_dir(home_dir)
+        .args(["config", "show"]);
+
+    cmd.assert().success().stdout(
+        predicate::str::contains("Default provider:")
+            .and(predicate::str::contains("codex"))
+            .and(predicate::str::contains("Default model:"))
+            .and(predicate::str::contains("gpt-5.4")),
+    );
+}
+
 // Helper function to get table names from database
 fn get_tables(conn: &Connection) -> Vec<String> {
     let mut stmt = conn
