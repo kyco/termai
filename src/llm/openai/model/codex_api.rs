@@ -17,9 +17,8 @@ pub struct CodexRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
 
-    /// Input can be text or conversation messages
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub input: Option<CodexInput>,
+    /// Input messages for the current conversation turn
+    pub input: Vec<CodexMessage>,
 
     /// Stream the response (must always be true for Codex API)
     pub stream: bool,
@@ -30,14 +29,6 @@ pub struct CodexRequest {
 
     /// Whether to store the conversation (must be false for Codex)
     pub store: bool,
-}
-
-/// Codex input - can be text or messages
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum CodexInput {
-    Text(String),
-    Messages(Vec<CodexMessage>),
 }
 
 /// A message in the conversation
@@ -93,10 +84,7 @@ pub enum CodexOutput {
         content: Vec<CodexContentItem>,
     },
     #[serde(rename = "reasoning")]
-    Reasoning {
-        id: String,
-        summary: Vec<String>,
-    },
+    Reasoning { id: String, summary: Vec<String> },
 }
 
 /// Content item within a message
@@ -120,24 +108,12 @@ pub struct CodexUsage {
 }
 
 impl CodexRequest {
-    /// Create a simple text request
-    pub fn simple(model: String, input: String) -> Self {
-        Self {
-            model,
-            instructions: None,
-            input: Some(CodexInput::Text(input)),
-            stream: true,
-            temperature: None,
-            store: false,
-        }
-    }
-
     /// Create a request from conversation messages
     pub fn from_messages(model: String, messages: Vec<CodexMessage>) -> Self {
         Self {
             model,
             instructions: None,
-            input: Some(CodexInput::Messages(messages)),
+            input: messages,
             stream: true,
             temperature: None,
             store: false,
@@ -173,5 +149,28 @@ impl CodexResponse {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CodexMessage, CodexRequest};
+
+    #[test]
+    fn test_request_serializes_input_as_message_array() {
+        let request = CodexRequest::from_messages(
+            "gpt-5.4".to_string(),
+            vec![CodexMessage {
+                role: "user".to_string(),
+                content: "hey".to_string(),
+            }],
+        )
+        .with_instructions("Be concise.".to_string());
+
+        let json = serde_json::to_value(&request).unwrap();
+
+        assert!(json["input"].is_array());
+        assert_eq!(json["input"][0]["role"], "user");
+        assert_eq!(json["input"][0]["content"], "hey");
     }
 }

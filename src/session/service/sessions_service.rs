@@ -35,7 +35,8 @@ pub fn get_most_recent_session<SR: SessionRepository, MR: MessageRepository>(
     session_repo: &SR,
     message_repository: &MR,
 ) -> Result<Session> {
-    let session_entities = session_repo.fetch_all_sessions()
+    let session_entities = session_repo
+        .fetch_all_sessions()
         .map_err(|e| anyhow::anyhow!("Failed to fetch sessions: {:?}", e))?;
 
     if session_entities.is_empty() {
@@ -51,7 +52,8 @@ pub fn get_most_recent_session<SR: SessionRepository, MR: MessageRepository>(
 
     sessions.sort_by(|a, b| b.expires_at.cmp(&a.expires_at));
 
-    let most_recent = sessions.first()
+    let most_recent = sessions
+        .first()
         .ok_or_else(|| anyhow::anyhow!("Failed to get most recent session"))?;
 
     let session = session_with_messages(message_repository, most_recent);

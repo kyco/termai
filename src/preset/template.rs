@@ -1,5 +1,5 @@
 /// Template parsing and rendering system
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -79,71 +79,75 @@ impl TemplateRenderer {
     /// Create new template renderer
     pub fn new() -> Result<Self> {
         let mut handlebars = Handlebars::new();
-        
+
         // Configure Handlebars settings
         handlebars.set_strict_mode(true);
-        
+
         // Register custom helpers
         Self::register_helpers(&mut handlebars)?;
-        
+
         Ok(Self { handlebars })
     }
-    
+
     /// Register custom Handlebars helpers for advanced functionality
     fn register_helpers(handlebars: &mut Handlebars) -> Result<()> {
         // Helper for current date/time formatting
         handlebars.register_helper("now", Box::new(helpers::now_helper));
-        
+
         // Helper for file content inclusion
         handlebars.register_helper("file", Box::new(helpers::file_helper));
-        
+
         // Helper for environment variable expansion
         handlebars.register_helper("env", Box::new(helpers::env_helper));
-        
+
         // Helper for Git repository information
         handlebars.register_helper("git", Box::new(helpers::git_helper));
-        
+
         Ok(())
     }
-    
+
     /// Render template with provided variables
-    pub fn render(&self, template: &Template, variables: &HashMap<String, Value>) -> Result<String> {
+    pub fn render(
+        &self,
+        template: &Template,
+        variables: &HashMap<String, Value>,
+    ) -> Result<String> {
         // Validate variables before rendering
         self.validate_variables(template, variables)?;
-        
+
         // Merge provided variables with defaults
         let context = self.build_context(template, variables)?;
-        
+
         // Render the template
         self.handlebars
             .render_template(&template.template, &context)
             .context("Failed to render template")
     }
-    
+
     /// Validate that all required variables are provided and types are correct
     fn validate_variables(
-        &self, 
-        template: &Template, 
-        variables: &HashMap<String, Value>
+        &self,
+        template: &Template,
+        variables: &HashMap<String, Value>,
     ) -> Result<()> {
         for (name, var_def) in &template.variables {
             if var_def.required && !variables.contains_key(name) {
                 bail!("Required variable '{}' not provided", name);
             }
-            
+
             if let Some(value) = variables.get(name) {
                 self.validate_variable_type(name, var_def, value)?;
             }
         }
         Ok(())
     }
-    
+
     /// Validate individual variable type
     fn validate_variable_type(
         &self,
         name: &str,
         var_def: &TemplateVariable,
-        value: &Value
+        value: &Value,
     ) -> Result<()> {
         let matches = match (&var_def.var_type, value) {
             (VariableType::String, Value::String(_)) => true,
@@ -152,29 +156,37 @@ impl TemplateRenderer {
             (VariableType::Array, Value::Array(_)) => true,
             (VariableType::Object, Value::Object(_)) => true,
             // Special types are handled as strings
-            (VariableType::File | VariableType::Directory | VariableType::DateTime | 
-             VariableType::GitInfo | VariableType::Environment, Value::String(_)) => true,
+            (
+                VariableType::File
+                | VariableType::Directory
+                | VariableType::DateTime
+                | VariableType::GitInfo
+                | VariableType::Environment,
+                Value::String(_),
+            ) => true,
             _ => false,
         };
-        
+
         if !matches {
             bail!(
-                "Variable '{}' has incorrect type. Expected {:?}, got {:?}", 
-                name, var_def.var_type, value
+                "Variable '{}' has incorrect type. Expected {:?}, got {:?}",
+                name,
+                var_def.var_type,
+                value
             );
         }
-        
+
         Ok(())
     }
-    
+
     /// Build template context by merging provided variables with defaults
     fn build_context(
-        &self, 
-        template: &Template, 
-        variables: &HashMap<String, Value>
+        &self,
+        template: &Template,
+        variables: &HashMap<String, Value>,
     ) -> Result<Value> {
         let mut context = serde_json::Map::new();
-        
+
         // Add default values for undefined variables
         for (name, var_def) in &template.variables {
             if let Some(value) = variables.get(name) {
@@ -183,7 +195,7 @@ impl TemplateRenderer {
                 context.insert(name.clone(), default.clone());
             }
         }
-        
+
         Ok(Value::Object(context))
     }
 }
@@ -197,7 +209,7 @@ impl Template {
         variables: HashMap<String, TemplateVariable>,
     ) -> Result<Self> {
         Self::validate_template_syntax(&template)?;
-        
+
         Ok(Self {
             name,
             description,
@@ -206,7 +218,7 @@ impl Template {
             metadata: TemplateMetadata::default(),
         })
     }
-    
+
     /// Validate template syntax without rendering
     pub fn validate_template_syntax(template_str: &str) -> Result<()> {
         let handlebars = Handlebars::new();
@@ -215,7 +227,7 @@ impl Template {
             .context("Invalid template syntax")?;
         Ok(())
     }
-    
+
     /// Get list of variables required by this template
     #[allow(dead_code)]
     pub fn required_variables(&self) -> Vec<&str> {
@@ -225,7 +237,7 @@ impl Template {
             .map(|(name, _)| name.as_str())
             .collect()
     }
-    
+
     /// Get list of optional variables with defaults
     #[allow(dead_code)]
     pub fn optional_variables(&self) -> Vec<&str> {
@@ -253,29 +265,29 @@ impl TemplateVariable {
             pattern: None,
         }
     }
-    
+
     /// Create required string variable
     pub fn required_string(description: String) -> Self {
         Self::new(VariableType::String, description, true, None)
     }
-    
+
     /// Create optional string variable with default
     pub fn optional_string(description: String, default: String) -> Self {
         Self::new(
-            VariableType::String, 
-            description, 
-            false, 
-            Some(Value::String(default))
+            VariableType::String,
+            description,
+            false,
+            Some(Value::String(default)),
         )
     }
-    
+
     /// Create boolean variable with default
     pub fn boolean(description: String, default: bool) -> Self {
         Self::new(
-            VariableType::Boolean, 
-            description, 
-            false, 
-            Some(Value::Bool(default))
+            VariableType::Boolean,
+            description,
+            false,
+            Some(Value::Bool(default)),
         )
     }
 }
@@ -284,7 +296,7 @@ impl TemplateVariable {
 mod helpers {
     use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
     use std::fs;
-    
+
     /// Helper for current date/time formatting
     pub fn now_helper(
         h: &Helper,
@@ -293,16 +305,17 @@ mod helpers {
         _: &mut RenderContext,
         out: &mut dyn Output,
     ) -> HelperResult {
-        let format = h.param(0)
+        let format = h
+            .param(0)
             .map(|v| v.value().as_str().unwrap_or("%Y-%m-%d %H:%M:%S"))
             .unwrap_or("%Y-%m-%d %H:%M:%S");
-            
+
         let now = chrono::Utc::now();
         let formatted = now.format(format).to_string();
         out.write(&formatted)?;
         Ok(())
     }
-    
+
     /// Helper for file content inclusion
     pub fn file_helper(
         h: &Helper,
@@ -321,7 +334,7 @@ mod helpers {
         }
         Ok(())
     }
-    
+
     /// Helper for environment variable expansion
     pub fn env_helper(
         h: &Helper,
@@ -338,7 +351,7 @@ mod helpers {
         }
         Ok(())
     }
-    
+
     /// Helper for Git repository information
     pub fn git_helper(
         h: &Helper,
@@ -360,7 +373,7 @@ mod helpers {
         }
         Ok(())
     }
-    
+
     fn get_git_branch() -> String {
         // Simplified Git branch detection
         std::process::Command::new("git")
@@ -371,7 +384,7 @@ mod helpers {
             .map(|s| s.trim().to_string())
             .unwrap_or_default()
     }
-    
+
     fn get_git_commit() -> String {
         // Simplified Git commit detection
         std::process::Command::new("git")
@@ -382,7 +395,7 @@ mod helpers {
             .map(|s| s.trim().to_string())
             .unwrap_or_default()
     }
-    
+
     fn get_git_author() -> String {
         // Simplified Git author detection
         std::process::Command::new("git")
@@ -398,7 +411,7 @@ mod helpers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_template_creation() {
         let mut variables = HashMap::new();
@@ -406,18 +419,19 @@ mod tests {
             "name".to_string(),
             TemplateVariable::required_string("User name".to_string()),
         );
-        
+
         let template = Template::new(
             "test".to_string(),
             "Test template".to_string(),
             "Hello {{name}}!".to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         assert_eq!(template.name, "test");
         assert_eq!(template.required_variables(), vec!["name"]);
     }
-    
+
     #[test]
     fn test_template_rendering() {
         let mut variables = HashMap::new();
@@ -425,22 +439,23 @@ mod tests {
             "name".to_string(),
             TemplateVariable::required_string("User name".to_string()),
         );
-        
+
         let template = Template::new(
             "test".to_string(),
             "Test template".to_string(),
             "Hello {{name}}!".to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let renderer = TemplateRenderer::new().unwrap();
         let mut context = HashMap::new();
         context.insert("name".to_string(), serde_json::json!("World"));
-        
+
         let result = renderer.render(&template, &context).unwrap();
         assert_eq!(result, "Hello World!");
     }
-    
+
     #[test]
     fn test_variable_validation() {
         let mut variables = HashMap::new();
@@ -448,17 +463,18 @@ mod tests {
             "required_var".to_string(),
             TemplateVariable::required_string("Required variable".to_string()),
         );
-        
+
         let template = Template::new(
             "test".to_string(),
             "Test template".to_string(),
             "{{required_var}}".to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let renderer = TemplateRenderer::new().unwrap();
         let context = HashMap::new(); // Empty context - should fail
-        
+
         let result = renderer.render(&template, &context);
         assert!(result.is_err());
     }

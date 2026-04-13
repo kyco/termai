@@ -1,10 +1,10 @@
+use crate::llm::common::model::role::Role;
 use crate::output::message::Message;
-use crate::output::streaming::{StreamingRenderer, StreamingConfig, stream_smart_content};
+use crate::output::streaming::{stream_smart_content, StreamingConfig, StreamingRenderer};
 use crate::output::syntax::SyntaxHighlighter;
 use crate::output::themes::ThemeManager;
-use crate::llm::common::model::role::Role;
-use colored::*;
 use anyhow::Result;
+use colored::*;
 
 /// Enhanced outputter with streaming, themes, and better formatting
 pub struct EnhancedOutputter {
@@ -35,19 +35,24 @@ impl EnhancedOutputter {
         for (i, message) in messages.iter().enumerate() {
             // Create role prefix with theme
             let role_text = message.role.to_string().to_uppercase();
-            let role_prefix = self.theme_manager.format_role(&role_text, message.role.clone()).to_string();
-            
+            let role_prefix = self
+                .theme_manager
+                .format_role(&role_text, message.role.clone())
+                .to_string();
+
             if self.enable_streaming {
                 // Use streaming renderer for better UX
                 stream_smart_content(
                     &mut self.streaming_renderer,
                     &message.message,
-                    Some(&format!("{}: ", role_prefix))
-                ).await?;
+                    Some(&format!("{}: ", role_prefix)),
+                )
+                .await?;
             } else {
                 // Fallback to instant display
                 print!("{}: ", role_prefix);
-                self.print_formatted_content(&message.message, &message.role).await?;
+                self.print_formatted_content(&message.message, &message.role)
+                    .await?;
             }
 
             // Add separator between messages (except for last)
@@ -73,40 +78,46 @@ impl EnhancedOutputter {
 
         while i < lines.len() {
             let line = lines[i];
-            
+
             if line.trim_start().starts_with("```") {
                 // Handle code blocks
                 let language = if line.len() > 3 {
                     let lang = line.trim_start().strip_prefix("```").unwrap_or("").trim();
-                    if lang.is_empty() { None } else { Some(lang) }
+                    if lang.is_empty() {
+                        None
+                    } else {
+                        Some(lang)
+                    }
                 } else {
                     None
                 };
-                
+
                 let mut code_content = Vec::new();
                 i += 1;
-                
+
                 while i < lines.len() && !lines[i].trim_start().starts_with("```") {
                     code_content.push(lines[i]);
                     i += 1;
                 }
-                
+
                 let code = code_content.join("\n");
                 self.print_code_block(&code, language).await?;
-                
+
                 if i < lines.len() {
                     i += 1; // Skip closing ```
                 }
             } else if self.is_table_line(line) {
                 // Handle tables
                 let mut table_lines = Vec::new();
-                while i < lines.len() && (self.is_table_line(lines[i]) || lines[i].trim().is_empty()) {
+                while i < lines.len()
+                    && (self.is_table_line(lines[i]) || lines[i].trim().is_empty())
+                {
                     if !lines[i].trim().is_empty() {
                         table_lines.push(lines[i]);
                     }
                     i += 1;
                 }
-                
+
                 if !table_lines.is_empty() {
                     self.print_table(&table_lines).await?;
                 }
@@ -123,21 +134,26 @@ impl EnhancedOutputter {
     /// Print a code block with syntax highlighting
     async fn print_code_block(&mut self, code: &str, language: Option<&str>) -> Result<()> {
         let box_chars = self.theme_manager.box_chars();
-        
+
         // Code block header
         let header = if let Some(lang) = language {
-            format!("{} {} {}", 
-                box_chars.top_left, 
+            format!(
+                "{} {} {}",
+                box_chars.top_left,
                 lang.bright_cyan().bold(),
-                box_chars.horizontal.to_string().repeat(40_usize.saturating_sub(lang.len() + 2))
+                box_chars
+                    .horizontal
+                    .to_string()
+                    .repeat(40_usize.saturating_sub(lang.len() + 2))
             )
         } else {
-            format!("{} Code {}", 
+            format!(
+                "{} Code {}",
                 box_chars.top_left,
                 box_chars.horizontal.to_string().repeat(43)
             )
         };
-        
+
         println!("{}", header.bright_black());
 
         // Highlight and print code
@@ -156,7 +172,8 @@ impl EnhancedOutputter {
         }
 
         // Bottom border
-        println!("{}{}", 
+        println!(
+            "{}{}",
             box_chars.bottom_left.to_string().bright_black(),
             box_chars.horizontal.to_string().repeat(50).bright_black()
         );
@@ -196,7 +213,7 @@ impl EnhancedOutputter {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            
+
             if !row.is_empty() && row.len() >= headers.len() {
                 rows.push(row);
             }
@@ -204,7 +221,9 @@ impl EnhancedOutputter {
 
         // Use streaming renderer for table
         if self.enable_streaming {
-            self.streaming_renderer.stream_table(&headers, &rows).await?;
+            self.streaming_renderer
+                .stream_table(&headers, &rows)
+                .await?;
         } else {
             // Fallback table printing
             self.print_simple_table(&headers, &rows).await?;
@@ -246,7 +265,11 @@ impl EnhancedOutputter {
         print!("{}", box_chars.vertical);
         for (i, header) in headers.iter().enumerate() {
             let width = col_widths[i];
-            print!(" {:^width$} ", header.bright_blue().bold(), width = width - 2);
+            print!(
+                " {:^width$} ",
+                header.bright_blue().bold(),
+                width = width - 2
+            );
             if i < headers.len() - 1 {
                 print!("{}", box_chars.vertical);
             }

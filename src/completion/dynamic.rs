@@ -341,12 +341,15 @@ mod tests {
         let top_level = DynamicCompleter::complete(&repo, &["auth".to_string()]).unwrap();
         assert_eq!(
             top_level,
-            vec!["login".to_string(), "logout".to_string(), "status".to_string()]
+            vec![
+                "login".to_string(),
+                "logout".to_string(),
+                "status".to_string()
+            ]
         );
 
         let provider_completion =
-            DynamicCompleter::complete(&repo, &["auth".to_string(), "login".to_string()])
-                .unwrap();
+            DynamicCompleter::complete(&repo, &["auth".to_string(), "login".to_string()]).unwrap();
         assert!(provider_completion.contains(&"codex".to_string()));
         assert!(provider_completion.contains(&"claude".to_string()));
         assert!(provider_completion.contains(&"openai".to_string()));

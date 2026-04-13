@@ -33,8 +33,10 @@ impl CallbackServer {
             .map_err(|e| anyhow!("Failed to start callback server: {}", e))?;
 
         // Channel to communicate callback result
-        let (tx, rx): (Sender<Result<CallbackResult>>, Receiver<Result<CallbackResult>>) =
-            mpsc::channel();
+        let (tx, rx): (
+            Sender<Result<CallbackResult>>,
+            Receiver<Result<CallbackResult>>,
+        ) = mpsc::channel();
 
         // Handle requests in a separate thread
         let server_handle = thread::spawn(move || {
@@ -51,11 +53,9 @@ impl CallbackServer {
                     Err(e) => Self::error_html(&e.to_string()),
                 };
 
-                let response = Response::from_string(response_html)
-                    .with_header(
-                        tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..])
-                            .unwrap(),
-                    );
+                let response = Response::from_string(response_html).with_header(
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
+                );
 
                 // Consume the request body to avoid connection issues
                 let mut body = Vec::new();
@@ -84,7 +84,9 @@ impl CallbackServer {
     ///
     /// Accepts either a relative callback path or the full localhost redirect URL.
     pub(crate) fn parse_callback_url(url: &str) -> Result<CallbackResult> {
-        let query_start = url.find('?').ok_or_else(|| anyhow!("No query parameters in callback URL"))?;
+        let query_start = url
+            .find('?')
+            .ok_or_else(|| anyhow!("No query parameters in callback URL"))?;
         let query = &url[query_start + 1..];
 
         let mut code = None;
@@ -162,7 +164,8 @@ impl CallbackServer {
 
     /// HTML response for authentication error
     fn error_html(error: &str) -> String {
-        format!(r#"<!DOCTYPE html>
+        format!(
+            r#"<!DOCTYPE html>
 <html>
 <head>
     <title>TermAI - Authentication Error</title>
@@ -209,7 +212,9 @@ impl CallbackServer {
         <p style="margin-top: 20px;">Please close this window and try again.</p>
     </div>
 </body>
-</html>"#, error)
+</html>"#,
+            error
+        )
     }
 }
 

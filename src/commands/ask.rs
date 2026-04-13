@@ -2,8 +2,8 @@
 /// Integrates with existing LLM infrastructure for direct question answering
 use crate::args::AskArgs;
 use crate::config::model::keys::ConfigKeys;
-use crate::config::settings::{ResolvedSettings, SettingsOverrides, SettingsProvider};
 use crate::config::service::config_service;
+use crate::config::settings::{ResolvedSettings, SettingsOverrides, SettingsProvider};
 use crate::llm::common::constants::SYSTEM_PROMPT;
 use crate::llm::common::model::role::Role;
 use crate::path::extract::extract_content;
@@ -195,7 +195,8 @@ async fn call_claude_api(
     session.messages = messages;
 
     // Use the existing Claude chat service
-    crate::llm::claude::service::chat::chat_with_model(&api_key.value, &mut session, Some(model)).await?;
+    crate::llm::claude::service::chat::chat_with_model(&api_key.value, &mut session, Some(model))
+        .await?;
 
     // Extract the assistant's response from the updated session
     if let Some(last_message) = session.messages.last() {
@@ -221,7 +222,8 @@ async fn call_openai_api(
     session.messages = messages;
 
     // Use the existing OpenAI chat service
-    crate::llm::openai::service::chat::chat_with_model(&api_key.value, &mut session, Some(model)).await?;
+    crate::llm::openai::service::chat::chat_with_model(&api_key.value, &mut session, Some(model))
+        .await?;
 
     // Extract the assistant's response from the updated session
     if let Some(last_message) = session.messages.last() {

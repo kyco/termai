@@ -17,33 +17,33 @@ impl BuiltinPresets {
             Self::refactoring_preset(),
         ]
     }
-    
+
     /// Get preset by name
     pub fn get_by_name(name: &str) -> Option<Preset> {
         Self::get_all()
             .into_iter()
             .find(|preset| preset.name == name)
     }
-    
+
     /// Code Review preset
     pub fn code_review_preset() -> Preset {
         let mut variables = HashMap::new();
-        
+
         variables.insert(
             "security".to_string(),
             TemplateVariable::boolean("Include security analysis".to_string(), true),
         );
-        
+
         variables.insert(
             "performance".to_string(),
             TemplateVariable::boolean("Include performance analysis".to_string(), true),
         );
-        
+
         variables.insert(
             "maintainability".to_string(),
             TemplateVariable::boolean("Include maintainability analysis".to_string(), true),
         );
-        
+
         variables.insert(
             "context_description".to_string(),
             TemplateVariable::optional_string(
@@ -51,7 +51,7 @@ impl BuiltinPresets {
                 "General code review".to_string(),
             ),
         );
-        
+
         let template_content = r#"Please review the following code for:
 
 {{#if security}}
@@ -95,28 +95,31 @@ Files to review:
 {{else}}
 Please provide the code you'd like me to review.
 {{/if}}"#;
-        
+
         let template = Template::new(
             "code-review".to_string(),
             "Comprehensive code review with security and performance focus".to_string(),
             template_content.to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         Preset {
             name: "Code Review Assistant".to_string(),
-            description: "Comprehensive code review with security, performance, and maintainability analysis".to_string(),
+            description:
+                "Comprehensive code review with security, performance, and maintainability analysis"
+                    .to_string(),
             category: "development".to_string(),
             version: "1.0".to_string(),
             template,
             config: PresetConfig::default(),
         }
     }
-    
+
     /// Documentation preset
     pub fn documentation_preset() -> Preset {
         let mut variables = HashMap::new();
-        
+
         variables.insert(
             "doc_type".to_string(),
             TemplateVariable::optional_string(
@@ -124,7 +127,7 @@ Please provide the code you'd like me to review.
                 "general".to_string(),
             ),
         );
-        
+
         variables.insert(
             "audience".to_string(),
             TemplateVariable::optional_string(
@@ -132,12 +135,12 @@ Please provide the code you'd like me to review.
                 "developers".to_string(),
             ),
         );
-        
+
         variables.insert(
             "include_examples".to_string(),
             TemplateVariable::boolean("Include code examples".to_string(), true),
         );
-        
+
         let template_content = r#"Generate {{doc_type}} documentation for the following code.
 
 **Target Audience:** {{audience}}
@@ -177,14 +180,15 @@ Code to document:
 {{else}}
 Please provide the code you'd like me to document.
 {{/if}}"#;
-        
+
         let template = Template::new(
             "documentation".to_string(),
             "Generate comprehensive documentation for code".to_string(),
             template_content.to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         Preset {
             name: "Documentation Generator".to_string(),
             description: "Generate API documentation, README files, and code comments".to_string(),
@@ -194,11 +198,11 @@ Please provide the code you'd like me to document.
             config: PresetConfig::default(),
         }
     }
-    
+
     /// Testing preset
     pub fn testing_preset() -> Preset {
         let mut variables = HashMap::new();
-        
+
         variables.insert(
             "test_type".to_string(),
             TemplateVariable::optional_string(
@@ -206,7 +210,7 @@ Please provide the code you'd like me to document.
                 "unit".to_string(),
             ),
         );
-        
+
         variables.insert(
             "test_framework".to_string(),
             TemplateVariable::optional_string(
@@ -214,12 +218,12 @@ Please provide the code you'd like me to document.
                 "auto-detect".to_string(),
             ),
         );
-        
+
         variables.insert(
             "coverage_focus".to_string(),
             TemplateVariable::boolean("Focus on edge cases and error conditions".to_string(), true),
         );
-        
+
         let template_content = r#"Generate {{test_type}} tests for the following code.
 
 **Test Framework:** {{test_framework}}
@@ -259,14 +263,15 @@ Code to test:
 {{else}}
 Please provide the code you'd like me to test.
 {{/if}}"#;
-        
+
         let template = Template::new(
             "testing".to_string(),
             "Generate comprehensive test suites".to_string(),
             template_content.to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         Preset {
             name: "Test Generator".to_string(),
             description: "Generate unit tests, integration tests, and test cases".to_string(),
@@ -276,16 +281,16 @@ Please provide the code you'd like me to test.
             config: PresetConfig::default(),
         }
     }
-    
+
     /// Debugging preset
     pub fn debugging_preset() -> Preset {
         let mut variables = HashMap::new();
-        
+
         variables.insert(
             "issue_description".to_string(),
             TemplateVariable::required_string("Describe the issue you're experiencing".to_string()),
         );
-        
+
         variables.insert(
             "error_message".to_string(),
             TemplateVariable::optional_string(
@@ -293,12 +298,12 @@ Please provide the code you'd like me to test.
                 "".to_string(),
             ),
         );
-        
+
         variables.insert(
             "include_logs".to_string(),
             TemplateVariable::boolean("Include log analysis".to_string(), true),
         );
-        
+
         let template_content = r#"Help debug the following issue:
 
 **Issue Description:** {{issue_description}}
@@ -339,14 +344,15 @@ Code with issues:
 {{else}}
 Please provide the code or error information you'd like me to debug.
 {{/if}}"#;
-        
+
         let template = Template::new(
             "debugging".to_string(),
             "Debug and analyze software issues".to_string(),
             template_content.to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         Preset {
             name: "Debugging Assistant".to_string(),
             description: "Analyze errors, debug issues, and provide solutions".to_string(),
@@ -356,11 +362,11 @@ Please provide the code or error information you'd like me to debug.
             config: PresetConfig::default(),
         }
     }
-    
+
     /// Refactoring preset
     pub fn refactoring_preset() -> Preset {
         let mut variables = HashMap::new();
-        
+
         variables.insert(
             "refactoring_goal".to_string(),
             TemplateVariable::optional_string(
@@ -368,17 +374,17 @@ Please provide the code or error information you'd like me to debug.
                 "general improvement".to_string(),
             ),
         );
-        
+
         variables.insert(
             "preserve_behavior".to_string(),
             TemplateVariable::boolean("Preserve existing behavior".to_string(), true),
         );
-        
+
         variables.insert(
             "suggest_patterns".to_string(),
             TemplateVariable::boolean("Suggest design patterns".to_string(), true),
         );
-        
+
         let template_content = r#"Suggest refactoring improvements for the following code.
 
 **Refactoring Goal:** {{refactoring_goal}}
@@ -421,17 +427,20 @@ Code to refactor:
 {{else}}
 Please provide the code you'd like me to refactor.
 {{/if}}"#;
-        
+
         let template = Template::new(
             "refactoring".to_string(),
             "Suggest code improvements and refactoring".to_string(),
             template_content.to_string(),
             variables,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         Preset {
             name: "Refactoring Assistant".to_string(),
-            description: "Suggest code improvements, design patterns, and architecture optimization".to_string(),
+            description:
+                "Suggest code improvements, design patterns, and architecture optimization"
+                    .to_string(),
             category: "development".to_string(),
             version: "1.0".to_string(),
             template,
@@ -443,12 +452,12 @@ Please provide the code you'd like me to refactor.
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_builtin_presets_creation() {
         let presets = BuiltinPresets::get_all();
         assert_eq!(presets.len(), 5);
-        
+
         let names: Vec<&str> = presets.iter().map(|p| p.name.as_str()).collect();
         assert!(names.contains(&"Code Review Assistant"));
         assert!(names.contains(&"Documentation Generator"));
@@ -456,25 +465,26 @@ mod tests {
         assert!(names.contains(&"Debugging Assistant"));
         assert!(names.contains(&"Refactoring Assistant"));
     }
-    
+
     #[test]
     fn test_get_preset_by_name() {
         let preset = BuiltinPresets::get_by_name("Code Review Assistant");
         assert!(preset.is_some());
-        
+
         let preset = preset.unwrap();
         assert_eq!(preset.category, "development");
         assert!(preset.template.variables.contains_key("security"));
     }
-    
+
     #[test]
     fn test_preset_template_validation() {
         let presets = BuiltinPresets::get_all();
-        
+
         for preset in presets {
             // Validate that template syntax is correct
-            Template::validate_template_syntax(&preset.template.template)
-                .unwrap_or_else(|e| panic!("Invalid template syntax in preset '{}': {}", preset.name, e));
+            Template::validate_template_syntax(&preset.template.template).unwrap_or_else(|e| {
+                panic!("Invalid template syntax in preset '{}': {}", preset.name, e)
+            });
         }
     }
 }

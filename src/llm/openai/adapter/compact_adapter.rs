@@ -1,5 +1,5 @@
 use crate::llm::openai::model::compact_api::{CompactRequest, CompactResponse};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use reqwest::Client;
 
 /// Adapter for the OpenAI Responses Compact API
@@ -7,12 +7,8 @@ pub struct CompactAdapter;
 
 impl CompactAdapter {
     /// Make a request to the Responses Compact API
-    pub async fn compact(
-        request: &CompactRequest,
-        api_key: &str,
-    ) -> Result<CompactResponse> {
-        let client = Client::builder()
-            .build()?;
+    pub async fn compact(request: &CompactRequest, api_key: &str) -> Result<CompactResponse> {
+        let client = Client::builder().build()?;
 
         let response = client
             .post("https://api.openai.com/v1/responses/compact")

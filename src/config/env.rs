@@ -97,7 +97,10 @@ mod tests {
         );
 
         env::set_var(EnvVars::CLAUDE_API_KEY, "claude-key");
-        assert_eq!(EnvResolver::claude_api_key(), Some("claude-key".to_string()));
+        assert_eq!(
+            EnvResolver::claude_api_key(),
+            Some("claude-key".to_string())
+        );
 
         env::remove_var(EnvVars::CLAUDE_API_KEY);
         env::remove_var(EnvVars::ANTHROPIC_API_KEY);
@@ -114,10 +117,7 @@ mod tests {
         env::set_var(EnvVars::OPENAI_API_KEY, "openai-key");
         let all_set = EnvResolver::get_all_set();
         assert_eq!(all_set.len(), baseline.len() + 1);
-        assert!(all_set.contains(&(
-            "OPENAI_API_KEY".to_string(),
-            "openai-key".to_string()
-        )));
+        assert!(all_set.contains(&("OPENAI_API_KEY".to_string(), "openai-key".to_string())));
 
         env::remove_var(EnvVars::OPENAI_API_KEY);
     }

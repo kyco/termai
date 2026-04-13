@@ -2,21 +2,18 @@ use crate::llm::common::model::role::Role;
 use crate::llm::openai::{
     adapter::responses_adapter::ResponsesAdapter,
     model::{
-        responses_api::{
-            ResponsesRequest, InputMessage, ResponseOutput, ContentItem, ToolChoice,
-            ExtendedInputItem, CompactionInputItem,
-        },
         model::Model,
+        responses_api::{
+            CompactionInputItem, ContentItem, ExtendedInputItem, InputMessage, ResponseOutput,
+            ResponsesRequest, ToolChoice,
+        },
     },
     service::compaction,
-    tools::{
-        builtin::get_enabled_tools,
-        executor::ToolExecutor,
-    },
+    tools::{builtin::get_enabled_tools, executor::ToolExecutor},
 };
 use crate::session::model::message::{Message, MessageType};
 use crate::session::model::session::Session;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 /// Chat without tools - simple request/response
 #[allow(dead_code)]
@@ -85,27 +82,31 @@ async fn chat_internal(
         }
 
         // Check if we have any compaction items (requires extended input format)
-        let has_compaction = session.messages.iter().any(|m| matches!(m.message_type, MessageType::Compaction { .. }));
+        let has_compaction = session
+            .messages
+            .iter()
+            .any(|m| matches!(m.message_type, MessageType::Compaction { .. }));
 
         // Build the request based on whether we have compaction items
         let request = if has_compaction {
             // Use extended input format to support compaction items
-            let extended_items: Vec<ExtendedInputItem> = session.messages.iter().map(|m| {
-                match &m.message_type {
-                    MessageType::Standard => {
-                        ExtendedInputItem::Message(InputMessage {
-                            role: m.role.to_string(),
-                            content: m.content.clone(),
-                        })
-                    }
-                    MessageType::Compaction { compaction_id, encrypted_content } => {
-                        ExtendedInputItem::Compaction(CompactionInputItem::new(
-                            compaction_id.clone(),
-                            encrypted_content.clone(),
-                        ))
-                    }
-                }
-            }).collect();
+            let extended_items: Vec<ExtendedInputItem> = session
+                .messages
+                .iter()
+                .map(|m| match &m.message_type {
+                    MessageType::Standard => ExtendedInputItem::Message(InputMessage {
+                        role: m.role.to_string(),
+                        content: m.content.clone(),
+                    }),
+                    MessageType::Compaction {
+                        compaction_id,
+                        encrypted_content,
+                    } => ExtendedInputItem::Compaction(CompactionInputItem::new(
+                        compaction_id.clone(),
+                        encrypted_content.clone(),
+                    )),
+                })
+                .collect();
 
             ResponsesRequest::from_extended(model_name.clone(), extended_items)
         } else {
@@ -120,12 +121,10 @@ async fn chat_internal(
                 .collect();
 
             // Check total input size to prevent hanging on extremely large inputs
-            let total_input_size: usize = input_messages
-                .iter()
-                .map(|m| m.content.len())
-                .sum();
+            let total_input_size: usize = input_messages.iter().map(|m| m.content.len()).sum();
 
-            if total_input_size > 500_000 { // 500KB limit
+            if total_input_size > 500_000 {
+                // 500KB limit
                 return Err(anyhow!(
                     "Input too large ({} characters). Please reduce input size to under 500,000 characters.",
                     total_input_size
@@ -154,7 +153,8 @@ async fn chat_internal(
                 request.instructions = Some(
                     "IMPORTANT: You are approaching the tool usage limit. \
                     Please provide your final answer based on the information gathered so far. \
-                    Do not make any more tool calls.".to_string()
+                    Do not make any more tool calls."
+                        .to_string(),
                 );
             }
         }
@@ -187,7 +187,12 @@ async fn chat_internal(
                         ));
                     }
                 }
-                ResponseOutput::FunctionCall { id, name, arguments, .. } => {
+                ResponseOutput::FunctionCall {
+                    id,
+                    name,
+                    arguments,
+                    ..
+                } => {
                     tool_calls.push((id, name, arguments));
                 }
                 ResponseOutput::Reasoning { .. } => {
@@ -212,18 +217,13 @@ async fn chat_internal(
             let status = if result.success { "success" } else { "error" };
             let result_content = format!(
                 "[Tool: {} ({})] {}\n\nResult:\n{}",
-                tool_name,
-                status,
-                call_id,
-                truncated_output
+                tool_name, status, call_id, truncated_output
             );
 
             // Add tool result as a user message so model can see it
-            session.messages.push(Message::new(
-                "".to_string(),
-                Role::User,
-                result_content,
-            ));
+            session
+                .messages
+                .push(Message::new("".to_string(), Role::User, result_content));
         }
 
         // Loop continues - model will respond to tool results

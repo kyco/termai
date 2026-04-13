@@ -9,12 +9,7 @@ pub struct BranchMessageEntity {
 }
 
 impl BranchMessageEntity {
-    pub fn new(
-        id: String,
-        branch_id: String,
-        message_id: String,
-        sequence_number: i32,
-    ) -> Self {
+    pub fn new(id: String, branch_id: String, message_id: String, sequence_number: i32) -> Self {
         Self {
             id,
             branch_id,

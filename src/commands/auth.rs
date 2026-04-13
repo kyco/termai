@@ -20,8 +20,12 @@ pub async fn handle_auth_command(repo: &SqliteRepository, action: &AuthAction) -
 async fn handle_login(repo: &SqliteRepository, provider: Provider) -> Result<()> {
     match provider {
         Provider::OpenaiCodex => crate::commands::codex_auth::handle_login_codex(repo).await,
-        Provider::Openai => handle_api_key_login(repo, "OpenAI", &ConfigKeys::ChatGptApiKey.to_key()),
-        Provider::Claude => handle_api_key_login(repo, "Claude", &ConfigKeys::ClaudeApiKey.to_key()),
+        Provider::Openai => {
+            handle_api_key_login(repo, "OpenAI", &ConfigKeys::ChatGptApiKey.to_key())
+        }
+        Provider::Claude => {
+            handle_api_key_login(repo, "Claude", &ConfigKeys::ClaudeApiKey.to_key())
+        }
     }
 }
 
@@ -92,7 +96,8 @@ fn print_key_status(repo: &SqliteRepository, provider: &str, config_key: &str) -
         println!("{}", "Status: Not configured".red());
         println!(
             "{}",
-            "Run the matching auth login command or set the matching API key environment variable.".white()
+            "Run the matching auth login command or set the matching API key environment variable."
+                .white()
         );
     }
     println!();

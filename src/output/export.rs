@@ -1,13 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use chrono;
+use comrak::{markdown_to_html, ComrakOptions};
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use comrak::{markdown_to_html, ComrakOptions};
-use chrono;
 
 use crate::llm::common::model::role::Role;
-use crate::session::model::session::Session;
 use crate::session::model::message::Message;
+use crate::session::model::session::Session;
 
 /// Supported export formats
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -122,8 +122,14 @@ impl ConversationExporter {
             content.push_str("# TermAI Conversation Export\n\n");
             content.push_str(&format!("**Session ID:** {}\n", session.id));
             content.push_str(&format!("**Session Name:** {}\n", session.name));
-            content.push_str(&format!("**Expires At:** {}\n", session.expires_at.format("%Y-%m-%d %H:%M:%S")));
-            content.push_str(&format!("**Message Count:** {}\n\n", session.messages.len()));
+            content.push_str(&format!(
+                "**Expires At:** {}\n",
+                session.expires_at.format("%Y-%m-%d %H:%M:%S")
+            ));
+            content.push_str(&format!(
+                "**Message Count:** {}\n\n",
+                session.messages.len()
+            ));
             content.push_str("---\n\n");
         }
 
@@ -149,11 +155,17 @@ impl ConversationExporter {
                 Role::System => "⚙️",
             };
 
-            content.push_str(&format!("## {} {}\n\n", role_emoji, message.role.to_string().to_uppercase()));
+            content.push_str(&format!(
+                "## {} {}\n\n",
+                role_emoji,
+                message.role.to_string().to_uppercase()
+            ));
 
             if self.config.include_timestamps {
-                content.push_str(&format!("*Timestamp: {}*\n\n", 
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
+                content.push_str(&format!(
+                    "*Timestamp: {}*\n\n",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                ));
             }
 
             // Clean and format message content
@@ -241,32 +253,41 @@ impl ConversationExporter {
     /// Convert session to JSON format
     fn session_to_json(&self, session: &Session) -> Result<String> {
         let mut json_data = serde_json::Map::new();
-        
+
         // Metadata
-        json_data.insert("export_info".to_string(), serde_json::json!({
-            "exported_at": chrono::Local::now().to_rfc3339(),
-            "exported_by": "TermAI",
-            "version": "1.0"
-        }));
+        json_data.insert(
+            "export_info".to_string(),
+            serde_json::json!({
+                "exported_at": chrono::Local::now().to_rfc3339(),
+                "exported_by": "TermAI",
+                "version": "1.0"
+            }),
+        );
 
         // Session data
-        json_data.insert("session".to_string(), serde_json::json!({
-            "id": session.id,
-            "name": session.name,
-            "expires_at": session.expires_at.and_utc().to_rfc3339(),
-            "current": session.current,
-            "message_count": session.messages.len()
-        }));
+        json_data.insert(
+            "session".to_string(),
+            serde_json::json!({
+                "id": session.id,
+                "name": session.name,
+                "expires_at": session.expires_at.and_utc().to_rfc3339(),
+                "current": session.current,
+                "message_count": session.messages.len()
+            }),
+        );
 
         // Messages
-        let messages_json: Vec<Value> = session.messages
+        let messages_json: Vec<Value> = session
+            .messages
             .iter()
-            .map(|msg| serde_json::json!({
-                "id": msg.id,
-                "role": msg.role.to_string(),
-                "content": msg.content,
-                "timestamp": chrono::Local::now().to_rfc3339()
-            }))
+            .map(|msg| {
+                serde_json::json!({
+                    "id": msg.id,
+                    "role": msg.role.to_string(),
+                    "content": msg.content,
+                    "timestamp": chrono::Local::now().to_rfc3339()
+                })
+            })
             .collect();
 
         json_data.insert("messages".to_string(), Value::Array(messages_json));
@@ -277,21 +298,26 @@ impl ConversationExporter {
     /// Convert messages to JSON format
     fn messages_to_json(&self, messages: &[Message], title: Option<&str>) -> Result<String> {
         let mut json_data = serde_json::Map::new();
-        
-        json_data.insert("export_info".to_string(), serde_json::json!({
-            "title": title.unwrap_or("TermAI Messages Export"),
-            "exported_at": chrono::Local::now().to_rfc3339(),
-            "exported_by": "TermAI",
-            "version": "1.0"
-        }));
+
+        json_data.insert(
+            "export_info".to_string(),
+            serde_json::json!({
+                "title": title.unwrap_or("TermAI Messages Export"),
+                "exported_at": chrono::Local::now().to_rfc3339(),
+                "exported_by": "TermAI",
+                "version": "1.0"
+            }),
+        );
 
         let messages_json: Vec<Value> = messages
             .iter()
-            .map(|msg| serde_json::json!({
-                "id": msg.id,
-                "role": msg.role.to_string(),
-                "content": msg.content
-            }))
+            .map(|msg| {
+                serde_json::json!({
+                    "id": msg.id,
+                    "role": msg.role.to_string(),
+                    "content": msg.content
+                })
+            })
             .collect();
 
         json_data.insert("messages".to_string(), Value::Array(messages_json));
@@ -323,7 +349,10 @@ impl ConversationExporter {
             content.push_str("\n\n");
             content.push_str(&format!("Session ID: {}\n", session.id));
             content.push_str(&format!("Session Name: {}\n", session.name));
-            content.push_str(&format!("Expires At: {}\n", session.expires_at.format("%Y-%m-%d %H:%M:%S")));
+            content.push_str(&format!(
+                "Expires At: {}\n",
+                session.expires_at.format("%Y-%m-%d %H:%M:%S")
+            ));
             content.push_str(&format!("Messages: {}\n\n", session.messages.len()));
             content.push_str(&"-".repeat(50));
             content.push_str("\n\n");
@@ -347,10 +376,12 @@ impl ConversationExporter {
         for (i, message) in messages.iter().enumerate() {
             // Role header
             content.push_str(&format!("[{}]", message.role.to_string().to_uppercase()));
-            
+
             if self.config.include_timestamps {
-                content.push_str(&format!(" - {}", 
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
+                content.push_str(&format!(
+                    " - {}",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                ));
             }
             content.push_str("\n");
 
@@ -384,24 +415,24 @@ impl ConversationExporter {
     fn markdown_to_plain_text(&self, markdown: &str) -> String {
         // Simple markdown to text conversion
         let mut text = markdown.to_string();
-        
+
         // Remove code block markers
         text = text.replace("```rust", "");
         text = text.replace("```python", "");
         text = text.replace("```javascript", "");
         text = text.replace("```", "");
-        
+
         // Remove markdown formatting
         text = text.replace("**", "");
         text = text.replace("*", "");
         text = text.replace("__", "");
         text = text.replace("_", "");
-        
+
         // Clean up headers
         text = text.replace("### ", "");
         text = text.replace("## ", "");
         text = text.replace("# ", "");
-        
+
         text
     }
 
@@ -530,7 +561,8 @@ hr {
     margin: 30px 0;
     color: #bdc3c7;
 }
-"#.to_string()
+"#
+            .to_string()
         }
     }
 }
@@ -560,11 +592,7 @@ mod tests {
     #[test]
     fn test_markdown_export() {
         let messages = vec![
-            Message::new(
-                "1".to_string(),
-                Role::User,
-                "Hello, world!".to_string(),
-            ),
+            Message::new("1".to_string(), Role::User, "Hello, world!".to_string()),
             Message::new(
                 "2".to_string(),
                 Role::Assistant,
@@ -574,7 +602,7 @@ mod tests {
 
         let exporter = ConversationExporter::new(ExportConfig::default());
         let result = exporter.messages_to_markdown(&messages, Some("Test Conversation"));
-        
+
         assert!(result.is_ok());
         let markdown = result.unwrap();
         assert!(markdown.contains("# Test Conversation"));
@@ -586,17 +614,15 @@ mod tests {
 
     #[test]
     fn test_json_export() {
-        let messages = vec![
-            Message::new(
-                "1".to_string(),
-                Role::User,
-                "Test message".to_string(),
-            ),
-        ];
+        let messages = vec![Message::new(
+            "1".to_string(),
+            Role::User,
+            "Test message".to_string(),
+        )];
 
         let exporter = ConversationExporter::new(ExportConfig::default());
         let result = exporter.messages_to_json(&messages, Some("Test"));
-        
+
         assert!(result.is_ok());
         let json = result.unwrap();
         assert!(json.contains("Test message"));
@@ -606,28 +632,39 @@ mod tests {
     #[test]
     fn test_export_formats() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         let message = Message::new(
             "1".to_string(),
             Role::Assistant,
             "Test content with `code`".to_string(),
         );
 
-        for format in [ExportFormat::Markdown, ExportFormat::Json, ExportFormat::PlainText].iter().cloned() {
-            let filename = format!("test.{}", match format {
-                ExportFormat::Markdown => "md",
-                ExportFormat::Json => "json",
-                ExportFormat::PlainText => "txt",
-                _ => "txt",
-            });
-            
+        for format in [
+            ExportFormat::Markdown,
+            ExportFormat::Json,
+            ExportFormat::PlainText,
+        ]
+        .iter()
+        .cloned()
+        {
+            let filename = format!(
+                "test.{}",
+                match format {
+                    ExportFormat::Markdown => "md",
+                    ExportFormat::Json => "json",
+                    ExportFormat::PlainText => "txt",
+                    _ => "txt",
+                }
+            );
+
             let output_path = temp_dir.path().join(filename);
             let exporter = ConversationExporter::new(ExportConfig::default());
-            let result = exporter.export_messages(&[message.clone()], format, &output_path, Some("Test"));
-            
+            let result =
+                exporter.export_messages(&[message.clone()], format, &output_path, Some("Test"));
+
             assert!(result.is_ok(), "Failed to export format: {:?}", format);
             assert!(output_path.exists(), "Export file was not created");
-            
+
             let content = fs::read_to_string(&output_path).unwrap();
             assert!(!content.is_empty(), "Export file is empty");
         }

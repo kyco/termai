@@ -1,9 +1,8 @@
 /// Branch comparison features for TermAI
 #[allow(dead_code)]
-/// 
+///
 /// This module provides sophisticated comparison capabilities between conversation branches,
 /// allowing users to analyze different approaches, solutions, and outcomes side-by-side.
-
 use crate::branch::entity::branch_entity::BranchEntity;
 use crate::branch::service::BranchService;
 use crate::repository::db::SqliteRepository;
@@ -128,7 +127,7 @@ impl BranchComparator {
 
         // Perform message-level comparisons
         let message_comparisons = Self::compare_messages(&branch_messages)?;
-        
+
         // Generate summary and insights
         let summary = Self::generate_comparison_summary(&branches, &message_comparisons)?;
 
@@ -146,12 +145,13 @@ impl BranchComparator {
         branch_names: &[String],
     ) -> Result<BranchComparison> {
         let all_branches = BranchService::get_session_branches(repo, session_id)?;
-        
+
         let mut branch_ids = Vec::new();
         for name in branch_names {
-            if let Some(branch) = all_branches.iter().find(|b| {
-                b.branch_name.as_deref() == Some(name) || b.id == *name
-            }) {
+            if let Some(branch) = all_branches
+                .iter()
+                .find(|b| b.branch_name.as_deref() == Some(name) || b.id == *name)
+            {
                 branch_ids.push(branch.id.clone());
             } else {
                 return Err(anyhow::anyhow!("Branch '{}' not found in session", name));
@@ -164,33 +164,39 @@ impl BranchComparator {
     /// Generate side-by-side comparison display
     pub fn format_side_by_side_comparison(comparison: &BranchComparison) -> String {
         let mut output = String::new();
-        
+
         // Header
-        output.push_str(&format!("{}\n", "📊 Side-by-Side Branch Comparison".bright_green().bold()));
+        output.push_str(&format!(
+            "{}\n",
+            "📊 Side-by-Side Branch Comparison".bright_green().bold()
+        ));
         output.push_str(&format!("{}\n", "═".repeat(40).dimmed()));
         output.push_str("\n");
 
         // Branch headers
-        let branch_names: Vec<String> = comparison.branches.iter()
+        let branch_names: Vec<String> = comparison
+            .branches
+            .iter()
             .map(|b| b.branch_name.as_deref().unwrap_or("unnamed").to_string())
             .collect();
 
         let col_width = 40;
         let separator = " │ ";
-        
+
         // Create column headers
         let mut header_line = String::new();
         for (i, name) in branch_names.iter().enumerate() {
             if i > 0 {
                 header_line.push_str(separator);
             }
-            header_line.push_str(&format!("{:width$}", 
-                format!("🌿 {}", name).bright_blue().bold(), 
+            header_line.push_str(&format!(
+                "{:width$}",
+                format!("🌿 {}", name).bright_blue().bold(),
                 width = col_width
             ));
         }
         output.push_str(&format!("{}\n", header_line));
-        
+
         // Separator line
         let mut sep_line = String::new();
         for i in 0..branch_names.len() {
@@ -204,13 +210,16 @@ impl BranchComparator {
         // Message comparisons
         for (msg_idx, msg_comparison) in comparison.message_comparisons.iter().enumerate() {
             if msg_comparison.messages.iter().any(|m| m.is_some()) {
-                output.push_str(&format!("\n{} {}\n", 
-                    "💬 Message".bright_yellow(), 
+                output.push_str(&format!(
+                    "\n{} {}\n",
+                    "💬 Message".bright_yellow(),
                     (msg_idx + 1).to_string().bright_white().bold()
                 ));
-                
+
                 let mut content_lines = Vec::new();
-                let max_lines = msg_comparison.messages.iter()
+                let max_lines = msg_comparison
+                    .messages
+                    .iter()
                     .map(|m| match m {
                         Some(msg) => Self::wrap_text(&msg.content, col_width - 2).len(),
                         None => 1,
@@ -238,13 +247,13 @@ impl BranchComparator {
                         if branch_idx > 0 {
                             line.push_str(separator);
                         }
-                        
+
                         let content = if line_idx < branch_lines.len() {
                             &branch_lines[line_idx]
                         } else {
                             ""
                         };
-                        
+
                         line.push_str(&format!("{:width$}", content, width = col_width));
                     }
                     output.push_str(&format!("{}\n", line));
@@ -252,8 +261,9 @@ impl BranchComparator {
 
                 // Show similarity score if available
                 if msg_comparison.similarity_score < 1.0 {
-                    output.push_str(&format!("   {} {:.1}%\n", 
-                        "Similarity:".dimmed(), 
+                    output.push_str(&format!(
+                        "   {} {:.1}%\n",
+                        "Similarity:".dimmed(),
                         msg_comparison.similarity_score * 100.0
                     ));
                 }
@@ -266,27 +276,35 @@ impl BranchComparator {
     /// Generate comparison summary with insights
     pub fn format_comparison_summary(comparison: &BranchComparison) -> String {
         let mut output = String::new();
-        
-        output.push_str(&format!("{}\n", "📋 Comparison Summary".bright_yellow().bold()));
+
+        output.push_str(&format!(
+            "{}\n",
+            "📋 Comparison Summary".bright_yellow().bold()
+        ));
         output.push_str(&format!("{}\n", "═".repeat(20).dimmed()));
         output.push_str("\n");
 
         let summary = &comparison.summary;
-        
+
         // Overall statistics
-        output.push_str(&format!("{} {}\n", 
-            "Messages compared:".bright_cyan(), 
+        output.push_str(&format!(
+            "{} {}\n",
+            "Messages compared:".bright_cyan(),
             summary.total_messages_compared.to_string().bright_white()
         ));
-        output.push_str(&format!("{} {:.1}%\n", 
-            "Overall similarity:".bright_cyan(), 
+        output.push_str(&format!(
+            "{} {:.1}%\n",
+            "Overall similarity:".bright_cyan(),
             summary.similarity_percentage
         ));
         output.push_str("\n");
 
         // Quality scores
         if !summary.quality_scores.is_empty() {
-            output.push_str(&format!("{}\n", "🏆 Quality Scores:".bright_yellow().bold()));
+            output.push_str(&format!(
+                "{}\n",
+                "🏆 Quality Scores:".bright_yellow().bold()
+            ));
             for score in &summary.quality_scores {
                 let score_color = if score.overall_score >= 80.0 {
                     "bright_green"
@@ -295,9 +313,10 @@ impl BranchComparator {
                 } else {
                     "bright_red"
                 };
-                
-                output.push_str(&format!("   {} {:.1}/100\n", 
-                    score.branch_name.bright_white(), 
+
+                output.push_str(&format!(
+                    "   {} {:.1}/100\n",
+                    score.branch_name.bright_white(),
                     match score_color {
                         "bright_green" => score.overall_score.to_string().bright_green(),
                         "bright_yellow" => score.overall_score.to_string().bright_yellow(),
@@ -310,7 +329,10 @@ impl BranchComparator {
 
         // Unique insights
         if !summary.unique_insights.is_empty() {
-            output.push_str(&format!("{}\n", "💡 Unique Insights:".bright_yellow().bold()));
+            output.push_str(&format!(
+                "{}\n",
+                "💡 Unique Insights:".bright_yellow().bold()
+            ));
             for insight in &summary.unique_insights {
                 let insight_icon = match insight.insight_type {
                     InsightType::Solution => "✅",
@@ -320,10 +342,11 @@ impl BranchComparator {
                     InsightType::Warning => "⚠️",
                     InsightType::Alternative => "🔀",
                 };
-                
-                output.push_str(&format!("   {} {} {}\n", 
-                    insight_icon, 
-                    insight.branch_name.bright_blue(), 
+
+                output.push_str(&format!(
+                    "   {} {} {}\n",
+                    insight_icon,
+                    insight.branch_name.bright_blue(),
                     insight.description
                 ));
             }
@@ -332,7 +355,10 @@ impl BranchComparator {
 
         // Recommendations
         if !summary.recommendations.is_empty() {
-            output.push_str(&format!("{}\n", "🎯 Recommendations:".bright_yellow().bold()));
+            output.push_str(&format!(
+                "{}\n",
+                "🎯 Recommendations:".bright_yellow().bold()
+            ));
             for rec in &summary.recommendations {
                 output.push_str(&format!("   • {}\n", rec));
             }
@@ -343,7 +369,11 @@ impl BranchComparator {
 
     /// Compare messages across branches
     fn compare_messages(branch_messages: &[Vec<Message>]) -> Result<Vec<MessageComparison>> {
-        let max_messages = branch_messages.iter().map(|msgs| msgs.len()).max().unwrap_or(0);
+        let max_messages = branch_messages
+            .iter()
+            .map(|msgs| msgs.len())
+            .max()
+            .unwrap_or(0);
         let mut comparisons = Vec::new();
 
         for seq_num in 0..max_messages {
@@ -373,7 +403,7 @@ impl BranchComparator {
     /// Calculate similarity between messages
     fn calculate_message_similarity(messages: &[Option<Message>]) -> f64 {
         let valid_messages: Vec<&Message> = messages.iter().filter_map(|m| m.as_ref()).collect();
-        
+
         if valid_messages.len() < 2 {
             return 1.0; // Single message or no messages
         }
@@ -384,7 +414,8 @@ impl BranchComparator {
 
         for i in 0..valid_messages.len() {
             for j in (i + 1)..valid_messages.len() {
-                let sim = Self::text_similarity(&valid_messages[i].content, &valid_messages[j].content);
+                let sim =
+                    Self::text_similarity(&valid_messages[i].content, &valid_messages[j].content);
                 total_similarity += sim;
                 comparisons += 1;
             }
@@ -401,10 +432,10 @@ impl BranchComparator {
     fn text_similarity(text1: &str, text2: &str) -> f64 {
         let words1: std::collections::HashSet<&str> = text1.split_whitespace().collect();
         let words2: std::collections::HashSet<&str> = text2.split_whitespace().collect();
-        
+
         let intersection = words1.intersection(&words2).count();
         let union = words1.union(&words2).count();
-        
+
         if union == 0 {
             1.0
         } else {
@@ -424,23 +455,27 @@ impl BranchComparator {
         message_comparisons: &[MessageComparison],
     ) -> Result<ComparisonSummary> {
         let total_messages = message_comparisons.len();
-        
+
         let avg_similarity = if total_messages > 0 {
-            message_comparisons.iter()
+            message_comparisons
+                .iter()
                 .map(|mc| mc.similarity_score)
-                .sum::<f64>() / total_messages as f64 * 100.0
+                .sum::<f64>()
+                / total_messages as f64
+                * 100.0
         } else {
             100.0
         };
 
         // Generate quality scores
         let quality_scores = Self::calculate_quality_scores(branches, message_comparisons);
-        
+
         // Generate insights
         let unique_insights = Self::extract_unique_insights(branches, message_comparisons);
-        
+
         // Generate recommendations
-        let recommendations = Self::generate_recommendations(branches, &quality_scores, avg_similarity);
+        let recommendations =
+            Self::generate_recommendations(branches, &quality_scores, avg_similarity);
 
         Ok(ComparisonSummary {
             total_messages_compared: total_messages,
@@ -459,12 +494,16 @@ impl BranchComparator {
         let mut scores = Vec::new();
 
         for (i, branch) in branches.iter().enumerate() {
-            let branch_name = branch.branch_name.as_deref().unwrap_or("unnamed").to_string();
-            
+            let branch_name = branch
+                .branch_name
+                .as_deref()
+                .unwrap_or("unnamed")
+                .to_string();
+
             // Simple scoring based on message presence and length
             let mut total_score = 0.0;
             let mut message_count = 0;
-            
+
             for comparison in message_comparisons {
                 if i < comparison.messages.len() {
                     if let Some(msg) = &comparison.messages[i] {
@@ -493,13 +532,19 @@ impl BranchComparator {
             criteria_scores.insert("depth".to_string(), overall_score * 0.7);
 
             let strengths = if overall_score >= 70.0 {
-                vec!["Comprehensive responses".to_string(), "Good detail level".to_string()]
+                vec![
+                    "Comprehensive responses".to_string(),
+                    "Good detail level".to_string(),
+                ]
             } else {
                 vec![]
             };
 
             let weaknesses = if overall_score < 50.0 {
-                vec!["Limited responses".to_string(), "Could be more detailed".to_string()]
+                vec![
+                    "Limited responses".to_string(),
+                    "Could be more detailed".to_string(),
+                ]
             } else {
                 vec![]
             };
@@ -525,21 +570,30 @@ impl BranchComparator {
         let mut insights = Vec::new();
 
         for (i, branch) in branches.iter().enumerate() {
-            let branch_name = branch.branch_name.as_deref().unwrap_or("unnamed").to_string();
-            
+            let branch_name = branch
+                .branch_name
+                .as_deref()
+                .unwrap_or("unnamed")
+                .to_string();
+
             // Generate sample insights based on branch characteristics
             if let Some(description) = &branch.description {
-                if description.to_lowercase().contains("error") || description.to_lowercase().contains("debug") {
+                if description.to_lowercase().contains("error")
+                    || description.to_lowercase().contains("debug")
+                {
                     insights.push(UniqueInsight {
                         branch_index: i,
                         branch_name: branch_name.clone(),
                         insight_type: InsightType::Solution,
-                        description: "Focuses on error handling and debugging approaches".to_string(),
+                        description: "Focuses on error handling and debugging approaches"
+                            .to_string(),
                         relevance_score: 0.8,
                     });
                 }
-                
-                if description.to_lowercase().contains("alternative") || description.to_lowercase().contains("different") {
+
+                if description.to_lowercase().contains("alternative")
+                    || description.to_lowercase().contains("different")
+                {
                     insights.push(UniqueInsight {
                         branch_index: i,
                         branch_name,
@@ -563,7 +617,10 @@ impl BranchComparator {
         let mut recommendations = Vec::new();
 
         // Find best performing branch
-        if let Some(best_branch) = quality_scores.iter().max_by(|a, b| a.overall_score.partial_cmp(&b.overall_score).unwrap()) {
+        if let Some(best_branch) = quality_scores
+            .iter()
+            .max_by(|a, b| a.overall_score.partial_cmp(&b.overall_score).unwrap())
+        {
             if best_branch.overall_score > 70.0 {
                 recommendations.push(format!(
                     "Consider using '{}' as the primary approach (score: {:.1})",
@@ -576,7 +633,10 @@ impl BranchComparator {
         if avg_similarity < 30.0 {
             recommendations.push("Branches show significantly different approaches - consider merging unique insights".to_string());
         } else if avg_similarity > 80.0 {
-            recommendations.push("Branches are very similar - consider consolidating to avoid redundancy".to_string());
+            recommendations.push(
+                "Branches are very similar - consider consolidating to avoid redundancy"
+                    .to_string(),
+            );
         }
 
         // Branch count recommendations
@@ -585,7 +645,10 @@ impl BranchComparator {
         }
 
         if recommendations.is_empty() {
-            recommendations.push("All branches provide valuable perspectives - continue exploring as needed".to_string());
+            recommendations.push(
+                "All branches provide valuable perspectives - continue exploring as needed"
+                    .to_string(),
+            );
         }
 
         recommendations
@@ -599,14 +662,14 @@ impl BranchComparator {
 
         let mut lines = Vec::new();
         let mut current_line = String::new();
-        
+
         for word in text.split_whitespace() {
             if current_line.len() + word.len() + 1 > width {
                 if !current_line.is_empty() {
                     lines.push(current_line.clone());
                     current_line.clear();
                 }
-                
+
                 // Handle very long words
                 if word.len() > width {
                     lines.push(word.to_string());
@@ -620,15 +683,15 @@ impl BranchComparator {
                 current_line.push_str(word);
             }
         }
-        
+
         if !current_line.is_empty() {
             lines.push(current_line);
         }
-        
+
         if lines.is_empty() {
             lines.push(String::new());
         }
-        
+
         lines
     }
 }
@@ -638,23 +701,23 @@ pub struct QuickCompare;
 
 impl QuickCompare {
     /// Compare just the outcomes/conclusions of branches
-    pub fn compare_outcomes(
-        repo: &SqliteRepository,
-        branch_ids: &[String],
-    ) -> Result<String> {
+    pub fn compare_outcomes(repo: &SqliteRepository, branch_ids: &[String]) -> Result<String> {
         let comparison = BranchComparator::compare_branches(repo, branch_ids)?;
-        
+
         let mut output = String::new();
-        output.push_str(&format!("{}\n", "🎯 Branch Outcomes Comparison".bright_green().bold()));
+        output.push_str(&format!(
+            "{}\n",
+            "🎯 Branch Outcomes Comparison".bright_green().bold()
+        ));
         output.push_str(&format!("{}\n", "═".repeat(30).dimmed()));
         output.push_str("\n");
 
         for (i, branch) in comparison.branches.iter().enumerate() {
             let branch_name = branch.branch_name.as_deref().unwrap_or("unnamed");
             let quality_score = comparison.summary.quality_scores.get(i);
-            
+
             output.push_str(&format!("🌿 {}\n", branch_name.bright_blue().bold()));
-            
+
             if let Some(score) = quality_score {
                 // Show strengths and weaknesses
                 if !score.strengths.is_empty() {
@@ -663,27 +726,42 @@ impl QuickCompare {
                         output.push_str(&format!("     • {}\n", strength.bright_green()));
                     }
                 }
-                
+
                 if !score.weaknesses.is_empty() {
-                    output.push_str(&format!("   {} {}\n", "⚠️".bright_yellow(), "Areas for improvement:"));
+                    output.push_str(&format!(
+                        "   {} {}\n",
+                        "⚠️".bright_yellow(),
+                        "Areas for improvement:"
+                    ));
                     for weakness in &score.weaknesses {
                         output.push_str(&format!("     • {}\n", weakness.dimmed()));
                     }
                 }
-                
-                output.push_str(&format!("   {} {:.1}/100\n", "Score:".bright_cyan(), score.overall_score));
+
+                output.push_str(&format!(
+                    "   {} {:.1}/100\n",
+                    "Score:".bright_cyan(),
+                    score.overall_score
+                ));
             }
-            
+
             if let Some(description) = &branch.description {
-                output.push_str(&format!("   {} {}\n", "Description:".dimmed(), description.dimmed()));
+                output.push_str(&format!(
+                    "   {} {}\n",
+                    "Description:".dimmed(),
+                    description.dimmed()
+                ));
             }
-            
+
             output.push_str("\n");
         }
 
         // Add recommendations
         if !comparison.summary.recommendations.is_empty() {
-            output.push_str(&format!("{}\n", "💡 Recommendations:".bright_yellow().bold()));
+            output.push_str(&format!(
+                "{}\n",
+                "💡 Recommendations:".bright_yellow().bold()
+            ));
             for rec in &comparison.summary.recommendations {
                 output.push_str(&format!("   • {}\n", rec));
             }

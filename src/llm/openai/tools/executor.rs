@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -151,7 +151,11 @@ impl ToolExecutor {
         match std::fs::write(&path, &args.content) {
             Ok(()) => Ok(ToolResult {
                 success: true,
-                output: format!("Successfully wrote {} bytes to '{}'", args.content.len(), args.path),
+                output: format!(
+                    "Successfully wrote {} bytes to '{}'",
+                    args.content.len(),
+                    args.path
+                ),
             }),
             Err(e) => Ok(ToolResult {
                 success: false,
@@ -174,11 +178,7 @@ impl ToolExecutor {
                     match entry {
                         Ok(entry) => {
                             let name = entry.file_name().to_string_lossy().to_string();
-                            let file_type = if entry.path().is_dir() {
-                                "dir"
-                            } else {
-                                "file"
-                            };
+                            let file_type = if entry.path().is_dir() { "dir" } else { "file" };
                             files.push(format!("[{}] {}", file_type, name));
                         }
                         Err(e) => {

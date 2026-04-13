@@ -13,12 +13,12 @@ use crate::llm::common::model::role::Role;
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
 //use crate::session::model::message::Message;
+use crate::branch::BranchService;
+use crate::repository::db::SqliteRepository;
 use crate::session::model::session::Session;
 use crate::session::repository::{MessageRepository, SessionRepository};
 use crate::session::service::sessions_service;
 use crate::ui::timer::ThinkingTimer;
-use crate::repository::db::SqliteRepository;
-use crate::branch::BranchService;
 
 /// Manages an interactive chat session with REPL interface
 pub struct InteractiveSession<'a, R, SR, MR>
@@ -58,7 +58,7 @@ where
     ) -> Result<Self> {
         let repl = ChatRepl::new()?;
         let formatter = ChatFormatter::new();
-        
+
         // Initialize chat state with current provider and model from config
         let chat_state = Self::initialize_chat_state(sqlite_repo)?;
 
@@ -328,11 +328,15 @@ where
                 if let Some(last_message) = self.session.messages.last() {
                     if last_message.role == Role::Assistant {
                         // Use the new async formatter for enhanced markdown and syntax highlighting
-                        if let Err(e) = self.formatter.format_message_async(
-                            &Role::Assistant,
-                            &last_message.content,
-                            Some(Local::now()),
-                        ).await {
+                        if let Err(e) = self
+                            .formatter
+                            .format_message_async(
+                                &Role::Assistant,
+                                &last_message.content,
+                                Some(Local::now()),
+                            )
+                            .await
+                        {
                             eprintln!("Error formatting AI response: {}", e);
                             // Fallback to basic formatting
                             let formatted_ai = self.formatter.format_message(
@@ -401,7 +405,8 @@ where
                     &ConfigKeys::ChatGptApiKey.to_key(),
                 )?;
                 if self.chat_state.tools_enabled {
-                    openai::service::chat::chat_with_tools(&api_key.value, &mut self.session).await?;
+                    openai::service::chat::chat_with_tools(&api_key.value, &mut self.session)
+                        .await?;
                 } else {
                     openai::service::chat::chat_with_model(
                         &api_key.value,
@@ -423,10 +428,18 @@ where
                         "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
                     ))?;
 
-                openai::service::codex::chat(&access_token, &mut self.session, Some(&self.chat_state.model)).await?;
+                openai::service::codex::chat(
+                    &access_token,
+                    &mut self.session,
+                    Some(&self.chat_state.model),
+                )
+                .await?;
             }
             _ => {
-                return Err(anyhow!("Unsupported provider: {}", self.chat_state.provider));
+                return Err(anyhow!(
+                    "Unsupported provider: {}",
+                    self.chat_state.provider
+                ));
             }
         }
 
@@ -549,18 +562,28 @@ where
         // Note: Need &mut SqliteRepository but we only have &SqliteRepository
         // This is a limitation of the current design. For now, show what the command would do:
         let message = if name.is_some() {
-            format!("🌿 Would create branch '{}' from current conversation state", branch_name)
+            format!(
+                "🌿 Would create branch '{}' from current conversation state",
+                branch_name
+            )
         } else {
-            format!("🌿 Would create auto-named branch '{}' from current conversation state", branch_name)
+            format!(
+                "🌿 Would create auto-named branch '{}' from current conversation state",
+                branch_name
+            )
         };
 
         // Display the branch creation message
-        self.repl.print_message(&self.formatter.format_success(&message));
+        self.repl
+            .print_message(&self.formatter.format_success(&message));
 
         // Show branch creation info
         let info_lines = vec![
             "📋 Branch would include:".to_string(),
-            format!("   • {} messages from current conversation", self.session.messages.len()),
+            format!(
+                "   • {} messages from current conversation",
+                self.session.messages.len()
+            ),
             "   • Full conversation context preserved".to_string(),
             "   • Ready for exploring alternative approaches".to_string(),
         ];
@@ -572,7 +595,7 @@ where
         // TODO: Actually create the branch when we have mutable access to repo
         // For now, this demonstrates the UI and command structure
         self.repl.print_message(&self.formatter.format_warning(
-            "⚠️  Branch creation temporarily disabled - requires mutable database access"
+            "⚠️  Branch creation temporarily disabled - requires mutable database access",
         ));
 
         Ok(())
@@ -581,23 +604,21 @@ where
     /// Handle /theme command
     fn handle_theme_command(&mut self, theme_name: Option<String>) {
         match theme_name {
-            Some(name) => {
-                match self.formatter.set_theme(&name) {
-                    Ok(()) => {
-                        self.repl.print_message(&self.formatter.format_success(
-                            &format!("Switched to '{}' theme", name),
-                        ));
-                    }
-                    Err(e) => {
-                        self.repl.print_message(&self.formatter.format_error(&e));
-                        let themes = self.formatter.available_themes();
-                        self.repl.print_message(&format!(
-                            "Available themes: {}",
-                            themes.join(", ")
-                        ));
-                    }
+            Some(name) => match self.formatter.set_theme(&name) {
+                Ok(()) => {
+                    self.repl.print_message(
+                        &self
+                            .formatter
+                            .format_success(&format!("Switched to '{}' theme", name)),
+                    );
                 }
-            }
+                Err(e) => {
+                    self.repl.print_message(&self.formatter.format_error(&e));
+                    let themes = self.formatter.available_themes();
+                    self.repl
+                        .print_message(&format!("Available themes: {}", themes.join(", ")));
+                }
+            },
             None => {
                 let themes = self.formatter.available_themes();
                 self.repl.print_message(&format!(
@@ -614,9 +635,11 @@ where
             Some(enabled) => {
                 self.formatter.set_streaming(enabled);
                 let status = if enabled { "enabled" } else { "disabled" };
-                self.repl.print_message(&self.formatter.format_success(
-                    &format!("Streaming output {}", status),
-                ));
+                self.repl.print_message(
+                    &self
+                        .formatter
+                        .format_success(&format!("Streaming output {}", status)),
+                );
             }
             None => {
                 // Toggle: we don't track the current state externally, so just
@@ -643,8 +666,10 @@ where
 
     /// Initialize chat state from current configuration
     fn initialize_chat_state(sqlite_repo: &SqliteRepository) -> Result<ChatState> {
-        let settings =
-            ResolvedSettings::load_for_current_dir_with_repo(sqlite_repo, SettingsOverrides::default())?;
+        let settings = ResolvedSettings::load_for_current_dir_with_repo(
+            sqlite_repo,
+            SettingsOverrides::default(),
+        )?;
         let chat_state = ChatState::new(
             settings.default_provider.as_str().to_string(),
             settings.selected_model(),
@@ -660,13 +685,15 @@ where
                 // Switch to specified model
                 match self.chat_state.switch_model(model) {
                     Ok(message) => {
-                        self.repl.print_message(&self.formatter.format_success(&message));
-                        
+                        self.repl
+                            .print_message(&self.formatter.format_success(&message));
+
                         // Update the configuration to reflect the new provider/model
                         self.update_config_from_state().await?;
                     }
                     Err(error) => {
-                        self.repl.print_message(&self.formatter.format_error(&error));
+                        self.repl
+                            .print_message(&self.formatter.format_error(&error));
                     }
                 }
             }
@@ -687,13 +714,15 @@ where
                 // Switch to specified provider
                 match self.chat_state.switch_provider(provider) {
                     Ok(message) => {
-                        self.repl.print_message(&self.formatter.format_success(&message));
-                        
+                        self.repl
+                            .print_message(&self.formatter.format_success(&message));
+
                         // Update the configuration to reflect the new provider/model
                         self.update_config_from_state().await?;
                     }
                     Err(error) => {
-                        self.repl.print_message(&self.formatter.format_error(&error));
+                        self.repl
+                            .print_message(&self.formatter.format_error(&error));
                     }
                 }
             }

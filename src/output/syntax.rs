@@ -1,9 +1,9 @@
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style, ThemeSet};
-use syntect::parsing::{SyntaxSet, SyntaxReference};
+use syntect::parsing::{SyntaxReference, SyntaxSet};
 use syntect::util::as_24_bit_terminal_escaped;
-use anyhow::{Result, anyhow};
-use std::collections::HashMap;
 
 /// Enhanced syntax highlighter with support for 20+ languages
 pub struct SyntaxHighlighter {
@@ -16,7 +16,7 @@ pub struct SyntaxHighlighter {
 impl SyntaxHighlighter {
     pub fn new() -> Self {
         let theme_set = ThemeSet::load_defaults();
-        
+
         // Choose the best available theme for code highlighting
         let current_theme = if theme_set.themes.contains_key("Solarized (dark)") {
             "Solarized (dark)".to_string()
@@ -26,16 +26,21 @@ impl SyntaxHighlighter {
             "InspiredGitHub".to_string()
         } else {
             // Use the first available theme as fallback
-            theme_set.themes.keys().next().unwrap_or(&"".to_string()).clone()
+            theme_set
+                .themes
+                .keys()
+                .next()
+                .unwrap_or(&"".to_string())
+                .clone()
         };
-        
+
         let mut highlighter = Self {
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set,
             current_theme,
             language_mappings: HashMap::new(),
         };
-        
+
         highlighter.setup_language_mappings();
         highlighter
     }
@@ -118,7 +123,8 @@ impl SyntaxHighlighter {
         ];
 
         for (alias, language) in mappings {
-            self.language_mappings.insert(alias.to_string(), language.to_string());
+            self.language_mappings
+                .insert(alias.to_string(), language.to_string());
         }
     }
 
@@ -143,7 +149,7 @@ impl SyntaxHighlighter {
     /// Find syntax by name with fuzzy matching
     fn find_syntax_by_name(&self, name: &str) -> Option<&SyntaxReference> {
         let name_lower = name.to_lowercase();
-        
+
         // Try direct mapping first
         if let Some(mapped_name) = self.language_mappings.get(&name_lower) {
             if let Some(syntax) = self.syntax_set.find_syntax_by_name(mapped_name) {
@@ -200,98 +206,110 @@ impl SyntaxHighlighter {
 
         // Language-specific patterns
         let code_sample = lines.join(" ");
-        
+
         // Rust patterns
-        if code_sample.contains("fn main()") || 
-           code_sample.contains("use std::") ||
-           code_sample.contains("impl ") ||
-           code_sample.contains("match ") {
+        if code_sample.contains("fn main()")
+            || code_sample.contains("use std::")
+            || code_sample.contains("impl ")
+            || code_sample.contains("match ")
+        {
             return self.syntax_set.find_syntax_by_name("Rust");
         }
 
         // Python patterns
-        if code_sample.contains("def ") || 
-           code_sample.contains("import ") ||
-           code_sample.contains("from ") ||
-           first_line.starts_with("import ") ||
-           first_line.starts_with("from ") {
+        if code_sample.contains("def ")
+            || code_sample.contains("import ")
+            || code_sample.contains("from ")
+            || first_line.starts_with("import ")
+            || first_line.starts_with("from ")
+        {
             return self.syntax_set.find_syntax_by_name("Python");
         }
 
         // JavaScript/TypeScript patterns
-        if code_sample.contains("function ") ||
-           code_sample.contains("const ") ||
-           code_sample.contains("let ") ||
-           code_sample.contains("var ") ||
-           code_sample.contains("=> ") ||
-           code_sample.contains("console.log") {
-            if code_sample.contains(": string") || 
-               code_sample.contains(": number") ||
-               code_sample.contains("interface ") ||
-               code_sample.contains("type ") {
+        if code_sample.contains("function ")
+            || code_sample.contains("const ")
+            || code_sample.contains("let ")
+            || code_sample.contains("var ")
+            || code_sample.contains("=> ")
+            || code_sample.contains("console.log")
+        {
+            if code_sample.contains(": string")
+                || code_sample.contains(": number")
+                || code_sample.contains("interface ")
+                || code_sample.contains("type ")
+            {
                 return self.syntax_set.find_syntax_by_name("TypeScript");
             }
             return self.syntax_set.find_syntax_by_name("JavaScript");
         }
 
         // Java patterns
-        if code_sample.contains("public class") ||
-           code_sample.contains("public static void main") ||
-           code_sample.contains("System.out.println") {
+        if code_sample.contains("public class")
+            || code_sample.contains("public static void main")
+            || code_sample.contains("System.out.println")
+        {
             return self.syntax_set.find_syntax_by_name("Java");
         }
 
         // C/C++ patterns
         if code_sample.contains("#include") {
-            if code_sample.contains("std::") || 
-               code_sample.contains("using namespace") ||
-               code_sample.contains("cout") {
+            if code_sample.contains("std::")
+                || code_sample.contains("using namespace")
+                || code_sample.contains("cout")
+            {
                 return self.syntax_set.find_syntax_by_name("C++");
             }
             return self.syntax_set.find_syntax_by_name("C");
         }
 
         // Go patterns
-        if code_sample.contains("package ") ||
-           code_sample.contains("func ") ||
-           code_sample.contains("import (") {
+        if code_sample.contains("package ")
+            || code_sample.contains("func ")
+            || code_sample.contains("import (")
+        {
             return self.syntax_set.find_syntax_by_name("Go");
         }
 
         // HTML patterns
-        if code_sample.contains("<!DOCTYPE") || 
-           code_sample.contains("<html") ||
-           code_sample.contains("<head>") ||
-           code_sample.contains("<body>") {
+        if code_sample.contains("<!DOCTYPE")
+            || code_sample.contains("<html")
+            || code_sample.contains("<head>")
+            || code_sample.contains("<body>")
+        {
             return self.syntax_set.find_syntax_by_name("HTML");
         }
 
         // CSS patterns
-        if code_sample.contains("{") && code_sample.contains("}") && 
-           (code_sample.contains(":") && code_sample.contains(";")) {
+        if code_sample.contains("{")
+            && code_sample.contains("}")
+            && (code_sample.contains(":") && code_sample.contains(";"))
+        {
             return self.syntax_set.find_syntax_by_name("CSS");
         }
 
         // SQL patterns
-        if code_sample.to_uppercase().contains("SELECT ") ||
-           code_sample.to_uppercase().contains("INSERT ") ||
-           code_sample.to_uppercase().contains("UPDATE ") ||
-           code_sample.to_uppercase().contains("DELETE ") ||
-           code_sample.to_uppercase().contains("CREATE TABLE") {
+        if code_sample.to_uppercase().contains("SELECT ")
+            || code_sample.to_uppercase().contains("INSERT ")
+            || code_sample.to_uppercase().contains("UPDATE ")
+            || code_sample.to_uppercase().contains("DELETE ")
+            || code_sample.to_uppercase().contains("CREATE TABLE")
+        {
             return self.syntax_set.find_syntax_by_name("SQL");
         }
 
         // JSON pattern
-        if (code_sample.trim().starts_with('{') && code_sample.trim().ends_with('}')) ||
-           (code_sample.trim().starts_with('[') && code_sample.trim().ends_with(']')) {
+        if (code_sample.trim().starts_with('{') && code_sample.trim().ends_with('}'))
+            || (code_sample.trim().starts_with('[') && code_sample.trim().ends_with(']'))
+        {
             if code_sample.contains("\":") && code_sample.contains(",") {
                 return self.syntax_set.find_syntax_by_name("JSON");
             }
         }
 
         // YAML patterns
-        if code_sample.contains("---") || 
-           (code_sample.contains(":") && !code_sample.contains("{")) {
+        if code_sample.contains("---") || (code_sample.contains(":") && !code_sample.contains("{"))
+        {
             return self.syntax_set.find_syntax_by_name("YAML");
         }
 
@@ -300,10 +318,14 @@ impl SyntaxHighlighter {
 
     /// Highlight code with the specified language
     pub fn highlight(&self, code: &str, language: Option<&str>) -> Result<String> {
-        let syntax = self.detect_language(code, language)
+        let syntax = self
+            .detect_language(code, language)
             .ok_or_else(|| anyhow!("Could not determine language for syntax highlighting"))?;
-        
-        let theme = self.theme_set.themes.get(&self.current_theme)
+
+        let theme = self
+            .theme_set
+            .themes
+            .get(&self.current_theme)
             .ok_or_else(|| anyhow!("Theme '{}' not found", self.current_theme))?;
 
         let mut highlighted_lines = Vec::new();
@@ -319,10 +341,15 @@ impl SyntaxHighlighter {
     }
 
     /// Highlight code with line numbers
-    pub fn highlight_with_line_numbers(&self, code: &str, language: Option<&str>, start_line: usize) -> Result<String> {
+    pub fn highlight_with_line_numbers(
+        &self,
+        code: &str,
+        language: Option<&str>,
+        start_line: usize,
+    ) -> Result<String> {
         let highlighted = self.highlight(code, language)?;
         let lines: Vec<&str> = highlighted.lines().collect();
-        
+
         // Calculate padding for line numbers
         let max_line_num = start_line + lines.len() - 1;
         let padding = max_line_num.to_string().len();
@@ -354,24 +381,30 @@ impl SyntaxHighlighter {
 
     /// Get supported languages
     pub fn supported_languages(&self) -> Vec<&str> {
-        self.syntax_set.syntaxes()
+        self.syntax_set
+            .syntaxes()
             .iter()
             .map(|s| s.name.as_str())
             .collect()
     }
 
     /// Create a diff highlighting for code changes
-    pub fn highlight_diff(&self, old_code: &str, new_code: &str, language: Option<&str>) -> Result<String> {
+    pub fn highlight_diff(
+        &self,
+        old_code: &str,
+        new_code: &str,
+        language: Option<&str>,
+    ) -> Result<String> {
         let old_lines: Vec<&str> = old_code.lines().collect();
         let new_lines: Vec<&str> = new_code.lines().collect();
-        
+
         let mut result = Vec::new();
         let max_lines = old_lines.len().max(new_lines.len());
-        
+
         for i in 0..max_lines {
             let old_line = old_lines.get(i).copied().unwrap_or("");
             let new_line = new_lines.get(i).copied().unwrap_or("");
-            
+
             if old_line != new_line {
                 if !old_line.is_empty() {
                     let highlighted = self.highlight(old_line, language)?;
@@ -386,7 +419,7 @@ impl SyntaxHighlighter {
                 result.push(format!("  {}", highlighted));
             }
         }
-        
+
         Ok(result.join("\n"))
     }
 
@@ -396,7 +429,7 @@ impl SyntaxHighlighter {
         let total_lines = lines.len();
         let non_empty_lines = lines.iter().filter(|line| !line.trim().is_empty()).count();
         let comment_lines = self.count_comment_lines(&lines, language);
-        
+
         let estimated_lang = if let Some(detected) = self.detect_language(code, language) {
             Some(detected.name.clone())
         } else {
@@ -420,10 +453,13 @@ impl SyntaxHighlighter {
             None => vec!["//", "#", "*", "<!--"], // Common comment markers
         };
 
-        lines.iter()
+        lines
+            .iter()
             .filter(|line| {
                 let trimmed = line.trim();
-                comment_markers.iter().any(|marker| trimmed.starts_with(marker))
+                comment_markers
+                    .iter()
+                    .any(|marker| trimmed.starts_with(marker))
             })
             .count()
     }
@@ -443,14 +479,16 @@ impl SyntaxHighlighter {
     /// Estimate code complexity
     fn estimate_complexity(&self, lines: &[&str]) -> usize {
         let complexity_keywords = [
-            "if", "else", "elif", "for", "while", "match", "case", "switch", 
-            "try", "catch", "except", "finally", "async", "await", "fn", "function", "def"
+            "if", "else", "elif", "for", "while", "match", "case", "switch", "try", "catch",
+            "except", "finally", "async", "await", "fn", "function", "def",
         ];
 
-        lines.iter()
+        lines
+            .iter()
             .map(|line| {
                 let line_lower = line.to_lowercase();
-                complexity_keywords.iter()
+                complexity_keywords
+                    .iter()
                     .filter(|keyword| line_lower.contains(*keyword))
                     .count()
             })
@@ -506,10 +544,10 @@ mod tests {
     fn test_syntax_highlighting() {
         let highlighter = SyntaxHighlighter::new();
         let code = "fn main() {\n    println!(\"Hello!\");\n}";
-        
+
         let result = highlighter.highlight(code, Some("rust"));
         assert!(result.is_ok());
-        
+
         let highlighted = result.unwrap();
         assert!(!highlighted.is_empty());
         assert!(highlighted.contains("main"));
@@ -519,10 +557,10 @@ mod tests {
     fn test_line_numbers() {
         let highlighter = SyntaxHighlighter::new();
         let code = "line 1\nline 2\nline 3";
-        
+
         let result = highlighter.highlight_with_line_numbers(code, None, 1);
         assert!(result.is_ok());
-        
+
         let numbered = result.unwrap();
         assert!(numbered.contains("1 │"));
         assert!(numbered.contains("2 │"));
@@ -533,7 +571,7 @@ mod tests {
     fn test_code_analysis() {
         let highlighter = SyntaxHighlighter::new();
         let code = "fn main() {\n    // This is a comment\n    if true {\n        println!(\"Hello!\");\n    }\n}";
-        
+
         let analysis = highlighter.analyze_code(code, Some("rust"));
         assert!(analysis.total_lines > 0);
         assert!(analysis.comment_lines > 0);
@@ -544,10 +582,10 @@ mod tests {
     fn test_theme_switching() {
         let mut highlighter = SyntaxHighlighter::new();
         let themes = highlighter.available_themes();
-        
+
         assert!(!themes.is_empty());
         assert!(themes.contains(&"base16-ocean.dark"));
-        
+
         if themes.contains(&"base16-ocean.light") {
             let result = highlighter.set_theme("base16-ocean.light");
             assert!(result.is_ok());
@@ -559,7 +597,7 @@ mod tests {
     fn test_supported_languages() {
         let highlighter = SyntaxHighlighter::new();
         let languages = highlighter.supported_languages();
-        
+
         assert!(!languages.is_empty());
         assert!(languages.contains(&"Rust"));
         assert!(languages.contains(&"Python"));

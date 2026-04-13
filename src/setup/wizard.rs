@@ -1,7 +1,7 @@
 use crate::config::model::keys::ConfigKeys;
 use crate::config::repository::ConfigRepository;
-use crate::config::settings::{SettingsProvider, UserConfig};
 use crate::config::service::config_service;
+use crate::config::settings::{SettingsProvider, UserConfig};
 use crate::setup::validator::{ApiKeyValidator, ClaudeValidator, OpenAIValidator};
 use anyhow::Result;
 use colored::*;
@@ -118,7 +118,12 @@ impl SetupWizard {
         );
         println!();
 
-        let providers = vec![Provider::Claude, Provider::OpenAI, Provider::OpenAICodex, Provider::Both];
+        let providers = vec![
+            Provider::Claude,
+            Provider::OpenAI,
+            Provider::OpenAICodex,
+            Provider::Both,
+        ];
 
         let selection = Select::with_theme(&self.theme)
             .with_prompt("Which AI provider would you like to use?")
@@ -249,10 +254,7 @@ impl SetupWizard {
         use crate::auth::token_manager::TokenManager;
 
         println!();
-        println!(
-            "{}",
-            "🔐 OpenAI Codex Authentication".bright_green().bold()
-        );
+        println!("{}", "🔐 OpenAI Codex Authentication".bright_green().bold());
         println!();
         println!("This will authenticate using your ChatGPT Plus or Pro subscription.");
         println!("You will be redirected to OpenAI's login page in your browser.");
@@ -355,35 +357,39 @@ impl SetupWizard {
                 .filter(|value| !value.is_empty());
 
             match api_key {
-                Some(api_key) => match ModelsService::get_models_for_provider(repo, &api_key, provider).await {
-                    Ok(mut models) if !models.is_empty() => {
-                        models.sort_by(|left, right| {
-                            right
-                                .created
-                                .cmp(&left.created)
-                                .then_with(|| left.id.cmp(&right.id))
-                        });
-                        models.into_iter().map(|model| model.id).collect()
-                    }
-                    Ok(_) => {
-                        println!(
+                Some(api_key) => {
+                    match ModelsService::get_models_for_provider(repo, &api_key, provider).await {
+                        Ok(mut models) if !models.is_empty() => {
+                            models.sort_by(|left, right| {
+                                right
+                                    .created
+                                    .cmp(&left.created)
+                                    .then_with(|| left.id.cmp(&right.id))
+                            });
+                            models.into_iter().map(|model| model.id).collect()
+                        }
+                        Ok(_) => {
+                            println!(
                             "{}",
                             "OpenAI returned no models for this provider. Using the built-in list."
                                 .yellow()
                         );
-                        let state = ChatState::new(provider.to_string(), "placeholder".to_string());
-                        state.available_models
+                            let state =
+                                ChatState::new(provider.to_string(), "placeholder".to_string());
+                            state.available_models
+                        }
+                        Err(err) => {
+                            println!(
+                                "{} {}",
+                                "⚠️  Failed to fetch models from OpenAI:".yellow(),
+                                err.to_string().dimmed()
+                            );
+                            let state =
+                                ChatState::new(provider.to_string(), "placeholder".to_string());
+                            state.available_models
+                        }
                     }
-                    Err(err) => {
-                        println!(
-                            "{} {}",
-                            "⚠️  Failed to fetch models from OpenAI:".yellow(),
-                            err.to_string().dimmed()
-                        );
-                        let state = ChatState::new(provider.to_string(), "placeholder".to_string());
-                        state.available_models
-                    }
-                },
+                }
                 None => {
                     if provider == "codex" {
                         println!(
@@ -439,10 +445,7 @@ impl SetupWizard {
         user_config.default.model = Some(selected_model.clone());
         user_config.save()?;
 
-        println!(
-            "✅ Default model set to: {}",
-            selected_model.bright_cyan()
-        );
+        println!("✅ Default model set to: {}", selected_model.bright_cyan());
 
         Ok(())
     }

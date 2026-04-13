@@ -239,7 +239,9 @@ pub fn handle_legacy_patterns(args: &Args, repo: &SqliteRepository) -> Result<bo
     }
 
     if args.is_claude_api_key() {
-        eprintln!("⚠️  Warning: --claude-api-key is deprecated. Use 'termai auth login claude' instead.");
+        eprintln!(
+            "⚠️  Warning: --claude-api-key is deprecated. Use 'termai auth login claude' instead."
+        );
         crate::config::service::claude_config::write_claude_key(repo, args)?;
         handled = true;
     }
@@ -263,7 +265,9 @@ pub fn handle_legacy_patterns(args: &Args, repo: &SqliteRepository) -> Result<bo
             user_config.default.provider = match provider {
                 crate::args::Provider::Claude => crate::config::settings::SettingsProvider::Claude,
                 crate::args::Provider::Openai => crate::config::settings::SettingsProvider::Openai,
-                crate::args::Provider::OpenaiCodex => crate::config::settings::SettingsProvider::Codex,
+                crate::args::Provider::OpenaiCodex => {
+                    crate::config::settings::SettingsProvider::Codex
+                }
             };
             user_config.save()?;
         }
@@ -500,7 +504,9 @@ fn enhance_rebase_error(error: anyhow::Error) -> anyhow::Error {
 fn enhance_conflicts_error(error: anyhow::Error) -> anyhow::Error {
     let guidance = format!(
         "\n{}\n{}\n• {}\n• {}\n• {}",
-        "💡 Conflict Resolution Troubleshooting:".bright_yellow().bold(),
+        "💡 Conflict Resolution Troubleshooting:"
+            .bright_yellow()
+            .bold(),
         "   Conflict resolution failed. Try these steps:".white(),
         "Check for active conflicts with 'termai conflicts detect'".cyan(),
         "Use 'termai conflicts guide' for comprehensive help".cyan(),
@@ -512,7 +518,9 @@ fn enhance_conflicts_error(error: anyhow::Error) -> anyhow::Error {
 fn enhance_preset_error(error: anyhow::Error) -> anyhow::Error {
     let guidance = format!(
         "\n{}\n{}\n• {}\n• {}\n• {}",
-        "💡 Preset Management Troubleshooting:".bright_yellow().bold(),
+        "💡 Preset Management Troubleshooting:"
+            .bright_yellow()
+            .bold(),
         "   Preset operation failed. Try these steps:".white(),
         "Use 'termai preset list' to see available presets".cyan(),
         "Check preset name spelling and case sensitivity".cyan(),

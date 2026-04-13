@@ -1,16 +1,18 @@
 /// Git commit message generation command handler
 use crate::args::CommitArgs;
-use crate::config::settings::{ResolvedSettings, SettingsOverrides, SettingsProvider};
 use crate::config::model::keys::ConfigKeys;
 use crate::config::service::config_service;
+use crate::config::settings::{ResolvedSettings, SettingsOverrides, SettingsProvider};
 use crate::git::{diff::DiffAnalyzer, repository::GitRepository};
 use crate::llm::claude::adapter::claude_adapter;
 use crate::llm::claude::model::chat_completion_request::ChatCompletionRequest;
 use crate::llm::claude::model::chat_message::ChatMessage;
 use crate::llm::common::model::role::Role;
 use crate::llm::openai::adapter::responses_adapter::ResponsesAdapter;
-use crate::llm::openai::model::responses_api::{ResponsesRequest, InputMessage, ResponseOutput, ContentItem};
 use crate::llm::openai::model::model::Model;
+use crate::llm::openai::model::responses_api::{
+    ContentItem, InputMessage, ResponseOutput, ResponsesRequest,
+};
 use crate::repository::db::SqliteRepository;
 use anyhow::{bail, Context, Result};
 use colored::*;
@@ -125,7 +127,10 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
             .items(&actions)
             .default(0)
             .interact()?;
-        eprintln!("DEBUG: Select dialog completed with selection: {}", selection);
+        eprintln!(
+            "DEBUG: Select dialog completed with selection: {}",
+            selection
+        );
 
         match selection {
             0 => {
@@ -233,7 +238,10 @@ async fn generate_ai_commit_message(
     let prompt = create_commit_message_prompt(diff_summary, args, &diff_context);
 
     // Call appropriate AI service
-    eprintln!("DEBUG: Using provider: {}", settings.default_provider.as_str());
+    eprintln!(
+        "DEBUG: Using provider: {}",
+        settings.default_provider.as_str()
+    );
     let ai_response = match settings.default_provider {
         SettingsProvider::Claude => {
             eprintln!("DEBUG: Getting Claude API key");
@@ -255,12 +263,11 @@ async fn generate_ai_commit_message(
         SettingsProvider::Codex => {
             eprintln!("DEBUG: Getting Codex access token");
             let token_manager = crate::auth::token_manager::TokenManager::new(repo);
-            let access_token = token_manager
-                .get_valid_token()
-                .await?
-                .ok_or_else(|| anyhow::anyhow!(
+            let access_token = token_manager.get_valid_token().await?.ok_or_else(|| {
+                anyhow::anyhow!(
                     "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
-                ))?;
+                )
+            })?;
             eprintln!("DEBUG: Calling Codex API");
             generate_with_codex(&prompt, &access_token, &selected_model).await?
         }
@@ -430,7 +437,7 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
                     })
                     .collect::<Vec<String>>()
                     .join("\n");
-                
+
                 if !message_text.is_empty() {
                     return Ok(message_text);
                 }
@@ -447,9 +454,9 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str)
     eprintln!("DEBUG: Using OpenAI Chat Completions fallback");
     use reqwest::Client;
     use serde_json::json;
-    
+
     let client = Client::new();
-    
+
     let request_body = json!({
         "model": model,
         "messages": [
@@ -472,11 +479,18 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str)
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
-        bail!("OpenAI Chat Completions API failed with status {}: {}", status, error_text);
+        bail!(
+            "OpenAI Chat Completions API failed with status {}: {}",
+            status,
+            error_text
+        );
     }
 
     let response_json: serde_json::Value = response.json().await?;
-    eprintln!("DEBUG: Fallback OpenAI response received: {:?}", response_json);
+    eprintln!(
+        "DEBUG: Fallback OpenAI response received: {:?}",
+        response_json
+    );
 
     // Extract the message content
     if let Some(choices) = response_json["choices"].as_array() {
@@ -500,11 +514,13 @@ async fn generate_with_codex(prompt: &str, access_token: &str, model: &str) -> R
         Role::System,
         "You are an expert Git commit message generator. Generate clear, conventional commit messages based on diff analysis.".to_string(),
     ));
-    session.messages.push(crate::session::model::message::Message::new(
-        "".to_string(),
-        Role::User,
-        prompt.to_string(),
-    ));
+    session
+        .messages
+        .push(crate::session::model::message::Message::new(
+            "".to_string(),
+            Role::User,
+            prompt.to_string(),
+        ));
 
     crate::llm::openai::service::codex::chat(access_token, &mut session, Some(model)).await?;
 
@@ -528,7 +544,7 @@ fn parse_ai_commit_response(
         .strip_suffix("```")
         .unwrap_or(response)
         .trim();
-    
+
     let lines: Vec<&str> = cleaned_response.lines().collect();
     eprintln!("DEBUG: Parsing response lines: {:?}", lines);
 

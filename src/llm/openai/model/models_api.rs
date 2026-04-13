@@ -88,7 +88,8 @@ impl ModelObject {
 
 /// Filter a list of models to only chat-capable models
 pub fn filter_chat_models(models: &[ModelObject]) -> Vec<ModelObject> {
-    models.iter()
+    models
+        .iter()
         .filter(|m| m.is_chat_model())
         .cloned()
         .collect()
@@ -264,28 +265,148 @@ mod tests {
     #[test]
     fn test_is_chat_model() {
         // Chat models
-        assert!(ModelObject { id: "gpt-5.2".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "gpt-4o".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "gpt-4o-mini".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "o1".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "o1-mini".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "o3".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "o4-mini".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(ModelObject { id: "chatgpt-4o-latest".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
+        assert!(ModelObject {
+            id: "gpt-5.2".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "gpt-4o".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "gpt-4o-mini".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "o1".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "o1-mini".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "o3".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "o4-mini".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(ModelObject {
+            id: "chatgpt-4o-latest".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
 
         // Non-chat models
-        assert!(!ModelObject { id: "text-embedding-3-small".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "text-embedding-ada-002".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "whisper-1".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "tts-1".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "tts-1-hd".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "dall-e-3".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "dall-e-2".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "text-davinci-003".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "text-moderation-latest".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "gpt-4o-realtime-preview".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "gpt-4o-audio-preview".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
-        assert!(!ModelObject { id: "gpt-4o-transcription".into(), object: "model".into(), created: 0, owned_by: "openai".into() }.is_chat_model());
+        assert!(!ModelObject {
+            id: "text-embedding-3-small".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "text-embedding-ada-002".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "whisper-1".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "tts-1".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "tts-1-hd".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "dall-e-3".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "dall-e-2".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "text-davinci-003".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "text-moderation-latest".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "gpt-4o-realtime-preview".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "gpt-4o-audio-preview".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
+        assert!(!ModelObject {
+            id: "gpt-4o-transcription".into(),
+            object: "model".into(),
+            created: 0,
+            owned_by: "openai".into()
+        }
+        .is_chat_model());
     }
 
     #[test]

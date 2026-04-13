@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Controls the verbosity level for GPT-5 responses
 /// Determines how many output tokens are generated

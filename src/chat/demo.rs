@@ -1,20 +1,20 @@
 use crate::chat::formatter::ChatFormatter;
 use crate::llm::common::model::role::Role;
-use chrono::Local;
 use anyhow::Result;
+use chrono::Local;
 use colored::*;
 
 /// Demo function to showcase enhanced chat formatting
 pub async fn demo_enhanced_chat_formatting() -> Result<()> {
     println!("🚀 Enhanced Chat Formatting Demo\n");
-    
+
     let mut formatter = ChatFormatter::new();
-    
+
     // Demo different types of responses that would come from an AI
     let sample_responses = vec![
         (
             "Simple response",
-            "Hello! I'm your AI assistant. How can I help you today?"
+            "Hello! I'm your AI assistant. How can I help you today?",
         ),
         (
             "Response with code",
@@ -34,7 +34,7 @@ fn main() {
 }
 ```
 
-This function uses recursion to calculate Fibonacci numbers."#
+This function uses recursion to calculate Fibonacci numbers."#,
         ),
         (
             "Response with table",
@@ -47,7 +47,7 @@ This function uses recursion to calculate Fibonacci numbers."#
 | JavaScript | 🟡 Improving | 🟡 Medium | 🟢 Easy |
 | C++ | 🟡 Manual | ⚡ Very High | 🔴 Steep |
 
-Each language has its strengths and use cases."#
+Each language has its strengths and use cases."#,
         ),
         (
             "Response with markdown formatting",
@@ -74,10 +74,10 @@ Before you begin, make sure you have:
 - [The Rust Book](https://doc.rust-lang.org/book/)
 - [Rust by Example](https://doc.rust-lang.org/rust-by-example/)
 
-Happy coding! 🦀"#
+Happy coding! 🦀"#,
         ),
         (
-            "Mixed content response", 
+            "Mixed content response",
             r#"Let me explain async/await in Rust:
 
 ## What is async/await?
@@ -119,22 +119,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 > The key is that async operations don't block the thread while waiting!
 
-This makes your applications much more efficient when dealing with I/O-bound workloads."#
+This makes your applications much more efficient when dealing with I/O-bound workloads."#,
         ),
     ];
 
     // Demonstrate each type of response
     for (i, (description, content)) in sample_responses.iter().enumerate() {
-        println!("{}", format!("Demo {}: {}", i + 1, description).bright_magenta().bold());
+        println!(
+            "{}",
+            format!("Demo {}: {}", i + 1, description)
+                .bright_magenta()
+                .bold()
+        );
         println!("{}", "─".repeat(60).bright_black());
-        
+
         // Format as if it's an AI response
-        formatter.format_message_async(
-            &Role::Assistant,
-            content,
-            Some(Local::now()),
-        ).await?;
-        
+        formatter
+            .format_message_async(&Role::Assistant, content, Some(Local::now()))
+            .await?;
+
         println!("{}", "─".repeat(60).bright_black());
         println!(); // Extra spacing between examples
     }
@@ -142,14 +145,23 @@ This makes your applications much more efficient when dealing with I/O-bound wor
     println!("✅ Enhanced chat formatting demo completed!");
     println!();
     println!("🎨 Features demonstrated:");
-    println!("  • {} Syntax highlighting for code blocks", "✅".bright_green());
+    println!(
+        "  • {} Syntax highlighting for code blocks",
+        "✅".bright_green()
+    );
     println!("  • {} Beautiful table rendering", "✅".bright_green());
-    println!("  • {} Markdown headers and formatting", "✅".bright_green());
+    println!(
+        "  • {} Markdown headers and formatting",
+        "✅".bright_green()
+    );
     println!("  • {} List formatting with bullets", "✅".bright_green());
     println!("  • {} Blockquote styling", "✅".bright_green());
     println!("  • {} Inline code highlighting", "✅".bright_green());
     println!("  • {} Themed role indicators", "✅".bright_green());
-    println!("  • {} Streaming support (configurable)", "✅".bright_green());
+    println!(
+        "  • {} Streaming support (configurable)",
+        "✅".bright_green()
+    );
 
     Ok(())
 }
@@ -157,7 +169,7 @@ This makes your applications much more efficient when dealing with I/O-bound wor
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_enhanced_chat_demo() {
         // Test that the demo runs without errors

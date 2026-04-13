@@ -5,12 +5,12 @@ mod examples {
     use crate::llm::openai::adapter::gpt5_adapter::Gpt5Adapter;
     use crate::llm::openai::config::Gpt5Config;
     use crate::llm::openai::model::{
-        reasoning_effort::ReasoningEffort,
-        responses_api::ResponsesRequest,
-        custom_tools::{CustomTool, AllowedToolsChoice, AllowedToolsMode, AllowedToolReference},
+        custom_tools::{AllowedToolReference, AllowedToolsChoice, AllowedToolsMode, CustomTool},
         // Temporarily commented out during migration
         // chat_completion_request::ChatCompletionRequest,
         // chat_message::ChatMessage,
+        reasoning_effort::ReasoningEffort,
+        responses_api::ResponsesRequest,
     };
     // use crate::llm::common::model::role::Role; // Commented during migration
     use anyhow::Result;
@@ -21,10 +21,14 @@ mod examples {
         let api_key = "your-api-key";
 
         // Create a simple request with custom reasoning and verbosity
-        let request = ResponsesRequest::with_reasoning("gpt-5.2".to_string(), "Explain quantum computing".to_string(), ReasoningEffort::Medium);
+        let request = ResponsesRequest::with_reasoning(
+            "gpt-5.2".to_string(),
+            "Explain quantum computing".to_string(),
+            ReasoningEffort::Medium,
+        );
 
         let response = adapter.responses(&request, api_key).await?;
-        
+
         if let Some(content) = Gpt5Adapter::extract_response_text(&response) {
             println!("GPT-5 Response: {}", content);
         }
@@ -51,8 +55,8 @@ mod examples {
         );
 
         let mut request = ResponsesRequest::simple(
-            "gpt-5.2".to_string(), 
-            "Calculate the fibonacci sequence for n=10 using the code_exec tool".to_string()
+            "gpt-5.2".to_string(),
+            "Calculate the fibonacci sequence for n=10 using the code_exec tool".to_string(),
         );
 
         request.tools = Some(vec![
@@ -60,7 +64,9 @@ mod examples {
             crate::llm::openai::model::responses_api::Tool::Custom(sql_tool),
         ]);
 
-        request.tool_choice = Some(crate::llm::openai::model::responses_api::ToolChoice::Auto("auto".to_string()));
+        request.tool_choice = Some(crate::llm::openai::model::responses_api::ToolChoice::Auto(
+            "auto".to_string(),
+        ));
 
         let response = adapter.responses(&request, api_key).await?;
         println!("Response with custom tools: {:?}", response);
@@ -85,10 +91,12 @@ mod examples {
 
         let mut request = ResponsesRequest::simple(
             "gpt-5.2".to_string(),
-            "Help me calculate 2+2 and get weather for San Francisco".to_string()
+            "Help me calculate 2+2 and get weather for San Francisco".to_string(),
         );
 
-        request.tool_choice = Some(crate::llm::openai::model::responses_api::ToolChoice::AllowedTools(allowed_choice));
+        request.tool_choice = Some(
+            crate::llm::openai::model::responses_api::ToolChoice::AllowedTools(allowed_choice),
+        );
 
         let response = adapter.responses(&request, api_key).await?;
         println!("Response with allowed tools: {:?}", response);
@@ -104,7 +112,7 @@ mod examples {
         // Different configurations for different use cases
         let configs = vec![
             ("Coding", Gpt5Config::for_coding()),
-            ("Reasoning", Gpt5Config::for_reasoning()), 
+            ("Reasoning", Gpt5Config::for_reasoning()),
             ("Speed", Gpt5Config::for_speed()),
             ("Privacy", Gpt5Config::for_privacy()),
         ];
@@ -133,7 +141,7 @@ mod examples {
         // This example is deprecated during migration
         Ok(())
     }
-    
+
     /// Old migration example (commented out)
     #[allow(dead_code)]
     async fn old_migration_example() -> Result<()> {
@@ -149,23 +157,29 @@ mod examples {
         // First turn
         let mut request = ResponsesRequest::simple(
             "gpt-5.2".to_string(),
-            "Let's solve this step by step: What's 15 * 24?".to_string()
+            "Let's solve this step by step: What's 15 * 24?".to_string(),
         );
         request.store = Some(true); // Enable storage for multi-turn
 
         let response1 = adapter.responses(&request, api_key).await?;
-        println!("First response: {:?}", Gpt5Adapter::extract_response_text(&response1));
+        println!(
+            "First response: {:?}",
+            Gpt5Adapter::extract_response_text(&response1)
+        );
 
         // Second turn - reference previous response
         let mut request2 = ResponsesRequest::simple(
             "gpt-5.2".to_string(),
-            "Now divide that result by 6".to_string()
+            "Now divide that result by 6".to_string(),
         );
         request2.previous_response_id = Some(response1.id.clone());
         request2.store = Some(true);
 
         let response2 = adapter.responses(&request2, api_key).await?;
-        println!("Second response: {:?}", Gpt5Adapter::extract_response_text(&response2));
+        println!(
+            "Second response: {:?}",
+            Gpt5Adapter::extract_response_text(&response2)
+        );
 
         Ok(())
     }
@@ -177,14 +191,14 @@ mod examples {
 
         let mut request = ResponsesRequest::simple(
             "gpt-5.2".to_string(),
-            "Analyze this sensitive data: [redacted for example]".to_string()
+            "Analyze this sensitive data: [redacted for example]".to_string(),
         );
 
         // Enable ZDR mode
         request.store = Some(false);
 
         let response = adapter.responses(&request, api_key).await?;
-        
+
         // The response will contain reasoning information
         if let Some(reasoning) = &response.reasoning {
             if reasoning.effort.is_some() {
@@ -203,15 +217,14 @@ mod examples {
         async fn test_examples_compile() {
             // These tests just verify the examples compile
             // In practice, you'd need real API keys and mock responses
-            
+
             // Just verify the request creation works
-            let request = ResponsesRequest::simple(
-                "gpt-5.2".to_string(),
-                "test".to_string()
-            );
+            let request = ResponsesRequest::simple("gpt-5.2".to_string(), "test".to_string());
             assert_eq!(request.model, "gpt-5.2");
             // Check input content (it's now wrapped in RequestInput enum)
-            if let Some(crate::llm::openai::model::responses_api::RequestInput::Text(text)) = &request.input {
+            if let Some(crate::llm::openai::model::responses_api::RequestInput::Text(text)) =
+                &request.input
+            {
                 assert_eq!(text, "test");
             } else {
                 panic!("Expected text input");

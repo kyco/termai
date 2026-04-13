@@ -14,9 +14,7 @@ pub struct ClaudeValidator {
 impl ClaudeValidator {
     pub fn new() -> Self {
         Self {
-            client: Client::builder()
-                .build()
-                .unwrap(),
+            client: Client::builder().build().unwrap(),
         }
     }
 }
@@ -77,9 +75,7 @@ pub struct OpenAIValidator {
 impl OpenAIValidator {
     pub fn new() -> Self {
         Self {
-            client: Client::builder()
-                .build()
-                .unwrap(),
+            client: Client::builder().build().unwrap(),
         }
     }
 }

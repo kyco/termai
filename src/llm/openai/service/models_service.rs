@@ -107,19 +107,11 @@ impl ModelsService {
         let models_json = serde_json::to_string(models)?;
 
         // Save models cache
-        config_service::write_config(
-            repo,
-            &ConfigKeys::OpenAIModelsCache.to_key(),
-            &models_json,
-        )?;
+        config_service::write_config(repo, &ConfigKeys::OpenAIModelsCache.to_key(), &models_json)?;
 
         // Save timestamp
         let now = Utc::now().to_rfc3339();
-        config_service::write_config(
-            repo,
-            &ConfigKeys::OpenAIModelsCacheTimestamp.to_key(),
-            &now,
-        )?;
+        config_service::write_config(repo, &ConfigKeys::OpenAIModelsCacheTimestamp.to_key(), &now)?;
 
         Ok(())
     }

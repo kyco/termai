@@ -416,16 +416,10 @@ mod tests {
 
     #[test]
     fn test_new_commands() {
-        assert_eq!(
-            ChatCommand::parse("/commands"),
-            Some(ChatCommand::Commands)
-        );
+        assert_eq!(ChatCommand::parse("/commands"), Some(ChatCommand::Commands));
         assert_eq!(ChatCommand::parse("/cmd"), Some(ChatCommand::Commands));
         assert_eq!(ChatCommand::parse("/status"), Some(ChatCommand::Status));
-        assert_eq!(
-            ChatCommand::parse("/settings"),
-            Some(ChatCommand::Settings)
-        );
+        assert_eq!(ChatCommand::parse("/settings"), Some(ChatCommand::Settings));
         assert_eq!(ChatCommand::parse("/config"), Some(ChatCommand::Settings));
         assert_eq!(ChatCommand::parse("/theme"), Some(ChatCommand::Theme(None)));
         assert_eq!(

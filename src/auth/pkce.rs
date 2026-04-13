@@ -42,7 +42,9 @@ mod tests {
         // Should be 86 characters (64 bytes base64url encoded without padding)
         assert!(verifier.len() >= 43 && verifier.len() <= 128);
         // Should only contain URL-safe characters
-        assert!(verifier.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(verifier
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
     }
 
     #[test]
@@ -60,7 +62,9 @@ mod tests {
         // Should be 43 characters (32 bytes base64url encoded without padding)
         assert_eq!(state.len(), 43);
         // Should only contain URL-safe characters
-        assert!(state.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(state
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
     }
 
     #[test]

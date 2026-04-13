@@ -181,7 +181,7 @@ pub enum ConfigAction {
     /// Show environment variable help and current values
     #[command(hide = true)]
     Env,
-    
+
     // Project configuration commands
     /// Initialize project configuration (.termai.toml)
     Init {
@@ -301,7 +301,7 @@ pub enum SessionAction {
         /// Name for the new branch (optional)
         #[arg(long)]
         name: Option<String>,
-        /// Description for the branch (optional) 
+        /// Description for the branch (optional)
         #[arg(long)]
         description: Option<String>,
         /// Branch from specific message index (0-based)

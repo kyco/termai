@@ -25,13 +25,13 @@ impl BranchMetadataRepository {
 
     /// Get metadata value for a branch
     pub fn get_metadata(&self, branch_id: &str, key: &str) -> Result<Option<String>> {
-        let mut stmt = self.repo.conn.prepare(
-            "SELECT value FROM branch_metadata WHERE branch_id = ?1 AND key = ?2"
-        )?;
+        let mut stmt = self
+            .repo
+            .conn
+            .prepare("SELECT value FROM branch_metadata WHERE branch_id = ?1 AND key = ?2")?;
 
-        let mut rows = stmt.query_map(params![branch_id, key], |row| {
-            Ok(row.get::<_, String>(0)?)
-        })?;
+        let mut rows =
+            stmt.query_map(params![branch_id, key], |row| Ok(row.get::<_, String>(0)?))?;
 
         match rows.next() {
             Some(row) => Ok(Some(row?)),
@@ -41,9 +41,10 @@ impl BranchMetadataRepository {
 
     /// Get all metadata for a branch
     pub fn get_all_metadata(&self, branch_id: &str) -> Result<HashMap<String, String>> {
-        let mut stmt = self.repo.conn.prepare(
-            "SELECT key, value FROM branch_metadata WHERE branch_id = ?1"
-        )?;
+        let mut stmt = self
+            .repo
+            .conn
+            .prepare("SELECT key, value FROM branch_metadata WHERE branch_id = ?1")?;
 
         let rows = stmt.query_map(params![branch_id], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -78,9 +79,10 @@ impl BranchMetadataRepository {
 
     /// Check if metadata key exists for a branch
     pub fn metadata_exists(&self, branch_id: &str, key: &str) -> Result<bool> {
-        let mut stmt = self.repo.conn.prepare(
-            "SELECT COUNT(*) FROM branch_metadata WHERE branch_id = ?1 AND key = ?2"
-        )?;
+        let mut stmt = self
+            .repo
+            .conn
+            .prepare("SELECT COUNT(*) FROM branch_metadata WHERE branch_id = ?1 AND key = ?2")?;
 
         let count: i32 = stmt.query_row(params![branch_id, key], |row| row.get(0))?;
         Ok(count > 0)
@@ -88,13 +90,12 @@ impl BranchMetadataRepository {
 
     /// Get branches with specific metadata key-value pair
     pub fn find_branches_by_metadata(&self, key: &str, value: &str) -> Result<Vec<String>> {
-        let mut stmt = self.repo.conn.prepare(
-            "SELECT branch_id FROM branch_metadata WHERE key = ?1 AND value = ?2"
-        )?;
+        let mut stmt = self
+            .repo
+            .conn
+            .prepare("SELECT branch_id FROM branch_metadata WHERE key = ?1 AND value = ?2")?;
 
-        let rows = stmt.query_map(params![key, value], |row| {
-            Ok(row.get::<_, String>(0)?)
-        })?;
+        let rows = stmt.query_map(params![key, value], |row| Ok(row.get::<_, String>(0)?))?;
 
         let mut branch_ids = Vec::new();
         for row in rows {
@@ -107,7 +108,7 @@ impl BranchMetadataRepository {
     /// Copy metadata from one branch to another
     pub fn copy_metadata(&mut self, from_branch_id: &str, to_branch_id: &str) -> Result<()> {
         let metadata = self.get_all_metadata(from_branch_id)?;
-        
+
         for (key, value) in metadata {
             self.set_metadata(to_branch_id, &key, &value)?;
         }

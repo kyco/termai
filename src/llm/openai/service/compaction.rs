@@ -12,9 +12,7 @@ const COMPACTION_CHAR_THRESHOLD: usize = 400_000;
 
 /// Check if a session needs compaction based on total message size
 pub fn needs_compaction(session: &Session) -> bool {
-    let total_size: usize = session.messages.iter()
-        .map(|m| m.content.len())
-        .sum();
+    let total_size: usize = session.messages.iter().map(|m| m.content.len()).sum();
     total_size > COMPACTION_CHAR_THRESHOLD
 }
 
@@ -28,16 +26,19 @@ pub fn needs_compaction(session: &Session) -> bool {
 /// If compaction fails, the session is left unchanged (graceful degradation)
 pub async fn compact_session(api_key: &str, session: &mut Session, model: &str) -> Result<()> {
     // Convert session messages to compact input format
-    let input: Vec<CompactInputItem> = session.messages.iter().map(|m| {
-        match &m.message_type {
+    let input: Vec<CompactInputItem> = session
+        .messages
+        .iter()
+        .map(|m| match &m.message_type {
             MessageType::Standard => {
                 CompactInputItem::message(m.role.to_string(), m.content.clone())
             }
-            MessageType::Compaction { compaction_id, encrypted_content } => {
-                CompactInputItem::compaction(compaction_id.clone(), encrypted_content.clone())
-            }
-        }
-    }).collect();
+            MessageType::Compaction {
+                compaction_id,
+                encrypted_content,
+            } => CompactInputItem::compaction(compaction_id.clone(), encrypted_content.clone()),
+        })
+        .collect();
 
     // Create the compact request
     let request = CompactRequest::new(model.to_string(), input);
@@ -52,20 +53,20 @@ pub async fn compact_session(api_key: &str, session: &mut Session, model: &str) 
         match output {
             CompactOutputItem::Message { role, content } => {
                 // Extract text from content items
-                let text = content.iter()
+                let text = content
+                    .iter()
                     .map(|c| c.text())
                     .collect::<Vec<_>>()
                     .join("");
 
                 if !text.is_empty() {
-                    new_messages.push(Message::new(
-                        String::new(),
-                        Role::from_str(&role),
-                        text,
-                    ));
+                    new_messages.push(Message::new(String::new(), Role::from_str(&role), text));
                 }
             }
-            CompactOutputItem::Compaction { id, encrypted_content } => {
+            CompactOutputItem::Compaction {
+                id,
+                encrypted_content,
+            } => {
                 // Create a compaction message
                 // The content is a placeholder since the actual content is encrypted
                 new_messages.push(Message::new_compaction(
@@ -88,7 +89,10 @@ pub async fn compact_session(api_key: &str, session: &mut Session, model: &str) 
 /// Attempt to compact session, logging errors but not failing the operation
 pub async fn try_compact_session(api_key: &str, session: &mut Session, model: &str) {
     if let Err(e) = compact_session(api_key, session, model).await {
-        eprintln!("Warning: Conversation compaction failed: {}. Continuing with original messages.", e);
+        eprintln!(
+            "Warning: Conversation compaction failed: {}. Continuing with original messages.",
+            e
+        );
     }
 }
 
@@ -113,11 +117,9 @@ mod tests {
         let mut session = Session::new_temporary();
         // Create a message larger than 400KB
         let large_content = "x".repeat(COMPACTION_CHAR_THRESHOLD + 1);
-        session.messages.push(Message::new(
-            "1".to_string(),
-            Role::User,
-            large_content,
-        ));
+        session
+            .messages
+            .push(Message::new("1".to_string(), Role::User, large_content));
         assert!(needs_compaction(&session));
     }
 
@@ -126,16 +128,12 @@ mod tests {
         let mut session = Session::new_temporary();
         // Create multiple messages that together exceed threshold
         let content = "x".repeat(COMPACTION_CHAR_THRESHOLD / 2 + 1);
-        session.messages.push(Message::new(
-            "1".to_string(),
-            Role::User,
-            content.clone(),
-        ));
-        session.messages.push(Message::new(
-            "2".to_string(),
-            Role::Assistant,
-            content,
-        ));
+        session
+            .messages
+            .push(Message::new("1".to_string(), Role::User, content.clone()));
+        session
+            .messages
+            .push(Message::new("2".to_string(), Role::Assistant, content));
         assert!(needs_compaction(&session));
     }
 }

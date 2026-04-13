@@ -283,7 +283,8 @@ impl CommandDiscovery {
             "Edit your user or active project config: termai config edit".to_string(),
             "Create a project config in the repo root: termai config init".to_string(),
             "Validate the active project config: termai config validate".to_string(),
-            "Migrate legacy DB defaults into ~/.config/termai/config.toml: termai config migrate".to_string(),
+            "Migrate legacy DB defaults into ~/.config/termai/config.toml: termai config migrate"
+                .to_string(),
         ]
     }
 

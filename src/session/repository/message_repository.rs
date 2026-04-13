@@ -47,6 +47,13 @@ fn row_to_message_entity() -> fn(&Row) -> Result<MessageEntity> {
         let message_type: String = row.get(4).unwrap_or_else(|_| "standard".to_string());
         let compaction_metadata: Option<String> = row.get(5).ok();
 
-        Ok(MessageEntity::new_with_type(id, session_id, role, content, message_type, compaction_metadata))
+        Ok(MessageEntity::new_with_type(
+            id,
+            session_id,
+            role,
+            content,
+            message_type,
+            compaction_metadata,
+        ))
     }
 }

@@ -8,16 +8,16 @@ pub async fn chat(
     api_key: &str,
 ) -> Result<(StatusCode, ChatCompletionResponse)> {
     // Create client without timeout restrictions
-    let client = Client::builder()
-        .build()?;
+    let client = Client::builder().build()?;
 
     // Log request info for debugging
-    let input_size: usize = request.messages.iter()
-        .map(|msg| msg.content.len())
-        .sum();
-        
+    let input_size: usize = request.messages.iter().map(|msg| msg.content.len()).sum();
+
     if input_size > 10000 {
-        eprintln!("Claude Request: Large input detected ({} characters)", input_size);
+        eprintln!(
+            "Claude Request: Large input detected ({} characters)",
+            input_size
+        );
     }
 
     let response = client

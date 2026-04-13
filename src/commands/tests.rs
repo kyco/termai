@@ -2,8 +2,8 @@
 mod tests {
     use super::super::{dispatch_command, handle_legacy_patterns};
     use crate::args::{
-        Args, AskArgs, AuthAction, ChatArgs, Commands, CompletionAction, ConfigAction,
-        ConfigArgs, Provider, RedactAction, SessionAction, SetupArgs,
+        Args, AskArgs, AuthAction, ChatArgs, Commands, CompletionAction, ConfigAction, ConfigArgs,
+        Provider, RedactAction, SessionAction, SetupArgs,
     };
     use crate::config::entity::config_entity::ConfigEntity;
     use crate::config::repository::ConfigRepository;

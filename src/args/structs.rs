@@ -414,34 +414,34 @@ pub enum TagFormat {
 pub struct RebaseArgs {
     /// Rebase action to perform
     pub action: String,
-    
+
     /// Target branch or commit for rebase
     pub target: Option<String>,
-    
+
     /// Number of commits to include in interactive rebase
     #[arg(short, long)]
     pub count: Option<usize>,
-    
+
     /// Continue interrupted rebase operation
     #[arg(long)]
     pub continue_rebase: bool,
-    
+
     /// Abort current rebase operation
     #[arg(long)]
     pub abort: bool,
-    
+
     /// Skip current commit in rebase
     #[arg(long)]
     pub skip: bool,
-    
+
     /// Enable AI-powered commit message suggestions during rebase
     #[arg(long)]
     pub ai_suggestions: bool,
-    
+
     /// Interactive mode with step-by-step guidance
     #[arg(long)]
     pub interactive: bool,
-    
+
     /// Automatically squash fixup commits
     #[arg(long)]
     pub autosquash: bool,
@@ -452,27 +452,27 @@ pub struct RebaseArgs {
 pub struct ConflictsArgs {
     /// Conflict resolution action to perform
     pub action: String,
-    
+
     /// Specific file to analyze/resolve
     #[arg(short, long)]
     pub file: Option<String>,
-    
+
     /// Show detailed analysis with AI insights
     #[arg(long)]
     pub detailed: bool,
-    
+
     /// Auto-resolve simple conflicts where possible
     #[arg(long)]
     pub auto_resolve: bool,
-    
+
     /// Preferred merge strategy (ours, theirs, manual)
     #[arg(long)]
     pub strategy: Option<String>,
-    
+
     /// Interactive resolution with step-by-step guidance
     #[arg(long)]
     pub interactive: bool,
-    
+
     /// Generate merge resolution documentation
     #[arg(long)]
     pub document: bool,
@@ -494,150 +494,150 @@ pub enum PresetAction {
         /// Filter by category
         #[arg(long)]
         category: Option<String>,
-        
+
         /// Search presets by name or description
         #[arg(long)]
         search: Option<String>,
-        
+
         /// Show detailed information
         #[arg(long)]
         detailed: bool,
     },
-    
+
     /// Use a preset interactively
     Use {
         /// Preset name to use
         name: String,
-        
+
         /// Local directory to include as context
         directory: Option<String>,
-        
+
         /// Multiple directories to include as context
         #[arg(short = 'd', long, value_delimiter = ',')]
         directories: Vec<String>,
-        
+
         /// Enable smart context discovery
         #[arg(long)]
         smart_context: bool,
-        
+
         /// Session name to use or create
         #[arg(long)]
         session: Option<String>,
-        
+
         /// Skip variable prompting and use defaults
         #[arg(long)]
         use_defaults: bool,
-        
+
         /// Preview template before execution
         #[arg(long)]
         preview: bool,
-        
+
         /// Use with Git staged changes
         #[arg(long)]
         git_staged: bool,
-        
+
         /// Specify variables directly (key=value format)
         #[arg(long, value_delimiter = ',')]
         variables: Vec<String>,
     },
-    
+
     /// Create a new preset
     Create {
         /// Preset name
         name: String,
-        
+
         /// Preset description
         #[arg(long)]
         description: Option<String>,
-        
+
         /// Preset category
         #[arg(long)]
         category: Option<String>,
-        
+
         /// Template content (if not provided, will prompt)
         #[arg(long)]
         template: Option<String>,
-        
+
         /// Create from current session
         #[arg(long)]
         from_session: Option<String>,
-        
+
         /// Open editor for template creation
         #[arg(long)]
         edit: bool,
     },
-    
+
     /// Show detailed information about a preset
     Show {
         /// Preset name to show
         name: String,
-        
+
         /// Show template content
         #[arg(long)]
         template: bool,
-        
+
         /// Show usage statistics
         #[arg(long)]
         stats: bool,
     },
-    
+
     /// Delete a preset (user presets only)
     Delete {
         /// Preset name to delete
         name: String,
-        
+
         /// Skip confirmation prompt
         #[arg(long)]
         force: bool,
     },
-    
+
     /// Export a preset to file
     Export {
         /// Preset name to export
         name: String,
-        
+
         /// Output file path
         #[arg(long)]
         file: String,
-        
+
         /// Export format
         #[arg(long, value_enum, default_value = "yaml")]
         format: PresetFormat,
     },
-    
+
     /// Import a preset from file
     Import {
         /// Preset file path
         file: String,
-        
+
         /// Force overwrite if preset already exists
         #[arg(long)]
         force: bool,
     },
-    
+
     /// Edit an existing preset
     Edit {
         /// Preset name to edit
         name: String,
-        
+
         /// Open editor for template modification
         #[arg(long)]
         template: bool,
-        
+
         /// Edit preset metadata
         #[arg(long)]
         metadata: bool,
     },
-    
+
     /// Search presets by name, description, or content
     Search {
         /// Search query
         query: String,
-        
+
         /// Search in template content too
         #[arg(long)]
         content: bool,
-        
+
         /// Filter by category
         #[arg(long)]
         category: Option<String>,

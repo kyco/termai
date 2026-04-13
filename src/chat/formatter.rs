@@ -1,5 +1,5 @@
 use crate::llm::common::model::role::Role;
-use crate::output::streaming::{StreamingRenderer, StreamingConfig};
+use crate::output::streaming::{StreamingConfig, StreamingRenderer};
 use crate::output::syntax::SyntaxHighlighter;
 use crate::output::themes::ThemeManager;
 use chrono::{DateTime, Local};
@@ -51,12 +51,12 @@ impl ChatFormatter {
         let role_prefix = if self.show_role_labels {
             let role_text = match role {
                 Role::User => "You",
-                Role::Assistant => "AI", 
+                Role::Assistant => "AI",
                 Role::System => "System",
             };
-            
+
             let formatted_role = self.theme_manager.format_role(role_text, role.clone());
-            
+
             let timestamp_str = if self.show_timestamps {
                 if let Some(ts) = timestamp {
                     format!(" {}", ts.format("%H:%M:%S").to_string().dimmed())
@@ -116,10 +116,10 @@ impl ChatFormatter {
         // For backward compatibility, return a simple formatted string
         let role_text = match role {
             Role::User => "💬 You",
-            Role::Assistant => "🤖 AI", 
+            Role::Assistant => "🤖 AI",
             Role::System => "⚙️ System",
         };
-        
+
         let timestamp_str = if self.show_timestamps {
             if let Some(ts) = timestamp {
                 format!(" {}", ts.format("%H:%M:%S").to_string().dimmed())
@@ -140,19 +140,21 @@ impl ChatFormatter {
         role_prefix: Option<String>,
     ) -> Result<(), std::io::Error> {
         use crate::output::streaming::stream_smart_content;
-        
+
         if self.enable_streaming {
             // Use our enhanced streaming system
             stream_smart_content(
                 &mut self.streaming_renderer,
                 content,
                 role_prefix.as_deref(),
-            ).await?;
+            )
+            .await?;
         } else {
             // Use synchronous enhanced formatting
-            self.format_content_synchronously(content, role_prefix.as_deref()).await?;
+            self.format_content_synchronously(content, role_prefix.as_deref())
+                .await?;
         }
-        
+
         Ok(())
     }
 
@@ -171,27 +173,31 @@ impl ChatFormatter {
 
         while i < lines.len() {
             let line = lines[i];
-            
+
             // Handle code blocks
             if line.trim_start().starts_with("```") {
                 let language = if line.len() > 3 {
                     let lang = line.trim_start().strip_prefix("```").unwrap_or("").trim();
-                    if lang.is_empty() { None } else { Some(lang) }
+                    if lang.is_empty() {
+                        None
+                    } else {
+                        Some(lang)
+                    }
                 } else {
                     None
                 };
-                
+
                 let mut code_content = Vec::new();
                 i += 1;
-                
+
                 while i < lines.len() && !lines[i].trim_start().starts_with("```") {
                     code_content.push(lines[i]);
                     i += 1;
                 }
-                
+
                 let code = code_content.join("\n");
                 self.print_code_block(&code, language)?;
-                
+
                 if i < lines.len() {
                     i += 1; // Skip closing ```
                 }
@@ -199,13 +205,15 @@ impl ChatFormatter {
             // Handle tables
             else if self.is_table_line(line) {
                 let mut table_lines = Vec::new();
-                while i < lines.len() && (self.is_table_line(lines[i]) || lines[i].trim().is_empty()) {
+                while i < lines.len()
+                    && (self.is_table_line(lines[i]) || lines[i].trim().is_empty())
+                {
                     if !lines[i].trim().is_empty() {
                         table_lines.push(lines[i]);
                     }
                     i += 1;
                 }
-                
+
                 if !table_lines.is_empty() {
                     self.print_table(&table_lines)?;
                 }
@@ -223,12 +231,11 @@ impl ChatFormatter {
 
     /// Print a code block with syntax highlighting
     fn print_code_block(&self, code: &str, language: Option<&str>) -> Result<(), std::io::Error> {
-        
         // Code block header with improved styling
         let header = if let Some(lang) = language {
             let lang_display = match lang.to_lowercase().as_str() {
                 "rust" => "🦀 Rust",
-                "python" => "🐍 Python", 
+                "python" => "🐍 Python",
                 "javascript" => "⚡ JavaScript",
                 "typescript" => "📘 TypeScript",
                 "java" => "☕ Java",
@@ -244,16 +251,19 @@ impl ChatFormatter {
                 "zig" => "⚡ Zig",
                 _ => lang,
             };
-            
+
             let padding_length = 50_usize.saturating_sub(lang_display.len() + 4);
-            format!("┌─ {} {}\n", 
+            format!(
+                "┌─ {} {}\n",
                 lang_display.bright_cyan().bold(),
                 "─".repeat(padding_length).bright_black()
             )
         } else {
-            "┌─ Code ─────────────────────────────────────────────\n".bright_black().to_string()
+            "┌─ Code ─────────────────────────────────────────────\n"
+                .bright_black()
+                .to_string()
         };
-        
+
         print!("{}", header);
 
         // Highlight and print code (no left border for clean copy-paste)
@@ -272,7 +282,8 @@ impl ChatFormatter {
         }
 
         // Bottom border
-        println!("{}", 
+        println!(
+            "{}",
             "└───────────────────────────────────────────────────".bright_black()
         );
 
@@ -310,7 +321,7 @@ impl ChatFormatter {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            
+
             if !row.is_empty() && row.len() >= headers.len() {
                 rows.push(row);
             }
@@ -321,7 +332,11 @@ impl ChatFormatter {
     }
 
     /// Simple table printing with box drawing
-    fn print_simple_table(&self, headers: &[String], rows: &[Vec<String>]) -> Result<(), std::io::Error> {
+    fn print_simple_table(
+        &self,
+        headers: &[String],
+        rows: &[Vec<String>],
+    ) -> Result<(), std::io::Error> {
         // Calculate column widths
         let mut col_widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
         for row in rows {
@@ -353,7 +368,11 @@ impl ChatFormatter {
         print!("{}", box_chars.vertical);
         for (i, header) in headers.iter().enumerate() {
             let width = col_widths[i];
-            print!(" {:^width$} ", header.bright_blue().bold(), width = width - 2);
+            print!(
+                " {:^width$} ",
+                header.bright_blue().bold(),
+                width = width - 2
+            );
             if i < headers.len() - 1 {
                 print!("{}", box_chars.vertical);
             }
@@ -404,67 +423,100 @@ impl ChatFormatter {
     /// Format individual markdown lines
     fn format_markdown_line(&self, line: &str) -> ColoredString {
         let trimmed = line.trim();
-        
+
         // Handle headers - improved styling with better visual separation
         if trimmed.starts_with("### ") {
             let title = &trimmed[4..]; // Remove "### "
-            return format!("🔷 {}", title).bright_cyan().bold().to_string().into();
+            return format!("🔷 {}", title)
+                .bright_cyan()
+                .bold()
+                .to_string()
+                .into();
         } else if trimmed.starts_with("##") {
             let title = if trimmed.starts_with("## ") {
                 &trimmed[3..] // Remove "## "
             } else {
                 &trimmed[2..] // Remove "##"
             };
-            return format!("🔵 {}", title.trim()).bright_blue().bold().to_string().into();
+            return format!("🔵 {}", title.trim())
+                .bright_blue()
+                .bold()
+                .to_string()
+                .into();
         } else if trimmed.starts_with("# ") {
             let title = &trimmed[2..]; // Remove "# "
-            return format!("🟢 {}", title).bright_green().bold().to_string().into();
+            return format!("🟢 {}", title)
+                .bright_green()
+                .bold()
+                .to_string()
+                .into();
         }
-        
+
         // Handle lists
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            return format!("  • {}", &trimmed[2..]).bright_yellow().to_string().into();
+            return format!("  • {}", &trimmed[2..])
+                .bright_yellow()
+                .to_string()
+                .into();
         }
-        
+
         // Handle numbered lists
-        if let Some(captures) = regex::Regex::new(r"^(\d+)\. (.*)").ok().and_then(|r| r.captures(trimmed)) {
+        if let Some(captures) = regex::Regex::new(r"^(\d+)\. (.*)")
+            .ok()
+            .and_then(|r| r.captures(trimmed))
+        {
             if let (Some(num), Some(content)) = (captures.get(1), captures.get(2)) {
-                return format!("  {}. {}", num.as_str().bright_yellow().bold(), content.as_str()).into();
+                return format!(
+                    "  {}. {}",
+                    num.as_str().bright_yellow().bold(),
+                    content.as_str()
+                )
+                .into();
             }
         }
-        
+
         // Handle blockquotes
         if trimmed.starts_with("> ") {
-            return format!("│ {}", &trimmed[2..]).bright_magenta().italic().to_string().into();
+            return format!("│ {}", &trimmed[2..])
+                .bright_magenta()
+                .italic()
+                .to_string()
+                .into();
         }
-        
+
         // Handle bold and italic
         let mut formatted = line.to_string();
-        
+
         // Handle inline code first
         if formatted.contains("`") {
             let re = regex::Regex::new(r"`([^`]+)`").unwrap();
-            formatted = re.replace_all(&formatted, |caps: &regex::Captures| {
-                format!("{}", caps[1].on_black().bright_white().bold())
-            }).to_string();
+            formatted = re
+                .replace_all(&formatted, |caps: &regex::Captures| {
+                    format!("{}", caps[1].on_black().bright_white().bold())
+                })
+                .to_string();
         }
-        
+
         // Handle bold text **text**
         if formatted.contains("**") {
             let re = regex::Regex::new(r"\*\*([^*]+)\*\*").unwrap();
-            formatted = re.replace_all(&formatted, |caps: &regex::Captures| {
-                format!("{}", caps[1].bold())
-            }).to_string();
+            formatted = re
+                .replace_all(&formatted, |caps: &regex::Captures| {
+                    format!("{}", caps[1].bold())
+                })
+                .to_string();
         }
-        
+
         // Handle italic text *text*
         if formatted.contains("*") && !formatted.contains("**") {
             let re = regex::Regex::new(r"\*([^*]+)\*").unwrap();
-            formatted = re.replace_all(&formatted, |caps: &regex::Captures| {
-                format!("{}", caps[1].italic())
-            }).to_string();
+            formatted = re
+                .replace_all(&formatted, |caps: &regex::Captures| {
+                    format!("{}", caps[1].italic())
+                })
+                .to_string();
         }
-        
+
         formatted.normal()
     }
 
@@ -483,7 +535,9 @@ impl ChatFormatter {
     /// Set theme
     #[allow(dead_code)]
     pub fn set_theme(&mut self, theme_name: &str) -> Result<(), String> {
-        self.theme_manager.set_theme(theme_name).map_err(|e| e.to_string())
+        self.theme_manager
+            .set_theme(theme_name)
+            .map_err(|e| e.to_string())
     }
 
     /// Get available themes
@@ -704,10 +758,7 @@ impl ChatFormatter {
         let rows = [
             ("Provider", provider),
             ("Model", model),
-            (
-                "Tools",
-                if tools_enabled { "enabled" } else { "disabled" },
-            ),
+            ("Tools", if tools_enabled { "enabled" } else { "disabled" }),
             (
                 "Streaming",
                 if streaming_enabled {

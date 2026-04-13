@@ -68,11 +68,8 @@ impl Session {
     }
 
     pub fn add_raw_message(&mut self, message: String, role: Role) {
-        self.messages.push(Message::new(
-            "".to_string(),
-            role,
-            message,
-        ));
+        self.messages
+            .push(Message::new("".to_string(), role, message));
     }
 
     pub fn redact<R: ConfigRepository>(&mut self, repo: &R) {

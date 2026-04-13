@@ -1,12 +1,12 @@
-use std::io::{self, Write};
-use std::time::Duration;
-use tokio::time::sleep;
 use colored::*;
 use crossterm::{
     cursor::MoveToColumn,
     terminal::{Clear, ClearType},
     ExecutableCommand,
 };
+use std::io::{self, Write};
+use std::time::Duration;
+use tokio::time::sleep;
 
 /// Configuration for streaming output behavior
 #[derive(Debug, Clone)]
@@ -52,7 +52,11 @@ impl StreamingRenderer {
     }
 
     /// Stream text output with typewriter effect
-    pub async fn stream_text(&mut self, content: &str, role_prefix: Option<&str>) -> io::Result<()> {
+    pub async fn stream_text(
+        &mut self,
+        content: &str,
+        role_prefix: Option<&str>,
+    ) -> io::Result<()> {
         if content.len() < self.config.min_content_length {
             // For short content, just print immediately
             if let Some(prefix) = role_prefix {
@@ -85,19 +89,19 @@ impl StreamingRenderer {
         // Stream the content
         let mut chars_written = 0;
         let content_chars: Vec<char> = content.chars().collect();
-        
+
         while chars_written < content_chars.len() && !self.is_cancelled {
             let end_pos = std::cmp::min(
                 chars_written + self.config.chars_per_batch,
                 content_chars.len(),
             );
-            
+
             let chunk: String = content_chars[chars_written..end_pos].iter().collect();
             print!("{}", chunk);
             self.stdout.flush()?;
-            
+
             chars_written = end_pos;
-            
+
             if chars_written < content_chars.len() {
                 sleep(Duration::from_millis(self.config.batch_delay_ms)).await;
             }
@@ -119,11 +123,15 @@ impl StreamingRenderer {
     ) -> io::Result<()> {
         // Code block header
         let header = if let Some(lang) = language {
-            format!("┌─ {} ─{}", lang.bright_cyan().bold(), "─".repeat(40_usize.saturating_sub(lang.len() + 4)))
+            format!(
+                "┌─ {} ─{}",
+                lang.bright_cyan().bold(),
+                "─".repeat(40_usize.saturating_sub(lang.len() + 4))
+            )
         } else {
             format!("┌─ Code ─{}", "─".repeat(37))
         };
-        
+
         println!("{}", header.bright_black());
 
         // Apply syntax highlighting if available
@@ -140,14 +148,15 @@ impl StreamingRenderer {
             if line.len() > 20 {
                 let chars: Vec<char> = line.chars().collect();
                 let mut char_pos = 0;
-                
+
                 while char_pos < chars.len() && !self.is_cancelled {
-                    let end_pos = std::cmp::min(char_pos + self.config.chars_per_batch, chars.len());
+                    let end_pos =
+                        std::cmp::min(char_pos + self.config.chars_per_batch, chars.len());
                     let chunk: String = chars[char_pos..end_pos].iter().collect();
                     print!("{}", chunk);
                     self.stdout.flush()?;
                     char_pos = end_pos;
-                    
+
                     if char_pos < chars.len() {
                         sleep(Duration::from_millis(self.config.batch_delay_ms / 2)).await;
                     }
@@ -155,9 +164,9 @@ impl StreamingRenderer {
             } else {
                 print!("{}", line);
             }
-            
+
             println!();
-            
+
             // Small delay between lines for readability
             if i < lines.len() - 1 {
                 sleep(Duration::from_millis(self.config.batch_delay_ms)).await;
@@ -165,25 +174,29 @@ impl StreamingRenderer {
         }
 
         println!("{}", format!("└{}", "─".repeat(50)).bright_black());
-        
+
         Ok(())
     }
 
     /// Show typing indicator animation
     async fn show_typing_indicator(&mut self) -> io::Result<()> {
-        let indicators = ["⌨️  AI is thinking...", "⌨️  AI is typing...", "⌨️  AI is responding..."];
+        let indicators = [
+            "⌨️  AI is thinking...",
+            "⌨️  AI is typing...",
+            "⌨️  AI is responding...",
+        ];
         let dots = ["", ".", "..", "..."];
-        
+
         // Show for about 1 second with animation
         for cycle in 0..8 {
             let indicator = indicators[cycle % indicators.len()];
             let dot_pattern = dots[cycle % dots.len()];
-            
+
             print!("\r{}{}", indicator.bright_cyan(), dot_pattern);
             self.stdout.flush()?;
             sleep(Duration::from_millis(150)).await;
         }
-        
+
         Ok(())
     }
 
@@ -196,7 +209,11 @@ impl StreamingRenderer {
     }
 
     /// Stream a markdown table with enhanced formatting
-    pub async fn stream_table(&mut self, headers: &[String], rows: &[Vec<String>]) -> io::Result<()> {
+    pub async fn stream_table(
+        &mut self,
+        headers: &[String],
+        rows: &[Vec<String>],
+    ) -> io::Result<()> {
         if headers.is_empty() || rows.is_empty() {
             return Ok(());
         }
@@ -254,37 +271,37 @@ impl StreamingRenderer {
             print!("│");
             for (i, cell) in row.iter().enumerate() {
                 let width = col_widths.get(i).unwrap_or(&10);
-                
+
                 // Stream longer cells for effect
                 if cell.len() > 15 {
                     let chars: Vec<char> = cell.chars().collect();
                     let mut char_pos = 0;
-                    
+
                     while char_pos < chars.len() && !self.is_cancelled {
                         let end_pos = std::cmp::min(char_pos + 2, chars.len());
                         let chunk: String = chars[char_pos..end_pos].iter().collect();
                         print!("{}", chunk);
                         self.stdout.flush()?;
                         char_pos = end_pos;
-                        
+
                         if char_pos < chars.len() {
                             sleep(Duration::from_millis(10)).await;
                         }
                     }
-                    
+
                     // Pad to width
                     let padding = width.saturating_sub(cell.len());
                     print!("{}", " ".repeat(padding));
                 } else {
                     print!("{:<width$}", cell, width = width);
                 }
-                
+
                 if i < row.len() - 1 {
                     print!("│");
                 }
             }
             println!("│");
-            
+
             // Small delay between rows
             if row_idx < rows.len() - 1 {
                 sleep(Duration::from_millis(50)).await;
@@ -357,32 +374,38 @@ async fn stream_markdown_content(
 
     while i < lines.len() {
         let line = lines[i];
-        
+
         if line.trim_start().starts_with("```") {
             // Extract language if specified
             let language = if line.len() > 3 {
                 let lang = line.trim_start().strip_prefix("```").unwrap_or("").trim();
-                if lang.is_empty() { None } else { Some(lang) }
+                if lang.is_empty() {
+                    None
+                } else {
+                    Some(lang)
+                }
             } else {
                 None
             };
-            
+
             // Find the closing ```
             let mut code_content = Vec::new();
             i += 1;
-            
+
             while i < lines.len() && !lines[i].trim_start().starts_with("```") {
                 code_content.push(lines[i]);
                 i += 1;
             }
-            
+
             if first_content && role_prefix.is_some() {
                 print!("{}", role_prefix.unwrap());
                 first_content = false;
             }
-            
-            renderer.stream_code_block(&code_content.join("\n"), language, None).await?;
-            
+
+            renderer
+                .stream_code_block(&code_content.join("\n"), language, None)
+                .await?;
+
             if i < lines.len() {
                 i += 1; // Skip closing ```
             }
@@ -417,15 +440,16 @@ fn parse_simple_table(content: &str) -> Option<(Vec<String>, Vec<Vec<String>>)> 
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            
+
             if headers.len() < 2 {
                 continue;
             }
 
             // Look for separator row (optional)
-            let start_row = if idx + 1 < lines.len() 
-                && lines[idx + 1].contains("---") 
-                && lines[idx + 1].contains('|') {
+            let start_row = if idx + 1 < lines.len()
+                && lines[idx + 1].contains("---")
+                && lines[idx + 1].contains('|')
+            {
                 idx + 2
             } else {
                 idx + 1
@@ -440,7 +464,7 @@ fn parse_simple_table(content: &str) -> Option<(Vec<String>, Vec<Vec<String>>)> 
                         .map(|s| s.trim().to_string())
                         .filter(|s| !s.is_empty())
                         .collect();
-                    
+
                     if row.len() >= headers.len() {
                         rows.push(row);
                     }

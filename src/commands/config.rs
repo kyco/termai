@@ -1,10 +1,10 @@
 /// Handlers for Config and Redact commands - configuration management
 use crate::args::{ConfigAction, ConfigArgs, Provider, RedactAction, RedactArgs};
+use crate::config::service::config_service;
 use crate::config::settings::{
     migrate_legacy_db_config, ProjectConfig, ProjectContextSettings, ProjectPrivacySettings,
     ResolvedSettings, SettingsOverrides, SettingsProvider, UserConfig,
 };
-use crate::config::service::config_service;
 use crate::llm::openai::model::models_api::{infer_provider_from_model_id, ModelObject};
 use crate::repository::db::SqliteRepository;
 use anyhow::{Context, Result};
@@ -85,8 +85,9 @@ pub async fn handle_config_command(
 fn handle_config_show(repo: &SqliteRepository) -> Result<()> {
     use crate::config::model::keys::ConfigKeys;
 
-    let settings = ResolvedSettings::load_for_current_dir_with_repo(repo, SettingsOverrides::default())
-        .context("Failed to resolve effective settings")?;
+    let settings =
+        ResolvedSettings::load_for_current_dir_with_repo(repo, SettingsOverrides::default())
+            .context("Failed to resolve effective settings")?;
 
     println!("{}", "📋 Effective Configuration".bright_blue().bold());
     println!("{}", "═════════════════════════".white().dimmed());
@@ -195,9 +196,18 @@ fn handle_config_show(repo: &SqliteRepository) -> Result<()> {
     );
     println!();
     println!("{}", "💡 Primary commands".bright_yellow().bold());
-    println!("   {}", "termai config edit      # Edit user or active project config".cyan());
-    println!("   {}", "termai config validate  # Validate the active project config".cyan());
-    println!("   {}", "termai config migrate   # Import legacy DB defaults into config.toml".cyan());
+    println!(
+        "   {}",
+        "termai config edit      # Edit user or active project config".cyan()
+    );
+    println!(
+        "   {}",
+        "termai config validate  # Validate the active project config".cyan()
+    );
+    println!(
+        "   {}",
+        "termai config migrate   # Import legacy DB defaults into config.toml".cyan()
+    );
     println!("   {}", "termai auth status codex".cyan());
     println!("   {}", "termai setup".cyan());
 
@@ -223,15 +233,24 @@ fn handle_set_api_key(
 
     println!(
         "{}",
-        format!("✅ {} API credential configured successfully", provider_name)
-            .green()
-            .bold()
+        format!(
+            "✅ {} API credential configured successfully",
+            provider_name
+        )
+        .green()
+        .bold()
     );
     println!();
     println!("{}", "💡 Next steps".bright_yellow().bold());
     println!("   {}", "termai config show".cyan());
-    println!("   {}", format!("termai config set-provider {}", suggested_provider).cyan());
-    println!("   {}", format!("termai auth status {}", suggested_provider).cyan());
+    println!(
+        "   {}",
+        format!("termai config set-provider {}", suggested_provider).cyan()
+    );
+    println!(
+        "   {}",
+        format!("termai auth status {}", suggested_provider).cyan()
+    );
 
     Ok(())
 }
@@ -240,12 +259,9 @@ fn handle_set_provider(provider: Provider) -> Result<()> {
     let mut user_config = UserConfig::load()?;
     user_config.default.provider = settings_provider_from_cli(provider);
 
-    if user_config
-        .default
-        .model
-        .as_deref()
-        .is_some_and(|model| infer_provider_from_model(model) != user_config.default.provider.as_str())
-    {
+    if user_config.default.model.as_deref().is_some_and(|model| {
+        infer_provider_from_model(model) != user_config.default.provider.as_str()
+    }) {
         user_config.default.model = None;
     }
 
@@ -269,7 +285,10 @@ fn handle_removed_config_command(command: &str, guidance: &str) -> Result<()> {
     println!();
     println!("{}", guidance.white());
     println!();
-    println!("{}", "Use 'termai config show' to inspect the current simplified layout.".cyan());
+    println!(
+        "{}",
+        "Use 'termai config show' to inspect the current simplified layout.".cyan()
+    );
     Ok(())
 }
 
@@ -280,11 +299,20 @@ fn handle_supported_env_command() -> Result<()> {
         ("ANTHROPIC_API_KEY", std::env::var("ANTHROPIC_API_KEY").ok()),
     ];
 
-    println!("{}", "🌍 Supported Environment Variables".bright_green().bold());
+    println!(
+        "{}",
+        "🌍 Supported Environment Variables".bright_green().bold()
+    );
     println!("{}", "══════════════════════════════════".white().dimmed());
     println!();
-    println!("{}", "Only auth-related environment variables remain supported in the simplified model.".white());
-    println!("{}", "Behavior defaults now live in TOML config files, not TERMAI_* overrides.".white());
+    println!(
+        "{}",
+        "Only auth-related environment variables remain supported in the simplified model.".white()
+    );
+    println!(
+        "{}",
+        "Behavior defaults now live in TOML config files, not TERMAI_* overrides.".white()
+    );
     println!();
 
     for (name, value) in supported {
@@ -312,16 +340,25 @@ fn handle_config_migrate(repo: &SqliteRepository) -> Result<()> {
             user_config_path.display().to_string().cyan()
         );
     } else if user_config_path.exists() {
-        println!("{}", "User config already exists. No migration was needed.".yellow());
+        println!(
+            "{}",
+            "User config already exists. No migration was needed.".yellow()
+        );
     } else {
-        println!("{}", "No legacy DB defaults were found to migrate.".yellow());
+        println!(
+            "{}",
+            "No legacy DB defaults were found to migrate.".yellow()
+        );
     }
 
     if let Some(project_config_path) = active_project_config_path() {
         let dropped = dropped_project_sections(&project_config_path)?;
         if !dropped.is_empty() {
             println!();
-            println!("{}", "⚠️  Dropped project sections detected".yellow().bold());
+            println!(
+                "{}",
+                "⚠️  Dropped project sections detected".yellow().bold()
+            );
             for section in dropped {
                 println!("   • {}", section.bright_yellow());
             }
@@ -369,7 +406,15 @@ fn active_project_config_path() -> Option<PathBuf> {
 }
 
 fn dropped_project_sections(path: &Path) -> Result<Vec<String>> {
-    const DROPPED: &[&str] = &["providers", "git", "output", "templates", "team", "quality", "env"];
+    const DROPPED: &[&str] = &[
+        "providers",
+        "git",
+        "output",
+        "templates",
+        "team",
+        "quality",
+        "env",
+    ];
 
     if !path.exists() {
         return Ok(Vec::new());
@@ -457,7 +502,11 @@ fn open_in_editor(path: &Path) -> Result<()> {
     match status {
         Ok(status) if status.success() => Ok(()),
         Ok(_) => Err(anyhow::anyhow!("Editor exited with a non-zero status")),
-        Err(err) => Err(anyhow::anyhow!("Failed to launch editor '{}': {}", editor, err)),
+        Err(err) => Err(anyhow::anyhow!(
+            "Failed to launch editor '{}': {}",
+            editor,
+            err
+        )),
     }
 }
 
@@ -704,21 +753,29 @@ fn remove_redaction_pattern(repo: &SqliteRepository, pattern: &str) -> Result<bo
 }
 
 /// Handle project configuration initialization
-fn handle_config_init(project_type: Option<&str>, template: Option<&str>, force: bool) -> Result<()> {
+fn handle_config_init(
+    project_type: Option<&str>,
+    template: Option<&str>,
+    force: bool,
+) -> Result<()> {
     let root = std::env::current_dir().context("Failed to determine current working directory")?;
     let config_path = ProjectConfig::file_path(&root);
 
     if config_path.exists() && !force {
         println!("{}", "⚠️  Project configuration already exists".yellow());
         println!("   {}", config_path.display().to_string().cyan());
-        println!("   {}", "Use 'termai config init --force' to overwrite it.".cyan());
+        println!(
+            "   {}",
+            "Use 'termai config init --force' to overwrite it.".cyan()
+        );
         return Ok(());
     }
 
     if let Some(template_name) = template {
         println!(
             "{} {}",
-            "⚠️  Project templates were removed in the simplified config model. Ignoring template:".yellow(),
+            "⚠️  Project templates were removed in the simplified config model. Ignoring template:"
+                .yellow(),
             template_name.bright_white()
         );
         println!();
@@ -747,7 +804,11 @@ fn handle_config_init(project_type: Option<&str>, template: Option<&str>, force:
     println!("{}", "✅ Project configuration initialized".green().bold());
     println!("   {}", config_path.display().to_string().cyan());
     if let Some(project_type) = &config.project_type {
-        println!("   {} {}", "Detected type:".bright_green(), project_type.bright_white());
+        println!(
+            "   {} {}",
+            "Detected type:".bright_green(),
+            project_type.bright_white()
+        );
     }
     println!();
     show_next_steps();
@@ -758,7 +819,10 @@ fn handle_config_init(project_type: Option<&str>, template: Option<&str>, force:
 fn handle_config_project() -> Result<()> {
     let Some(project_config_path) = active_project_config_path() else {
         println!("{}", "⚠️  No active .termai.toml found".yellow());
-        println!("   {}", "Run 'termai config init' in the project root to create one.".cyan());
+        println!(
+            "   {}",
+            "Run 'termai config init' in the project root to create one.".cyan()
+        );
         return Ok(());
     };
 
@@ -770,9 +834,17 @@ fn handle_config_project() -> Result<()> {
     println!("{}", "📋 Project Configuration".bright_blue().bold());
     println!("{}", "════════════════════════".white().dimmed());
     println!();
-    println!("{} {}", "File:".bright_green(), project_config_path.display().to_string().cyan());
+    println!(
+        "{} {}",
+        "File:".bright_green(),
+        project_config_path.display().to_string().cyan()
+    );
     if let Some(project_type) = &config.project_type {
-        println!("{} {}", "Project type:".bright_green(), project_type.bright_white());
+        println!(
+            "{} {}",
+            "Project type:".bright_green(),
+            project_type.bright_white()
+        );
     }
     println!(
         "{} {}",
@@ -818,7 +890,10 @@ fn handle_config_project() -> Result<()> {
 fn handle_config_validate() -> Result<()> {
     let Some(project_config_path) = active_project_config_path() else {
         println!("{}", "⚠️  No active .termai.toml found".yellow());
-        println!("   {}", "Run 'termai config init' in the project root to create one.".cyan());
+        println!(
+            "   {}",
+            "Run 'termai config init' in the project root to create one.".cyan()
+        );
         return Ok(());
     };
 
@@ -828,10 +903,17 @@ fn handle_config_validate() -> Result<()> {
     let config = ProjectConfig::load_from_root(root)
         .with_context(|| format!("Failed to load {}", project_config_path.display()))?;
 
-    println!("{}", "✅ Validate Project Configuration".bright_blue().bold());
+    println!(
+        "{}",
+        "✅ Validate Project Configuration".bright_blue().bold()
+    );
     println!("{}", "══════════════════════════════════".white().dimmed());
     println!();
-    println!("{} {}", "File:".bright_green(), project_config_path.display().to_string().cyan());
+    println!(
+        "{} {}",
+        "File:".bright_green(),
+        project_config_path.display().to_string().cyan()
+    );
 
     let dropped = dropped_project_sections(&project_config_path)?;
     let mut has_warnings = false;
@@ -851,7 +933,12 @@ fn handle_config_validate() -> Result<()> {
     }
 
     println!();
-    println!("{}", "✅ Simplified project config parsed successfully.".green().bold());
+    println!(
+        "{}",
+        "✅ Simplified project config parsed successfully."
+            .green()
+            .bold()
+    );
     if !has_warnings {
         println!("{}", "No structural issues detected.".green());
     }
@@ -869,9 +956,16 @@ fn handle_config_edit() -> Result<()> {
         UserConfig::default_path()?
     };
 
-    println!("{} {}", "📝 Opening".bright_blue().bold(), target_path.display().to_string().cyan());
+    println!(
+        "{} {}",
+        "📝 Opening".bright_blue().bold(),
+        target_path.display().to_string().cyan()
+    );
     open_in_editor(&target_path)?;
-    println!("   {}", "Run 'termai config validate' if you edited a project config.".dimmed());
+    println!(
+        "   {}",
+        "Run 'termai config validate' if you edited a project config.".dimmed()
+    );
     Ok(())
 }
 
@@ -898,10 +992,22 @@ fn handle_config_import(file: &str, merge: bool) -> Result<()> {
 /// Show next steps after configuration initialization
 fn show_next_steps() {
     println!("{}", "💡 Next steps:".bright_yellow().bold());
-    println!("   {}        # View effective settings", "termai config show".cyan());
-    println!("   {}       # Validate configuration", "termai config validate".cyan());
-    println!("   {}          # Edit configuration", "termai config edit".cyan());
-    println!("   {}              # Start chatting with project context", "termai chat".cyan());
+    println!(
+        "   {}        # View effective settings",
+        "termai config show".cyan()
+    );
+    println!(
+        "   {}       # Validate configuration",
+        "termai config validate".cyan()
+    );
+    println!(
+        "   {}          # Edit configuration",
+        "termai config edit".cyan()
+    );
+    println!(
+        "   {}              # Start chatting with project context",
+        "termai chat".cyan()
+    );
 }
 
 struct ModelCatalog {
@@ -1057,12 +1163,22 @@ async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Resul
 
     let selected_model = match model {
         Some(model_name) => {
-            if !catalog.model_names.iter().any(|candidate| candidate == model_name) {
+            if !catalog
+                .model_names
+                .iter()
+                .any(|candidate| candidate == model_name)
+            {
                 println!("{}", "❌ Invalid model name".red().bold());
                 println!();
                 println!("{}", "💡 Available models:".bright_yellow().bold());
-                println!("   {}  # Open the model selector", "termai config set-model".cyan());
-                println!("   {}  # List all models", "termai config list-models".cyan());
+                println!(
+                    "   {}  # Open the model selector",
+                    "termai config set-model".cyan()
+                );
+                println!(
+                    "   {}  # List all models",
+                    "termai config list-models".cyan()
+                );
                 return Ok(());
             }
 
@@ -1075,7 +1191,12 @@ async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Resul
             }
 
             if catalog.model_names.is_empty() {
-                println!("{}", "❌ No models available for the current provider".red().bold());
+                println!(
+                    "{}",
+                    "❌ No models available for the current provider"
+                        .red()
+                        .bold()
+                );
                 return Ok(());
             }
 
@@ -1117,7 +1238,8 @@ async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Resul
     // Show model description
     let temp_state = ChatState::new(provider.clone(), selected_model.clone());
     let description = temp_state.list_models();
-    let model_line = description.lines()
+    let model_line = description
+        .lines()
         .find(|line| line.contains(&selected_model))
         .unwrap_or("");
     if !model_line.is_empty() {
@@ -1129,7 +1251,10 @@ async fn handle_set_model(repo: &SqliteRepository, model: Option<&str>) -> Resul
 
     println!();
     println!("{}", "💡 Start using:".bright_yellow().bold());
-    println!("   {}              # Start chatting with this model", "termai chat".cyan());
+    println!(
+        "   {}              # Start chatting with this model",
+        "termai chat".cyan()
+    );
     println!("   {}  # Quick question", "termai ask \"question\"".cyan());
 
     Ok(())

@@ -287,7 +287,8 @@ mod tests {
 
                 assert!(
                     message.contains("Short option names must be unique")
-                        || (message.contains("include_untracked") && message.contains("interactive")),
+                        || (message.contains("include_untracked")
+                            && message.contains("interactive")),
                     "Unexpected panic during man generation: {message}"
                 );
             }

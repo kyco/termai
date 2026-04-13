@@ -28,24 +28,39 @@ impl<'a, R: ConfigRepository> TokenManager<'a, R> {
 
     /// Load tokens from the configuration database
     pub fn load_tokens(&self) -> Result<Option<OAuthTokens>> {
-        let access_token = match config_service::fetch_by_key(self.repo, &ConfigKeys::CodexAccessToken.to_key()) {
-            Ok(config) if !config.value.is_empty() => config.value,
-            _ => return Ok(None),
-        };
+        let access_token =
+            match config_service::fetch_by_key(self.repo, &ConfigKeys::CodexAccessToken.to_key()) {
+                Ok(config) if !config.value.is_empty() => config.value,
+                _ => return Ok(None),
+            };
 
-        let refresh_token = config_service::fetch_by_key(self.repo, &ConfigKeys::CodexRefreshToken.to_key())
-            .ok()
-            .and_then(|c| if c.value.is_empty() { None } else { Some(c.value) });
+        let refresh_token =
+            config_service::fetch_by_key(self.repo, &ConfigKeys::CodexRefreshToken.to_key())
+                .ok()
+                .and_then(|c| {
+                    if c.value.is_empty() {
+                        None
+                    } else {
+                        Some(c.value)
+                    }
+                });
 
-        let expires_at = config_service::fetch_by_key(self.repo, &ConfigKeys::CodexTokenExpiry.to_key())
-            .ok()
-            .and_then(|c| DateTime::parse_from_rfc3339(&c.value).ok())
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(|| Utc::now());
+        let expires_at =
+            config_service::fetch_by_key(self.repo, &ConfigKeys::CodexTokenExpiry.to_key())
+                .ok()
+                .and_then(|c| DateTime::parse_from_rfc3339(&c.value).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|| Utc::now());
 
         let id_token = config_service::fetch_by_key(self.repo, &ConfigKeys::CodexIdToken.to_key())
             .ok()
-            .and_then(|c| if c.value.is_empty() { None } else { Some(c.value) });
+            .and_then(|c| {
+                if c.value.is_empty() {
+                    None
+                } else {
+                    Some(c.value)
+                }
+            });
 
         Ok(Some(OAuthTokens {
             access_token,
@@ -79,11 +94,7 @@ impl<'a, R: ConfigRepository> TokenManager<'a, R> {
         )?;
 
         if let Some(ref id_token) = tokens.id_token {
-            config_service::write_config(
-                self.repo,
-                &ConfigKeys::CodexIdToken.to_key(),
-                id_token,
-            )?;
+            config_service::write_config(self.repo, &ConfigKeys::CodexIdToken.to_key(), id_token)?;
         }
 
         Ok(())
@@ -92,7 +103,8 @@ impl<'a, R: ConfigRepository> TokenManager<'a, R> {
     /// Clear all stored tokens (logout)
     pub fn clear_tokens(&self) -> Result<()> {
         let _ = config_service::write_config(self.repo, &ConfigKeys::CodexAccessToken.to_key(), "");
-        let _ = config_service::write_config(self.repo, &ConfigKeys::CodexRefreshToken.to_key(), "");
+        let _ =
+            config_service::write_config(self.repo, &ConfigKeys::CodexRefreshToken.to_key(), "");
         let _ = config_service::write_config(self.repo, &ConfigKeys::CodexTokenExpiry.to_key(), "");
         let _ = config_service::write_config(self.repo, &ConfigKeys::CodexIdToken.to_key(), "");
         Ok(())
@@ -176,7 +188,11 @@ impl std::fmt::Display for AuthStatus {
         match self {
             AuthStatus::NotAuthenticated => write!(f, "Not authenticated"),
             AuthStatus::Authenticated { expires_at } => {
-                write!(f, "Authenticated (expires {})", expires_at.format("%Y-%m-%d %H:%M:%S UTC"))
+                write!(
+                    f,
+                    "Authenticated (expires {})",
+                    expires_at.format("%Y-%m-%d %H:%M:%S UTC")
+                )
             }
             AuthStatus::Expired { can_refresh } => {
                 if *can_refresh {

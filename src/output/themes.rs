@@ -1,7 +1,7 @@
-use colored::*;
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use colored::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Color palette for terminal output
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,16 +77,16 @@ pub struct ThemeManager {
 impl Default for ColorPalette {
     fn default() -> Self {
         Self {
-            primary: "#7C3AED".to_string(),     // Purple
-            secondary: "#3B82F6".to_string(),   // Blue
-            success: "#10B981".to_string(),     // Green
-            warning: "#F59E0B".to_string(),     // Yellow
-            error: "#EF4444".to_string(),       // Red
-            info: "#06B6D4".to_string(),        // Cyan
-            text: "#F9FAFB".to_string(),        // Light gray
-            text_dim: "#9CA3AF".to_string(),    // Dim gray
-            background: "#111827".to_string(),   // Dark gray
-            border: "#374151".to_string(),       // Medium gray
+            primary: "#7C3AED".to_string(),    // Purple
+            secondary: "#3B82F6".to_string(),  // Blue
+            success: "#10B981".to_string(),    // Green
+            warning: "#F59E0B".to_string(),    // Yellow
+            error: "#EF4444".to_string(),      // Red
+            info: "#06B6D4".to_string(),       // Cyan
+            text: "#F9FAFB".to_string(),       // Light gray
+            text_dim: "#9CA3AF".to_string(),   // Dim gray
+            background: "#111827".to_string(), // Dark gray
+            border: "#374151".to_string(),     // Medium gray
         }
     }
 }
@@ -94,14 +94,14 @@ impl Default for ColorPalette {
 impl Default for SyntaxColors {
     fn default() -> Self {
         Self {
-            keyword: "#8B5CF6".to_string(),     // Purple
-            string: "#10B981".to_string(),      // Green
-            comment: "#6B7280".to_string(),     // Gray
-            function: "#3B82F6".to_string(),    // Blue
-            variable: "#F59E0B".to_string(),    // Yellow
-            number: "#EF4444".to_string(),      // Red
-            operator: "#06B6D4".to_string(),    // Cyan
-            type_name: "#8B5CF6".to_string(),   // Purple
+            keyword: "#8B5CF6".to_string(),   // Purple
+            string: "#10B981".to_string(),    // Green
+            comment: "#6B7280".to_string(),   // Gray
+            function: "#3B82F6".to_string(),  // Blue
+            variable: "#F59E0B".to_string(),  // Yellow
+            number: "#EF4444".to_string(),    // Red
+            operator: "#06B6D4".to_string(),  // Cyan
+            type_name: "#8B5CF6".to_string(), // Purple
         }
     }
 }
@@ -125,7 +125,7 @@ impl ThemeManager {
             current_theme: Theme::default(),
             available_themes: HashMap::new(),
         };
-        
+
         manager.load_builtin_themes();
         manager
     }
@@ -133,7 +133,8 @@ impl ThemeManager {
     /// Load built-in themes
     fn load_builtin_themes(&mut self) {
         // Default theme
-        self.available_themes.insert("default".to_string(), Theme::default());
+        self.available_themes
+            .insert("default".to_string(), Theme::default());
 
         // Dark theme
         let dark_theme = Theme {
@@ -195,7 +196,8 @@ impl ThemeManager {
             use_icons: true,
             box_drawing: BoxDrawingStyle::Single,
         };
-        self.available_themes.insert("light".to_string(), light_theme);
+        self.available_themes
+            .insert("light".to_string(), light_theme);
 
         // Minimal theme
         let minimal_theme = Theme {
@@ -226,7 +228,8 @@ impl ThemeManager {
             use_icons: false,
             box_drawing: BoxDrawingStyle::Minimal,
         };
-        self.available_themes.insert("minimal".to_string(), minimal_theme);
+        self.available_themes
+            .insert("minimal".to_string(), minimal_theme);
     }
 
     /// Set the current theme
@@ -250,7 +253,11 @@ impl ThemeManager {
     }
 
     /// Get themed text for different message types
-    pub fn format_role(&self, role_text: &str, role: crate::llm::common::model::role::Role) -> ColoredString {
+    pub fn format_role(
+        &self,
+        role_text: &str,
+        role: crate::llm::common::model::role::Role,
+    ) -> ColoredString {
         match role {
             crate::llm::common::model::role::Role::User => {
                 if self.current_theme.use_icons {
@@ -355,7 +362,12 @@ impl ThemeManager {
             result.push_str(&title_text);
             result.push_str(&chars.horizontal.to_string().repeat(remaining));
         } else {
-            result.push_str(&chars.horizontal.to_string().repeat(box_width.saturating_sub(2)));
+            result.push_str(
+                &chars
+                    .horizontal
+                    .to_string()
+                    .repeat(box_width.saturating_sub(2)),
+            );
         }
         result.push(chars.top_right);
         result.push('\n');
@@ -364,7 +376,7 @@ impl ThemeManager {
         for line in content.lines() {
             result.push(chars.vertical);
             result.push(' ');
-            
+
             if line.len() <= content_width {
                 result.push_str(line);
                 result.push_str(&" ".repeat(content_width.saturating_sub(line.len())));
@@ -372,7 +384,7 @@ impl ThemeManager {
                 result.push_str(&line[..content_width.saturating_sub(3)]);
                 result.push_str("...");
             }
-            
+
             result.push(' ');
             result.push(chars.vertical);
             result.push('\n');
@@ -380,7 +392,12 @@ impl ThemeManager {
 
         // Bottom border
         result.push(chars.bottom_left);
-        result.push_str(&chars.horizontal.to_string().repeat(box_width.saturating_sub(2)));
+        result.push_str(
+            &chars
+                .horizontal
+                .to_string()
+                .repeat(box_width.saturating_sub(2)),
+        );
         result.push(chars.bottom_right);
 
         result
@@ -507,13 +524,13 @@ mod tests {
     #[test]
     fn test_theme_switching() {
         let mut manager = ThemeManager::new();
-        
+
         assert_eq!(manager.current_theme.name, "Default");
-        
+
         let result = manager.set_theme("dark");
         assert!(result.is_ok());
         assert_eq!(manager.current_theme.name, "Dark");
-        
+
         let result = manager.set_theme("nonexistent");
         assert!(result.is_err());
     }
@@ -522,7 +539,7 @@ mod tests {
     fn test_box_drawing() {
         let manager = ThemeManager::new();
         let box_content = manager.create_box("Test", "Hello\nWorld", Some(30));
-        
+
         assert!(box_content.contains("Test"));
         assert!(box_content.contains("Hello"));
         assert!(box_content.contains("World"));
@@ -532,10 +549,13 @@ mod tests {
     #[test]
     fn test_message_formatting() {
         let manager = ThemeManager::new();
-        
+
         let user_msg = manager.format_role("User", crate::llm::common::model::role::Role::User);
-        let assistant_msg = manager.format_role("Assistant", crate::llm::common::model::role::Role::Assistant);
-        
+        let assistant_msg = manager.format_role(
+            "Assistant",
+            crate::llm::common::model::role::Role::Assistant,
+        );
+
         assert!(user_msg.to_string().contains("User"));
         assert!(assistant_msg.to_string().contains("Assistant"));
     }
@@ -543,12 +563,12 @@ mod tests {
     #[test]
     fn test_status_formatting() {
         let manager = ThemeManager::new();
-        
+
         let success = manager.format_success("Success message");
         let warning = manager.format_warning("Warning message");
         let error = manager.format_error("Error message");
         let info = manager.format_info("Info message");
-        
+
         assert!(success.to_string().contains("Success message"));
         assert!(warning.to_string().contains("Warning message"));
         assert!(error.to_string().contains("Error message"));

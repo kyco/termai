@@ -1,5 +1,5 @@
 use crate::llm::openai::model::responses_api::{ResponsesRequest, ResponsesResponse};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use reqwest::Client;
 
 /// Adapter for the OpenAI Responses API
@@ -7,12 +7,8 @@ pub struct ResponsesAdapter;
 
 impl ResponsesAdapter {
     /// Make a request to the Responses API
-    pub async fn chat(
-        request: &ResponsesRequest,
-        api_key: &str,
-    ) -> Result<ResponsesResponse> {
-        let client = Client::builder()
-            .build()?;
+    pub async fn chat(request: &ResponsesRequest, api_key: &str) -> Result<ResponsesResponse> {
+        let client = Client::builder().build()?;
 
         let response = client
             .post("https://api.openai.com/v1/responses")
@@ -35,7 +31,7 @@ impl ResponsesAdapter {
 
         // Get response text first to debug parsing issues
         let response_text = response.text().await?;
-        
+
         // Try to parse the JSON response
         match serde_json::from_str::<ResponsesResponse>(&response_text) {
             Ok(parsed_response) => Ok(parsed_response),
@@ -55,7 +51,7 @@ impl ResponsesAdapter {
     ) -> Result<reqwest::Response> {
         let mut streaming_request = request.clone();
         streaming_request.stream = Some(true);
-        
+
         let client = Client::new();
         let response = client
             .post("https://api.openai.com/v1/responses")

@@ -1,13 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use colored::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tiny_http::{Server, Response, Header};
-use colored::*;
+use tiny_http::{Header, Response, Server};
 
 use crate::output::export::{ConversationExporter, ExportConfig};
 use crate::session::model::message::Message;
@@ -65,7 +65,7 @@ impl BrowserPreview {
     ) -> Result<String> {
         // Generate HTML content
         let html_content = self.generate_html_content(messages, title)?;
-        
+
         // Update current content
         {
             let mut content = self.current_content.lock().unwrap();
@@ -78,7 +78,7 @@ impl BrowserPreview {
         }
 
         let url = format!("http://{}:{}", self.config.host, self.config.port);
-        
+
         // Auto-open browser if configured
         if self.config.auto_open {
             self.open_browser(&url)?;
@@ -115,7 +115,10 @@ impl BrowserPreview {
 
         server_running.store(true, Ordering::Relaxed);
 
-        println!("{}", format!("🌐 Starting preview server at http://{}", address).bright_cyan());
+        println!(
+            "{}",
+            format!("🌐 Starting preview server at http://{}", address).bright_cyan()
+        );
 
         // Spawn server thread
         thread::spawn(move || {
@@ -131,19 +134,38 @@ impl BrowserPreview {
                     "/" => {
                         let content = current_content.lock().unwrap().clone();
                         if content.is_empty() {
-                            Response::from_string(Self::default_page())
-                                .with_header(Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap())
+                            Response::from_string(Self::default_page()).with_header(
+                                Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"text/html; charset=utf-8"[..],
+                                )
+                                .unwrap(),
+                            )
                         } else {
-                            Response::from_string(content)
-                                .with_header(Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap())
+                            Response::from_string(content).with_header(
+                                Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"text/html; charset=utf-8"[..],
+                                )
+                                .unwrap(),
+                            )
                         }
                     }
                     "/api/refresh" => {
                         // Refresh endpoint for live updates
                         let content = current_content.lock().unwrap().clone();
                         Response::from_string(content)
-                            .with_header(Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap())
-                            .with_header(Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap())
+                            .with_header(
+                                Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"text/html; charset=utf-8"[..],
+                                )
+                                .unwrap(),
+                            )
+                            .with_header(
+                                Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..])
+                                    .unwrap(),
+                            )
                     }
                     "/static/refresh.js" => {
                         let js = if config.auto_refresh {
@@ -151,17 +173,16 @@ impl BrowserPreview {
                         } else {
                             "// Auto-refresh disabled".to_string()
                         };
-                        Response::from_string(js)
-                            .with_header(Header::from_bytes(&b"Content-Type"[..], &b"application/javascript"[..]).unwrap())
+                        Response::from_string(js).with_header(
+                            Header::from_bytes(
+                                &b"Content-Type"[..],
+                                &b"application/javascript"[..],
+                            )
+                            .unwrap(),
+                        )
                     }
-                    "/favicon.ico" => {
-                        Response::from_string("")
-                            .with_status_code(404)
-                    }
-                    _ => {
-                        Response::from_string("Not Found")
-                            .with_status_code(404)
-                    }
+                    "/favicon.ico" => Response::from_string("").with_status_code(404),
+                    _ => Response::from_string("Not Found").with_status_code(404),
                 };
 
                 if let Err(e) = request.respond(response) {
@@ -193,7 +214,7 @@ impl BrowserPreview {
         if self.config.auto_refresh {
             html = html.replace(
                 "</head>",
-                "<script src=\"/static/refresh.js\"></script>\n</head>"
+                "<script src=\"/static/refresh.js\"></script>\n</head>",
             );
         }
 
@@ -206,13 +227,10 @@ impl BrowserPreview {
     /// Add interactive features to HTML
     fn add_interactive_features(&self, mut html: String) -> String {
         // Add copy buttons to code blocks
-        html = html.replace(
-            "<pre>",
-            r#"<div class="code-container"><pre>"#
-        );
+        html = html.replace("<pre>", r#"<div class="code-container"><pre>"#);
         html = html.replace(
             "</pre>",
-            r#"</pre><button class="copy-btn" onclick="copyCode(this)">📋 Copy</button></div>"#
+            r#"</pre><button class="copy-btn" onclick="copyCode(this)">📋 Copy</button></div>"#,
         );
 
         // Add JavaScript for interactive features
@@ -641,7 +659,8 @@ document.addEventListener('visibilitychange', function() {
         checkForUpdates();
     }
 });
-"#.to_string()
+"#
+        .to_string()
     }
 
     /// Generate default page content
@@ -687,12 +706,16 @@ document.addEventListener('visibilitychange', function() {
         <p>Use TermAI to preview conversations here.</p>
     </div>
 </body>
-</html>"#.to_string()
+</html>"#
+            .to_string()
     }
 
     /// Open browser to the preview URL
     fn open_browser(&self, url: &str) -> Result<()> {
-        println!("{}", format!("🚀 Opening browser at {}", url).bright_green());
+        println!(
+            "{}",
+            format!("🚀 Opening browser at {}", url).bright_green()
+        );
 
         let command = if cfg!(target_os = "windows") {
             ("cmd", vec!["/c", "start", url])
@@ -757,11 +780,7 @@ mod tests {
         let preview = BrowserPreview::new(config).unwrap();
 
         let messages = vec![
-            Message::new(
-                "1".to_string(),
-                Role::User,
-                "Hello, world!".to_string(),
-            ),
+            Message::new("1".to_string(), Role::User, "Hello, world!".to_string()),
             Message::new(
                 "2".to_string(),
                 Role::Assistant,
@@ -769,8 +788,10 @@ mod tests {
             ),
         ];
 
-        let html = preview.generate_html_content(&messages, Some("Test Chat")).unwrap();
-        
+        let html = preview
+            .generate_html_content(&messages, Some("Test Chat"))
+            .unwrap();
+
         assert!(html.contains("Test Chat"));
         assert!(html.contains("Hello, world!"));
         assert!(html.contains("Hello! How can I help you?"));

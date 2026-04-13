@@ -1,26 +1,26 @@
+use crate::llm::openai::model::custom_tools::PreambleConfig;
 use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use crate::llm::openai::model::verbosity::Verbosity;
-use crate::llm::openai::model::custom_tools::PreambleConfig;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for GPT-5 specific features
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Gpt5Config {
     /// Preferred reasoning effort level
     pub reasoning_effort: ReasoningEffort,
-    
+
     /// Preferred verbosity level
     pub verbosity: Verbosity,
-    
+
     /// Whether to use the new Responses API when available
     pub prefer_responses_api: bool,
-    
+
     /// Enable preambles for tool calls
     pub preambles: PreambleConfig,
-    
+
     /// Store conversations for multi-turn context
     pub store_conversations: bool,
-    
+
     /// Zero Data Retention mode (uses encrypted reasoning items)
     pub zero_data_retention: bool,
 }
@@ -104,7 +104,8 @@ impl Gpt5Config {
     pub fn with_preambles(mut self, enabled: bool) -> Self {
         self.preambles.enabled = enabled;
         if enabled && self.preambles.instruction.is_none() {
-            self.preambles.instruction = Some("Before you call a tool, explain why you are calling it.".to_string());
+            self.preambles.instruction =
+                Some("Before you call a tool, explain why you are calling it.".to_string());
         }
         self
     }
@@ -131,7 +132,11 @@ impl Gpt5Config {
             "GPT-5 Config: reasoning={}, verbosity={}, api={}, preambles={}, storage={}, zdr={}",
             self.reasoning_effort.to_string(),
             self.verbosity.to_string(),
-            if self.prefer_responses_api { "responses" } else { "chat" },
+            if self.prefer_responses_api {
+                "responses"
+            } else {
+                "chat"
+            },
             self.preambles.enabled,
             self.store_conversations,
             self.zero_data_retention,

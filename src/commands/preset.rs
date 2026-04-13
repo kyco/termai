@@ -1,13 +1,13 @@
 /// Preset and template management command handler
 use crate::args::{PresetAction, PresetArgs, PresetFormat};
-use crate::preset::builtin::BuiltinPresets;
-use crate::preset::manager::{PresetManager, PresetInfo};
-use crate::preset::template::Template;
-use crate::repository::db::SqliteRepository;
 use crate::context::SmartContext;
 use crate::git::diff::DiffAnalyzer;
 use crate::path::model::Files;
-use anyhow::{Context, Result, bail};
+use crate::preset::builtin::BuiltinPresets;
+use crate::preset::manager::{PresetInfo, PresetManager};
+use crate::preset::template::Template;
+use crate::repository::db::SqliteRepository;
+use anyhow::{bail, Context, Result};
 use colored::*;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -16,23 +16,32 @@ use std::path::{Path, PathBuf};
 /// Handle the preset subcommand
 pub async fn handle_preset_command(args: &PresetArgs, _repo: &SqliteRepository) -> Result<()> {
     // Initialize preset manager
-    let preset_manager = PresetManager::new()
-        .context("Failed to initialize preset manager")?;
+    let preset_manager = PresetManager::new().context("Failed to initialize preset manager")?;
 
     match &args.action {
-        PresetAction::List { category, search, detailed } => {
-            handle_list_presets(&preset_manager, category.as_deref(), search.as_deref(), *detailed).await
+        PresetAction::List {
+            category,
+            search,
+            detailed,
+        } => {
+            handle_list_presets(
+                &preset_manager,
+                category.as_deref(),
+                search.as_deref(),
+                *detailed,
+            )
+            .await
         }
-        PresetAction::Use { 
-            name, 
-            directory, 
-            directories, 
-            smart_context, 
-            session, 
-            use_defaults, 
-            preview, 
-            git_staged, 
-            variables 
+        PresetAction::Use {
+            name,
+            directory,
+            directories,
+            smart_context,
+            session,
+            use_defaults,
+            preview,
+            git_staged,
+            variables,
         } => {
             handle_use_preset(
                 &preset_manager,
@@ -45,15 +54,16 @@ pub async fn handle_preset_command(args: &PresetArgs, _repo: &SqliteRepository) 
                 *preview,
                 *git_staged,
                 variables,
-            ).await
+            )
+            .await
         }
-        PresetAction::Create { 
-            name, 
-            description, 
-            category, 
-            template, 
-            from_session, 
-            edit 
+        PresetAction::Create {
+            name,
+            description,
+            category,
+            template,
+            from_session,
+            edit,
         } => {
             handle_create_preset(
                 &preset_manager,
@@ -63,11 +73,14 @@ pub async fn handle_preset_command(args: &PresetArgs, _repo: &SqliteRepository) 
                 template.as_deref(),
                 from_session.as_deref(),
                 *edit,
-            ).await
+            )
+            .await
         }
-        PresetAction::Show { name, template, stats } => {
-            handle_show_preset(&preset_manager, name, *template, *stats).await
-        }
+        PresetAction::Show {
+            name,
+            template,
+            stats,
+        } => handle_show_preset(&preset_manager, name, *template, *stats).await,
         PresetAction::Delete { name, force } => {
             handle_delete_preset(&preset_manager, name, *force).await
         }
@@ -77,12 +90,16 @@ pub async fn handle_preset_command(args: &PresetArgs, _repo: &SqliteRepository) 
         PresetAction::Import { file, force } => {
             handle_import_preset(&preset_manager, file, *force).await
         }
-        PresetAction::Edit { name, template, metadata } => {
-            handle_edit_preset(&preset_manager, name, *template, *metadata).await
-        }
-        PresetAction::Search { query, content, category } => {
-            handle_search_presets(&preset_manager, query, *content, category.as_deref()).await
-        }
+        PresetAction::Edit {
+            name,
+            template,
+            metadata,
+        } => handle_edit_preset(&preset_manager, name, *template, *metadata).await,
+        PresetAction::Search {
+            query,
+            content,
+            category,
+        } => handle_search_presets(&preset_manager, query, *content, category.as_deref()).await,
     }
 }
 
@@ -97,9 +114,8 @@ async fn handle_list_presets(
     println!("{}", "═══════════════════".white().dimmed());
 
     // Get all presets
-    let mut presets = manager.list_presets()
-        .context("Failed to list presets")?;
-    
+    let mut presets = manager.list_presets().context("Failed to list presets")?;
+
     // Add built-in presets
     for builtin in BuiltinPresets::get_all() {
         presets.push(PresetInfo {
@@ -115,15 +131,19 @@ async fn handle_list_presets(
 
     // Apply filters
     if let Some(category_filter) = category {
-        presets.retain(|p| p.category.to_lowercase().contains(&category_filter.to_lowercase()));
+        presets.retain(|p| {
+            p.category
+                .to_lowercase()
+                .contains(&category_filter.to_lowercase())
+        });
     }
 
     if let Some(search_query) = search {
         let query_lower = search_query.to_lowercase();
         presets.retain(|p| {
-            p.name.to_lowercase().contains(&query_lower) ||
-            p.description.to_lowercase().contains(&query_lower) ||
-            p.category.to_lowercase().contains(&query_lower)
+            p.name.to_lowercase().contains(&query_lower)
+                || p.description.to_lowercase().contains(&query_lower)
+                || p.category.to_lowercase().contains(&query_lower)
         });
     }
 
@@ -136,26 +156,51 @@ async fn handle_list_presets(
         // Detailed view
         for preset in presets {
             println!();
-            println!("{} {}", "📦".bright_blue(), preset.name.bright_green().bold());
+            println!(
+                "{} {}",
+                "📦".bright_blue(),
+                preset.name.bright_green().bold()
+            );
             println!("   {}: {}", "Description".dimmed(), preset.description);
-            println!("   {}: {}", "Category".dimmed(), preset.category.bright_cyan());
+            println!(
+                "   {}: {}",
+                "Category".dimmed(),
+                preset.category.bright_cyan()
+            );
             println!("   {}: {}", "Version".dimmed(), preset.version);
-            println!("   {}: {}", "Type".dimmed(), if preset.is_builtin { "Built-in".bright_yellow() } else { "User".bright_magenta() });
+            println!(
+                "   {}: {}",
+                "Type".dimmed(),
+                if preset.is_builtin {
+                    "Built-in".bright_yellow()
+                } else {
+                    "User".bright_magenta()
+                }
+            );
             if preset.usage_count > 0 {
-                println!("   {}: {}×", "Used".dimmed(), preset.usage_count.to_string().bright_white());
+                println!(
+                    "   {}: {}×",
+                    "Used".dimmed(),
+                    preset.usage_count.to_string().bright_white()
+                );
             }
         }
     } else {
         // Table view
         println!();
-        println!("┌─────────────────────┬─────────────┬──────────────────────────────────┬─────────┐");
-        println!("│ {} │ {} │ {} │ {} │", 
+        println!(
+            "┌─────────────────────┬─────────────┬──────────────────────────────────┬─────────┐"
+        );
+        println!(
+            "│ {} │ {} │ {} │ {} │",
             format!("{:<19}", "Preset").bright_white().bold(),
             format!("{:<11}", "Category").bright_white().bold(),
             format!("{:<32}", "Description").bright_white().bold(),
             format!("{:<7}", "Usage").bright_white().bold()
         );
-        println!("├─────────────────────┼─────────────┼──────────────────────────────────┼─────────┤");
+        println!(
+            "├─────────────────────┼─────────────┼──────────────────────────────────┼─────────┤"
+        );
 
         for preset in presets {
             let name_display = if preset.is_builtin {
@@ -163,7 +208,7 @@ async fn handle_list_presets(
             } else {
                 preset.name.clone()
             };
-            
+
             let description_truncated = if preset.description.len() > 32 {
                 format!("{}...", &preset.description[..29])
             } else {
@@ -176,18 +221,29 @@ async fn handle_list_presets(
                 "-".to_string()
             };
 
-            println!("│ {} │ {} │ {} │ {} │",
+            println!(
+                "│ {} │ {} │ {} │ {} │",
                 format!("{:<19}", name_display).bright_green(),
                 format!("{:<11}", preset.category).bright_cyan(),
                 format!("{:<32}", description_truncated),
                 format!("{:<7}", usage_display).bright_white()
             );
         }
-        println!("└─────────────────────┴─────────────┴──────────────────────────────────┴─────────┘");
-        
+        println!(
+            "└─────────────────────┴─────────────┴──────────────────────────────────┴─────────┘"
+        );
+
         println!();
-        println!("{} Use a preset: {}", "💡".bright_yellow(), "termai preset use <name>".bright_cyan());
-        println!("{} Show details: {}", "📖".bright_blue(), "termai preset show <name>".bright_cyan());
+        println!(
+            "{} Use a preset: {}",
+            "💡".bright_yellow(),
+            "termai preset use <name>".bright_cyan()
+        );
+        println!(
+            "{} Show details: {}",
+            "📖".bright_blue(),
+            "termai preset show <name>".bright_cyan()
+        );
     }
 
     Ok(())
@@ -206,18 +262,26 @@ async fn handle_use_preset(
     git_staged: bool,
     variables: &[String],
 ) -> Result<()> {
-    println!("{}", format!("🔍 Using preset: {}", name).bright_blue().bold());
+    println!(
+        "{}",
+        format!("🔍 Using preset: {}", name).bright_blue().bold()
+    );
     println!();
 
     // Try to load preset (first check built-ins, then user presets)
     let preset = if let Some(builtin) = BuiltinPresets::get_by_name(name) {
         builtin
     } else {
-        manager.load_preset(name)
+        manager
+            .load_preset(name)
             .with_context(|| format!("Preset '{}' not found", name))?
     };
 
-    println!("{} {}", "📦".bright_green(), preset.description.bright_white());
+    println!(
+        "{} {}",
+        "📦".bright_green(),
+        preset.description.bright_white()
+    );
     println!();
 
     // Parse provided variables
@@ -226,18 +290,22 @@ async fn handle_use_preset(
         if let Some((key, value)) = var.split_once('=') {
             provided_vars.insert(key.to_string(), Value::String(value.to_string()));
         } else {
-            eprintln!("⚠️  Invalid variable format '{}'. Use key=value format.", var);
+            eprintln!(
+                "⚠️  Invalid variable format '{}'. Use key=value format.",
+                var
+            );
         }
     }
-    
+
     // Collect file content based on integration flags
-    let file_content = collect_context_files(directory, directories, smart_context, git_staged).await?;
-    
+    let file_content =
+        collect_context_files(directory, directories, smart_context, git_staged).await?;
+
     // Add file content to variables if we have any
     if !file_content.is_empty() {
         let content_str = format_files_for_template(&file_content);
         provided_vars.insert("file_content".to_string(), Value::String(content_str));
-        
+
         // Add additional Git context if using git-staged
         if git_staged {
             let git_info = collect_git_context().await?;
@@ -247,7 +315,10 @@ async fn handle_use_preset(
         }
     } else if !provided_vars.contains_key("file_content") {
         // Add default file_content for built-in presets that expect it
-        provided_vars.insert("file_content".to_string(), Value::String("[No file content provided]".to_string()));
+        provided_vars.insert(
+            "file_content".to_string(),
+            Value::String("[No file content provided]".to_string()),
+        );
     }
 
     // Collect variables
@@ -260,7 +331,10 @@ async fn handle_use_preset(
             } else if let Some(default) = &var_def.default {
                 vars.insert(name.clone(), default.clone());
             } else if var_def.required {
-                bail!("Required variable '{}' not provided and has no default", name);
+                bail!(
+                    "Required variable '{}' not provided and has no default",
+                    name
+                );
             }
         }
         vars
@@ -268,13 +342,15 @@ async fn handle_use_preset(
         // Interactive collection (only file_content counts as non-interactive)
         use crate::preset::variables::VariableCollector;
         let collector = VariableCollector::new();
-        collector.collect_variables(&preset.template)
+        collector
+            .collect_variables(&preset.template)
             .context("Failed to collect variables")?
     } else {
         // Mix of provided and defaults
         use crate::preset::variables::VariableCollector;
         let collector = VariableCollector::new();
-        collector.collect_from_values(&preset.template, &provided_vars)
+        collector
+            .collect_from_values(&preset.template, &provided_vars)
             .context("Failed to process provided variables")?
     };
 
@@ -285,13 +361,12 @@ async fn handle_use_preset(
         }
     }
 
-
     // Render template
     use crate::preset::template::TemplateRenderer;
-    let renderer = TemplateRenderer::new()
-        .context("Failed to create template renderer")?;
-    
-    let rendered = renderer.render(&preset.template, &variables)
+    let renderer = TemplateRenderer::new().context("Failed to create template renderer")?;
+
+    let rendered = renderer
+        .render(&preset.template, &variables)
         .context("Failed to render template")?;
 
     if preview {
@@ -300,12 +375,13 @@ async fn handle_use_preset(
         println!("{}", rendered.bright_white());
         println!("{}", "─".repeat(50).dimmed());
         println!();
-        
+
         use dialoguer::Confirm;
         if !Confirm::new()
             .with_prompt("Continue with this template?")
             .default(true)
-            .interact()? {
+            .interact()?
+        {
             println!("❌ Cancelled by user.");
             return Ok(());
         }
@@ -320,7 +396,11 @@ async fn handle_use_preset(
     // Session integration
     if let Some(session_name) = session {
         println!();
-        println!("{} {}", "💾".bright_blue(), format!("Saving to session: {}", session_name).bright_white());
+        println!(
+            "{} {}",
+            "💾".bright_blue(),
+            format!("Saving to session: {}", session_name).bright_white()
+        );
         // TODO: Integrate with session management system
         // For now, just show the integration point
         println!("   Session management integration will be implemented in the next phase.");
@@ -329,18 +409,18 @@ async fn handle_use_preset(
     // Show suggested next steps
     println!();
     println!("{} Template rendered successfully!", "🎉".bright_green());
-    
+
     if session.is_some() {
         println!("💡 The rendered prompt has been prepared for AI interaction.");
         println!("💡 Session context will be preserved for follow-up questions.");
     } else {
         println!("💡 Add --session <name> to save this interaction for later reference.");
     }
-    
+
     if git_staged && !file_content.is_empty() {
         println!("🚀 Ready for Git workflow - staged files have been analyzed.");
     }
-    
+
     if smart_context && !file_content.is_empty() {
         println!("🧠 Smart context discovery selected the most relevant files.");
     }
@@ -363,11 +443,11 @@ async fn handle_create_preset(
     println!("Let's create a new preset: {}", name.bright_green().bold());
     println!();
 
-    use dialoguer::{Input, Select, Confirm};
+    use dialoguer::{Confirm, Input, Select};
 
     // Step 1: Basic Information
     println!("{}", "📝 Step 1: Basic Information".bright_yellow().bold());
-    
+
     let description = if let Some(desc) = description {
         desc.to_string()
     } else {
@@ -378,10 +458,16 @@ async fn handle_create_preset(
     };
 
     let category_options = vec![
-        "development", "testing", "debugging", "documentation", 
-        "refactoring", "review", "analysis", "custom"
+        "development",
+        "testing",
+        "debugging",
+        "documentation",
+        "refactoring",
+        "review",
+        "analysis",
+        "custom",
     ];
-    
+
     let category = if let Some(cat) = category {
         cat.to_string()
     } else {
@@ -397,7 +483,7 @@ async fn handle_create_preset(
 
     // Step 2: Template Content
     println!("{}", "📝 Step 2: Template Content".bright_yellow().bold());
-    
+
     let template_content = if let Some(content) = template_content {
         content.to_string()
     } else if edit {
@@ -413,20 +499,26 @@ async fn handle_create_preset(
 
     // Step 3: Variable Definitions
     println!();
-    println!("{}", "📝 Step 3: Variable Definitions".bright_yellow().bold());
-    
+    println!(
+        "{}",
+        "📝 Step 3: Variable Definitions".bright_yellow().bold()
+    );
+
     let mut variables = HashMap::new();
-    
+
     // Auto-detect variables from template content
     let detected_vars = detect_template_variables(&template_content);
     if !detected_vars.is_empty() {
-        println!("🔍 Detected variables: {}", detected_vars.join(", ").bright_cyan());
-        
+        println!(
+            "🔍 Detected variables: {}",
+            detected_vars.join(", ").bright_cyan()
+        );
+
         if Confirm::new()
             .with_prompt("Define these variables interactively?")
             .default(true)
-            .interact()? {
-            
+            .interact()?
+        {
             variables = define_template_variables(&detected_vars)?;
         }
     }
@@ -434,13 +526,14 @@ async fn handle_create_preset(
     // Validate template syntax
     println!();
     println!("{}", "🔍 Validating template...".bright_blue());
-    
+
     if let Err(e) = Template::validate_template_syntax(&template_content) {
         eprintln!("❌ Template validation failed: {}", e);
         if !Confirm::new()
             .with_prompt("Continue anyway?")
             .default(false)
-            .interact()? {
+            .interact()?
+        {
             bail!("Template validation failed");
         }
     } else {
@@ -450,7 +543,10 @@ async fn handle_create_preset(
     // Step 4: Configuration
     println!();
     println!("{}", "📝 Step 4: Workflow Metadata".bright_yellow().bold());
-    println!("{}", "Preset runtime settings were removed from the simplified model.".dimmed());
+    println!(
+        "{}",
+        "Preset runtime settings were removed from the simplified model.".dimmed()
+    );
     let config = crate::preset::manager::PresetConfig::default();
 
     // Create template
@@ -459,7 +555,8 @@ async fn handle_create_preset(
         description.clone(),
         template_content.clone(),
         variables,
-    ).context("Failed to create template")?;
+    )
+    .context("Failed to create template")?;
 
     let preset = crate::preset::manager::Preset {
         name: name.to_string(),
@@ -472,29 +569,49 @@ async fn handle_create_preset(
 
     // Step 5: Preview and Confirm
     println!();
-    println!("{}", "📝 Step 5: Preview & Confirmation".bright_yellow().bold());
+    println!(
+        "{}",
+        "📝 Step 5: Preview & Confirmation".bright_yellow().bold()
+    );
     println!();
     println!("📦 {}", preset.name.bright_green().bold());
     println!("   📋 {}", preset.description);
     println!("   🏷️  {}", preset.category.bright_cyan());
-    println!("   🔧 {} variables defined", preset.template.variables.len());
-    
+    println!(
+        "   🔧 {} variables defined",
+        preset.template.variables.len()
+    );
+
     if Confirm::new()
         .with_prompt("Save this preset?")
         .default(true)
-        .interact()? {
-        
+        .interact()?
+    {
         // Save preset
-        manager.save_preset(&preset)
+        manager
+            .save_preset(&preset)
             .context("Failed to save preset")?;
 
         println!();
-        println!("🎉 {} Preset '{}' created successfully!", "✅".bright_green(), name.bright_green().bold());
-        println!("💡 Use it with: {}", format!("termai preset use \"{}\"", name).bright_cyan());
-        println!("📖 View details: {}", format!("termai preset show \"{}\"", name).bright_cyan());
-        
+        println!(
+            "🎉 {} Preset '{}' created successfully!",
+            "✅".bright_green(),
+            name.bright_green().bold()
+        );
+        println!(
+            "💡 Use it with: {}",
+            format!("termai preset use \"{}\"", name).bright_cyan()
+        );
+        println!(
+            "📖 View details: {}",
+            format!("termai preset show \"{}\"", name).bright_cyan()
+        );
+
         if !preset.template.variables.is_empty() {
-            println!("🔧 Test variables: {}", format!("termai preset use \"{}\" --preview", name).bright_cyan());
+            println!(
+                "🔧 Test variables: {}",
+                format!("termai preset use \"{}\" --preview", name).bright_cyan()
+            );
         }
     } else {
         println!("❌ Preset creation cancelled.");
@@ -514,29 +631,43 @@ async fn handle_show_preset(
     let preset = if let Some(builtin) = BuiltinPresets::get_by_name(name) {
         builtin
     } else {
-        manager.load_preset(name)
+        manager
+            .load_preset(name)
             .with_context(|| format!("Preset '{}' not found", name))?
     };
 
-    println!("{} {}", "📦".bright_green(), preset.name.bright_white().bold());
+    println!(
+        "{} {}",
+        "📦".bright_green(),
+        preset.name.bright_white().bold()
+    );
     println!("{}", "═".repeat(50).dimmed());
     println!("{}: {}", "Description".bright_blue(), preset.description);
-    println!("{}: {}", "Category".bright_blue(), preset.category.bright_cyan());
+    println!(
+        "{}: {}",
+        "Category".bright_blue(),
+        preset.category.bright_cyan()
+    );
     println!("{}: {}", "Version".bright_blue(), preset.version);
-    
+
     if !preset.template.variables.is_empty() {
         println!();
         println!("{}", "Variables:".bright_yellow().bold());
         for (var_name, var_def) in &preset.template.variables {
-            let required_marker = if var_def.required { "*".red() } else { " ".normal() };
+            let required_marker = if var_def.required {
+                "*".red()
+            } else {
+                " ".normal()
+            };
             let default_info = if let Some(default) = &var_def.default {
                 format!(" (default: {})", default).dimmed()
             } else {
                 "".normal()
             };
-            println!("  {}{}: {} {}", 
-                required_marker, 
-                var_name.bright_white(), 
+            println!(
+                "  {}{}: {} {}",
+                required_marker,
+                var_name.bright_white(),
                 var_def.description.bright_white(),
                 default_info
             );
@@ -555,11 +686,7 @@ async fn handle_show_preset(
 }
 
 /// Handle deleting a preset
-async fn handle_delete_preset(
-    manager: &PresetManager,
-    name: &str,
-    force: bool,
-) -> Result<()> {
+async fn handle_delete_preset(manager: &PresetManager, name: &str, force: bool) -> Result<()> {
     // Check if it's a built-in preset
     if BuiltinPresets::get_by_name(name).is_some() {
         bail!("Cannot delete built-in preset '{}'", name);
@@ -568,15 +695,20 @@ async fn handle_delete_preset(
     if !force {
         use dialoguer::Confirm;
         if !Confirm::new()
-            .with_prompt(&format!("Are you sure you want to delete preset '{}'?", name))
+            .with_prompt(&format!(
+                "Are you sure you want to delete preset '{}'?",
+                name
+            ))
             .default(false)
-            .interact()? {
+            .interact()?
+        {
             println!("❌ Cancelled by user.");
             return Ok(());
         }
     }
 
-    manager.delete_preset(name)
+    manager
+        .delete_preset(name)
         .with_context(|| format!("Failed to delete preset '{}'", name))?;
 
     println!("✅ Preset '{}' deleted successfully!", name.bright_green());
@@ -592,8 +724,9 @@ async fn handle_export_preset(
     _format: &PresetFormat,
 ) -> Result<()> {
     let path = Path::new(file_path);
-    
-    manager.export_preset(name, path)
+
+    manager
+        .export_preset(name, path)
         .with_context(|| format!("Failed to export preset '{}'", name))?;
 
     Ok(())
@@ -606,12 +739,13 @@ async fn handle_import_preset(
     _force: bool,
 ) -> Result<()> {
     let path = Path::new(file_path);
-    
+
     if !path.exists() {
         bail!("File '{}' does not exist", file_path);
     }
 
-    manager.import_preset(path)
+    manager
+        .import_preset(path)
         .with_context(|| format!("Failed to import preset from '{}'", file_path))?;
 
     Ok(())
@@ -626,36 +760,51 @@ async fn handle_edit_preset(
 ) -> Result<()> {
     // Check if it's a built-in preset
     if BuiltinPresets::get_by_name(name).is_some() {
-        println!("🔄 {} Creating editable copy of built-in preset '{}'", "📋".bright_yellow(), name.bright_green().bold());
-        
+        println!(
+            "🔄 {} Creating editable copy of built-in preset '{}'",
+            "📋".bright_yellow(),
+            name.bright_green().bold()
+        );
+
         use dialoguer::Confirm;
         if !Confirm::new()
-            .with_prompt(&format!("Built-in presets cannot be edited directly. Create a custom copy of '{}'?", name))
+            .with_prompt(&format!(
+                "Built-in presets cannot be edited directly. Create a custom copy of '{}'?",
+                name
+            ))
             .default(true)
-            .interact()? {
+            .interact()?
+        {
             println!("❌ Edit cancelled.");
             return Ok(());
         }
-        
+
         // Create custom copy
         let builtin = BuiltinPresets::get_by_name(name).unwrap();
         let custom_name = format!("{} (Custom)", name);
-        
+
         let mut custom_preset = builtin.clone();
         custom_preset.name = custom_name.clone();
         custom_preset.version = "1.0-custom".to_string();
-        
+
         manager.save_preset(&custom_preset)?;
         println!("✅ Created custom copy: '{}'", custom_name.bright_green());
         println!("💡 Editing the custom copy instead...");
         println!();
-        
+
         // Continue editing the custom copy
-        return Box::pin(handle_edit_preset(manager, &custom_name, edit_template, edit_metadata)).await;
+        return Box::pin(handle_edit_preset(
+            manager,
+            &custom_name,
+            edit_template,
+            edit_metadata,
+        ))
+        .await;
     }
 
     // Load the preset
-    let mut preset = manager.load_preset(name)
+    let mut preset = manager
+        .load_preset(name)
         .with_context(|| format!("Preset '{}' not found", name))?;
 
     println!("{}", "✏️  Preset Editor".bright_blue().bold());
@@ -663,7 +812,7 @@ async fn handle_edit_preset(
     println!("Editing preset: {}", preset.name.bright_green().bold());
     println!();
 
-    use dialoguer::{Select, Confirm};
+    use dialoguer::{Confirm, Select};
 
     // Determine what to edit
     let edit_options = if edit_template && edit_metadata {
@@ -671,7 +820,7 @@ async fn handle_edit_preset(
     } else if edit_template {
         vec!["Template Only"]
     } else if edit_metadata {
-        vec!["Metadata Only"]  
+        vec!["Metadata Only"]
     } else {
         vec!["Template", "Metadata", "Variables", "Configuration", "All"]
     };
@@ -713,7 +862,10 @@ async fn handle_edit_preset(
         }
         _ => {
             // Handle forced template/metadata editing
-            if edit_template || edit_options[0] == "Template Only" || edit_options[0] == "Template & Metadata" {
+            if edit_template
+                || edit_options[0] == "Template Only"
+                || edit_options[0] == "Template & Metadata"
+            {
                 changes_made |= edit_preset_template(&mut preset).await?;
                 if edit_options[0] == "Template & Metadata" {
                     println!();
@@ -729,22 +881,29 @@ async fn handle_edit_preset(
     if changes_made {
         println!();
         println!("{}", "💾 Saving changes...".bright_blue());
-        
+
         // Validate template before saving
         if let Err(e) = Template::validate_template_syntax(&preset.template.template) {
             eprintln!("⚠️  Template validation warning: {}", e);
             if !Confirm::new()
                 .with_prompt("Save anyway?")
                 .default(false)
-                .interact()? {
+                .interact()?
+            {
                 println!("❌ Changes not saved.");
                 return Ok(());
             }
         }
-        
+
         manager.save_preset(&preset)?;
-        println!("✅ Preset '{}' updated successfully!", preset.name.bright_green());
-        println!("🧪 Test it: {}", format!("termai preset use \"{}\" --preview", preset.name).bright_cyan());
+        println!(
+            "✅ Preset '{}' updated successfully!",
+            preset.name.bright_green()
+        );
+        println!(
+            "🧪 Test it: {}",
+            format!("termai preset use \"{}\" --preview", preset.name).bright_cyan()
+        );
     } else {
         println!("ℹ️  No changes made.");
     }
@@ -759,15 +918,25 @@ async fn handle_search_presets(
     _search_content: bool,
     category: Option<&str>,
 ) -> Result<()> {
-    println!("{}", format!("🔍 Searching presets for: '{}'", query).bright_blue().bold());
+    println!(
+        "{}",
+        format!("🔍 Searching presets for: '{}'", query)
+            .bright_blue()
+            .bold()
+    );
     println!();
 
-    let results = manager.search_presets(query)
+    let results = manager
+        .search_presets(query)
         .context("Failed to search presets")?;
 
     let mut filtered_results = results;
     if let Some(cat_filter) = category {
-        filtered_results.retain(|p| p.category.to_lowercase().contains(&cat_filter.to_lowercase()));
+        filtered_results.retain(|p| {
+            p.category
+                .to_lowercase()
+                .contains(&cat_filter.to_lowercase())
+        });
     }
 
     // Also search built-in presets
@@ -775,13 +944,16 @@ async fn handle_search_presets(
     let builtin_matches: Vec<_> = BuiltinPresets::get_all()
         .into_iter()
         .filter(|preset| {
-            preset.name.to_lowercase().contains(&query_lower) ||
-            preset.description.to_lowercase().contains(&query_lower) ||
-            preset.category.to_lowercase().contains(&query_lower)
+            preset.name.to_lowercase().contains(&query_lower)
+                || preset.description.to_lowercase().contains(&query_lower)
+                || preset.category.to_lowercase().contains(&query_lower)
         })
         .filter(|preset| {
             if let Some(cat_filter) = category {
-                preset.category.to_lowercase().contains(&cat_filter.to_lowercase())
+                preset
+                    .category
+                    .to_lowercase()
+                    .contains(&cat_filter.to_lowercase())
             } else {
                 true
             }
@@ -793,29 +965,56 @@ async fn handle_search_presets(
         return Ok(());
     }
 
-    println!("📋 Found {} result(s):", filtered_results.len() + builtin_matches.len());
+    println!(
+        "📋 Found {} result(s):",
+        filtered_results.len() + builtin_matches.len()
+    );
     println!();
 
     // Show built-in matches
     for preset in builtin_matches {
-        println!("{} {} {}", "📦".bright_blue(), preset.name.bright_green().bold(), "✨".bright_yellow());
+        println!(
+            "{} {} {}",
+            "📦".bright_blue(),
+            preset.name.bright_green().bold(),
+            "✨".bright_yellow()
+        );
         println!("   {}: {}", "Description".dimmed(), preset.description);
-        println!("   {}: {}", "Category".dimmed(), preset.category.bright_cyan());
+        println!(
+            "   {}: {}",
+            "Category".dimmed(),
+            preset.category.bright_cyan()
+        );
         println!();
     }
 
     // Show user preset matches
     for preset in filtered_results {
-        println!("{} {}", "📦".bright_blue(), preset.name.bright_green().bold());
+        println!(
+            "{} {}",
+            "📦".bright_blue(),
+            preset.name.bright_green().bold()
+        );
         println!("   {}: {}", "Description".dimmed(), preset.description);
-        println!("   {}: {}", "Category".dimmed(), preset.category.bright_cyan());
+        println!(
+            "   {}: {}",
+            "Category".dimmed(),
+            preset.category.bright_cyan()
+        );
         if preset.usage_count > 0 {
-            println!("   {}: {}×", "Used".dimmed(), preset.usage_count.to_string().bright_white());
+            println!(
+                "   {}: {}×",
+                "Used".dimmed(),
+                preset.usage_count.to_string().bright_white()
+            );
         }
         println!();
     }
 
-    println!("💡 Use a preset: {}", "termai preset use <name>".bright_cyan());
+    println!(
+        "💡 Use a preset: {}",
+        "termai preset use <name>".bright_cyan()
+    );
 
     Ok(())
 }
@@ -828,20 +1027,23 @@ async fn collect_context_files(
     git_staged: bool,
 ) -> Result<Vec<Files>> {
     let mut files = Vec::new();
-    
+
     // Determine working directory
     let current_dir = std::env::current_dir().context("Failed to get current directory")?;
-    
+
     if git_staged {
         // Collect Git staged files
         files.extend(collect_git_staged_files(&current_dir).await?);
-        
+
         if smart_context {
-            println!("📊 {} Smart context discovery with Git staged files", "🔍".bright_blue());
+            println!(
+                "📊 {} Smart context discovery with Git staged files",
+                "🔍".bright_blue()
+            );
             // Use smart context to enhance the staged file selection
             let smart_ctx = SmartContext::from_project(&current_dir)?;
             let additional_files = smart_ctx.discover_context(&current_dir, None).await?;
-            
+
             // Add files that aren't already included from Git staging
             for file in additional_files {
                 if !files.iter().any(|f| f.path == file.path) {
@@ -853,7 +1055,7 @@ async fn collect_context_files(
         // Use smart context discovery on specified directories
         println!("📊 {} Smart context discovery", "🔍".bright_blue());
         let smart_ctx = SmartContext::from_project(&current_dir)?;
-        
+
         if let Some(dir) = directory {
             let dir_path = if Path::new(dir).is_relative() {
                 current_dir.join(dir)
@@ -877,26 +1079,31 @@ async fn collect_context_files(
     } else {
         // Traditional directory-based file collection
         let mut target_dirs = Vec::new();
-        
+
         if let Some(dir) = directory {
             target_dirs.push(dir.to_string());
         }
         target_dirs.extend_from_slice(directories);
-        
+
         if target_dirs.is_empty() {
             target_dirs.push(".".to_string());
         }
-        
+
         for dir in target_dirs {
             files.extend(collect_files_from_directory(&dir).await?);
         }
     }
-    
+
     if !files.is_empty() {
         println!("📁 Collected {} files for context", files.len());
         for file in &files {
-            let display_path = if file.path.starts_with(&current_dir.to_string_lossy().to_string()) {
-                file.path.strip_prefix(&format!("{}/", current_dir.display())).unwrap_or(&file.path)
+            let display_path = if file
+                .path
+                .starts_with(&current_dir.to_string_lossy().to_string())
+            {
+                file.path
+                    .strip_prefix(&format!("{}/", current_dir.display()))
+                    .unwrap_or(&file.path)
             } else {
                 &file.path
             };
@@ -904,30 +1111,35 @@ async fn collect_context_files(
         }
         println!();
     }
-    
+
     Ok(files)
 }
 
 /// Collect Git staged files
 async fn collect_git_staged_files(repo_path: &Path) -> Result<Vec<Files>> {
     use git2::Repository;
-    
+
     let repo = Repository::open(repo_path)
         .context("Failed to open Git repository. Use --directory to specify a Git repository.")?;
-    
+
     let diff_analyzer = DiffAnalyzer::new(&repo);
-    let staged_diff = diff_analyzer.analyze_staged()
+    let staged_diff = diff_analyzer
+        .analyze_staged()
         .context("Failed to analyze staged changes")?;
-    
+
     if staged_diff.files_changed == 0 {
         println!("⚠️  No staged files found. Stage files with 'git add' first.");
         return Ok(Vec::new());
     }
-    
-    println!("📊 {} Found {} staged file(s)", "📝".bright_green(), staged_diff.files_changed);
+
+    println!(
+        "📊 {} Found {} staged file(s)",
+        "📝".bright_green(),
+        staged_diff.files_changed
+    );
     staged_diff.display_summary();
     println!();
-    
+
     let mut files = Vec::new();
     for file_change in &staged_diff.files {
         if let Some(path) = &file_change.new_path {
@@ -947,72 +1159,78 @@ async fn collect_git_staged_files(repo_path: &Path) -> Result<Vec<Files>> {
             }
         }
     }
-    
+
     Ok(files)
 }
 
 /// Collect files from a directory (traditional approach)
 async fn collect_files_from_directory(directory: &str) -> Result<Vec<Files>> {
     use crate::path::extract::extract_content;
-    
+
     let target_path = if Path::new(directory).is_relative() {
         let current_dir = std::env::current_dir().context("Failed to get current directory")?;
         current_dir.join(directory)
     } else {
         PathBuf::from(directory)
     };
-    
+
     if !target_path.exists() {
         bail!("Directory '{}' does not exist", directory);
     }
-    
+
     // Use the existing path extraction functionality
     let files = extract_content(&Some(target_path.to_string_lossy().to_string()), &[], &[])
         .ok_or_else(|| anyhow::anyhow!("Failed to extract files from directory"))?;
-        
+
     Ok(files)
 }
 
 /// Collect additional Git context information
 async fn collect_git_context() -> Result<HashMap<String, String>> {
     use git2::Repository;
-    
+
     let current_dir = std::env::current_dir().context("Failed to get current directory")?;
     let repo = Repository::open(&current_dir)?;
-    
+
     let mut git_info = HashMap::new();
-    
+
     // Current branch
     if let Ok(head) = repo.head() {
         if let Some(branch_name) = head.shorthand() {
             git_info.insert("git_branch".to_string(), branch_name.to_string());
         }
     }
-    
+
     // Current commit
     if let Ok(head) = repo.head() {
         if let Ok(commit) = head.peel_to_commit() {
             let commit_id = commit.id().to_string();
             git_info.insert("git_commit".to_string(), commit_id[..8].to_string());
             git_info.insert("git_commit_full".to_string(), commit_id);
-            
+
             if let Some(message) = commit.message() {
-                git_info.insert("git_last_commit_message".to_string(), message.lines().next().unwrap_or("").to_string());
+                git_info.insert(
+                    "git_last_commit_message".to_string(),
+                    message.lines().next().unwrap_or("").to_string(),
+                );
             }
         }
     }
-    
+
     // Repository status
     let diff_analyzer = DiffAnalyzer::new(&repo);
     if let Ok(unstaged_diff) = diff_analyzer.analyze_unstaged() {
         if unstaged_diff.files_changed > 0 {
             git_info.insert("git_status".to_string(), "dirty".to_string());
-            git_info.insert("git_unstaged_files".to_string(), unstaged_diff.files_changed.to_string());
+            git_info.insert(
+                "git_unstaged_files".to_string(),
+                unstaged_diff.files_changed.to_string(),
+            );
         } else {
             git_info.insert("git_status".to_string(), "clean".to_string());
         }
     }
-    
+
     Ok(git_info)
 }
 
@@ -1021,17 +1239,17 @@ fn format_files_for_template(files: &[Files]) -> String {
     if files.is_empty() {
         return "[No files provided]".to_string();
     }
-    
+
     let mut result = String::new();
-    
+
     for (i, file) in files.iter().enumerate() {
         if i > 0 {
             result.push_str("\n\n");
         }
-        
+
         result.push_str(&format!("## File: {}\n", file.path));
         result.push_str("```");
-        
+
         // Add language hint based on file extension
         if let Some(ext) = Path::new(&file.path).extension().and_then(|e| e.to_str()) {
             match ext {
@@ -1056,12 +1274,12 @@ fn format_files_for_template(files: &[Files]) -> String {
                 _ => result.push_str("text"),
             }
         }
-        
+
         result.push('\n');
         result.push_str(&file.content);
         result.push_str("\n```");
     }
-    
+
     result
 }
 
@@ -1070,21 +1288,34 @@ fn format_files_for_template(files: &[Files]) -> String {
 /// Detect template variables from content using regex
 fn detect_template_variables(content: &str) -> Vec<String> {
     use regex::Regex;
-    
+
     let mut variables = std::collections::HashSet::new();
-    
+
     // Match {{variable}} patterns, excluding built-in helpers
     let var_regex = Regex::new(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}").unwrap();
     for cap in var_regex.captures_iter(content) {
         if let Some(var_name) = cap.get(1) {
             let name = var_name.as_str();
             // Skip Handlebars built-in helpers
-            if !matches!(name, "if" | "else" | "unless" | "each" | "with" | "lookup" | "log" | "#if" | "#else" | "#unless" | "#each" | "#with") {
+            if !matches!(
+                name,
+                "if" | "else"
+                    | "unless"
+                    | "each"
+                    | "with"
+                    | "lookup"
+                    | "log"
+                    | "#if"
+                    | "#else"
+                    | "#unless"
+                    | "#each"
+                    | "#with"
+            ) {
                 variables.insert(name.to_string());
             }
         }
     }
-    
+
     // Also match {{#if variable}} patterns
     let if_regex = Regex::new(r"\{\{\s*#if\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}").unwrap();
     for cap in if_regex.captures_iter(content) {
@@ -1092,42 +1323,50 @@ fn detect_template_variables(content: &str) -> Vec<String> {
             variables.insert(var_name.as_str().to_string());
         }
     }
-    
+
     let mut result: Vec<String> = variables.into_iter().collect();
     result.sort();
     result
 }
 
 /// Interactively define template variables
-fn define_template_variables(var_names: &[String]) -> Result<HashMap<String, crate::preset::template::TemplateVariable>> {
-    use dialoguer::{Input, Select, Confirm};
+fn define_template_variables(
+    var_names: &[String],
+) -> Result<HashMap<String, crate::preset::template::TemplateVariable>> {
     use crate::preset::template::{TemplateVariable, VariableType};
-    
+    use dialoguer::{Confirm, Input, Select};
+
     let mut variables = HashMap::new();
-    
+
     println!();
     println!("🔧 Defining variables...");
-    
+
     let var_types = vec![
-        "String", "Boolean", "Number", "File", "Directory", 
-        "DateTime", "GitInfo", "Environment"
+        "String",
+        "Boolean",
+        "Number",
+        "File",
+        "Directory",
+        "DateTime",
+        "GitInfo",
+        "Environment",
     ];
-    
+
     for var_name in var_names {
         println!();
         println!("📝 Variable: {}", var_name.bright_cyan().bold());
-        
+
         let description: String = Input::new()
             .with_prompt("  📋 Description")
             .with_initial_text(&format!("Description for {}", var_name))
             .interact_text()?;
-        
+
         let type_selection = Select::new()
             .with_prompt("  🏷️  Type")
             .default(0) // String
             .items(&var_types)
             .interact()?;
-        
+
         let var_type = match type_selection {
             0 => VariableType::String,
             1 => VariableType::Boolean,
@@ -1139,45 +1378,50 @@ fn define_template_variables(var_names: &[String]) -> Result<HashMap<String, cra
             7 => VariableType::Environment,
             _ => VariableType::String,
         };
-        
+
         let required = Confirm::new()
             .with_prompt("  ❓ Required?")
             .default(true)
             .interact()?;
-        
+
         let default_value = if !required {
             let default_input: String = Input::new()
                 .with_prompt("  💡 Default value (optional)")
                 .allow_empty(true)
                 .interact_text()?;
-            
+
             if default_input.is_empty() {
                 None
             } else {
                 Some(match var_type {
-                    VariableType::Boolean => serde_json::Value::Bool(default_input.to_lowercase() == "true"),
+                    VariableType::Boolean => {
+                        serde_json::Value::Bool(default_input.to_lowercase() == "true")
+                    }
                     VariableType::Number => {
                         if let Ok(num) = default_input.parse::<f64>() {
-                            serde_json::Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0)))
+                            serde_json::Value::Number(
+                                serde_json::Number::from_f64(num)
+                                    .unwrap_or(serde_json::Number::from(0)),
+                            )
                         } else {
                             serde_json::Value::String(default_input)
                         }
-                    },
+                    }
                     _ => serde_json::Value::String(default_input),
                 })
             }
         } else {
             None
         };
-        
+
         variables.insert(
             var_name.clone(),
-            TemplateVariable::new(var_type, description, required, default_value)
+            TemplateVariable::new(var_type, description, required, default_value),
         );
-        
+
         println!("  ✅ Variable '{}' configured", var_name.bright_green());
     }
-    
+
     Ok(variables)
 }
 
@@ -1185,19 +1429,19 @@ fn define_template_variables(var_names: &[String]) -> Result<HashMap<String, cra
 fn edit_template_in_editor(initial_content: &str) -> Result<String> {
     use std::fs;
     use std::process::Command;
-    
+
     // Create temporary file
     let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join(format!("termai_template_{}.hbs", 
+    let temp_file = temp_dir.join(format!(
+        "termai_template_{}.hbs",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs()
     ));
-    
+
     // Write initial content
-    fs::write(&temp_file, initial_content)
-        .context("Failed to create temporary template file")?;
-    
+    fs::write(&temp_file, initial_content).context("Failed to create temporary template file")?;
+
     // Get editor command
     let editor = std::env::var("EDITOR")
         .or_else(|_| std::env::var("VISUAL"))
@@ -1208,124 +1452,140 @@ fn edit_template_in_editor(initial_content: &str) -> Result<String> {
                 "nano".to_string()
             }
         });
-    
+
     // Open editor
     let status = Command::new(&editor)
         .arg(&temp_file)
         .status()
         .context("Failed to open editor")?;
-    
+
     if !status.success() {
         bail!("Editor exited with error");
     }
-    
+
     // Read edited content
-    let content = fs::read_to_string(&temp_file)
-        .context("Failed to read edited template")?;
-    
+    let content = fs::read_to_string(&temp_file).context("Failed to read edited template")?;
+
     // Clean up
     let _ = fs::remove_file(&temp_file);
-    
+
     Ok(content)
 }
 
 /// Edit preset metadata (name, description, category)
 fn edit_preset_metadata(preset: &mut crate::preset::manager::Preset) -> Result<bool> {
     use dialoguer::{Input, Select};
-    
+
     println!("{}", "📝 Editing Metadata".bright_yellow().bold());
-    
+
     let mut changes_made = false;
-    
+
     // Edit description
     let new_description: String = Input::new()
         .with_prompt("📋 Description")
         .with_initial_text(&preset.description)
         .interact_text()?;
-    
+
     if new_description != preset.description {
         preset.description = new_description;
         changes_made = true;
     }
-    
+
     // Edit category
     let category_options = vec![
-        "development", "testing", "debugging", "documentation", 
-        "refactoring", "review", "analysis", "custom"
+        "development",
+        "testing",
+        "debugging",
+        "documentation",
+        "refactoring",
+        "review",
+        "analysis",
+        "custom",
     ];
-    
+
     let current_category_index = category_options
         .iter()
         .position(|&cat| cat == preset.category)
         .unwrap_or(7); // default to custom
-    
+
     let category_selection = Select::new()
         .with_prompt("🏷️  Category")
         .default(current_category_index)
         .items(&category_options)
         .interact()?;
-    
+
     let new_category = category_options[category_selection].to_string();
     if new_category != preset.category {
         preset.category = new_category;
         changes_made = true;
     }
-    
+
     if changes_made {
         println!("✅ Metadata updated");
     } else {
         println!("ℹ️  No metadata changes made");
     }
-    
+
     Ok(changes_made)
 }
 
 /// Edit preset template content
 async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Result<bool> {
-    use dialoguer::{Input, Select, Confirm};
-    
+    use dialoguer::{Confirm, Input, Select};
+
     println!("{}", "📝 Editing Template".bright_yellow().bold());
-    
+
     let edit_options = vec![
         "Edit in external editor",
         "Edit inline (text input)",
         "View current template",
     ];
-    
+
     let choice = Select::new()
         .with_prompt("🔧 How would you like to edit the template?")
         .items(&edit_options)
         .interact()?;
-    
+
     match choice {
         0 => {
             // External editor
             println!("🔧 Opening external editor...");
             let new_content = edit_template_in_editor(&preset.template.template)?;
-            
+
             if new_content != preset.template.template {
                 // Check for new variables
                 let old_vars = detect_template_variables(&preset.template.template);
                 let new_vars = detect_template_variables(&new_content);
-                let added_vars: Vec<_> = new_vars.iter()
+                let added_vars: Vec<_> = new_vars
+                    .iter()
                     .filter(|&var| !old_vars.contains(var))
                     .collect();
-                
+
                 if !added_vars.is_empty() {
-                    println!("🔍 Detected new variables: {}", added_vars.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ").bright_cyan());
-                    
+                    println!(
+                        "🔍 Detected new variables: {}",
+                        added_vars
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                            .bright_cyan()
+                    );
+
                     if Confirm::new()
                         .with_prompt("Define these new variables?")
                         .default(true)
-                        .interact()? {
-                        
-                        let new_var_defs = define_template_variables(&added_vars.iter().map(|s| s.to_string()).collect::<Vec<_>>())?;
+                        .interact()?
+                    {
+                        let new_var_defs = define_template_variables(
+                            &added_vars.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                        )?;
                         for (name, var_def) in new_var_defs {
                             preset.template.variables.insert(name, var_def);
                         }
                     }
                 }
-                
+
                 preset.template.template = new_content;
                 println!("✅ Template updated via external editor");
                 return Ok(true);
@@ -1340,7 +1600,7 @@ async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Re
                 .with_prompt("📄 Template content")
                 .with_initial_text(&preset.template.template)
                 .interact_text()?;
-            
+
             if new_content != preset.template.template {
                 preset.template.template = new_content;
                 println!("✅ Template updated");
@@ -1358,14 +1618,15 @@ async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Re
             println!("{}", preset.template.template.bright_white());
             println!("{}", "─".repeat(50).dimmed());
             println!();
-            
+
             if Confirm::new()
                 .with_prompt("Edit this template?")
                 .default(true)
-                .interact()? {
+                .interact()?
+            {
                 return Box::pin(edit_preset_template(preset)).await;
             }
-            
+
             return Ok(false);
         }
         _ => Ok(false),
@@ -1374,19 +1635,19 @@ async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Re
 
 /// Edit preset variables
 fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<bool> {
-    use dialoguer::{Input, Select, Confirm};
-    
+    use dialoguer::{Confirm, Input, Select};
+
     println!("{}", "📝 Editing Variables".bright_yellow().bold());
-    
+
     let mut changes_made = false;
-    
+
     if preset.template.variables.is_empty() {
         println!("ℹ️  No variables currently defined");
         if Confirm::new()
             .with_prompt("Add variables from template?")
             .default(true)
-            .interact()? {
-            
+            .interact()?
+        {
             let detected_vars = detect_template_variables(&preset.template.template);
             if !detected_vars.is_empty() {
                 let new_vars = define_template_variables(&detected_vars)?;
@@ -1399,7 +1660,7 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
         }
         return Ok(changes_made);
     }
-    
+
     loop {
         println!();
         println!("📋 Current variables:");
@@ -1408,43 +1669,47 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
             let var_def = &preset.template.variables[name];
             let type_str = format!("{:?}", var_def.var_type);
             let required_str = if var_def.required { "*" } else { "" };
-            println!("  {}. {}{} ({}) - {}", 
-                i + 1, 
-                name.bright_cyan(), 
-                required_str.red(), 
+            println!(
+                "  {}. {}{} ({}) - {}",
+                i + 1,
+                name.bright_cyan(),
+                required_str.red(),
                 type_str.bright_blue(),
                 var_def.description.dimmed()
             );
         }
-        
+
         println!();
         let options = vec![
             "Add new variable",
-            "Edit existing variable", 
+            "Edit existing variable",
             "Remove variable",
-            "Done with variables"
+            "Done with variables",
         ];
-        
+
         let choice = Select::new()
             .with_prompt("🔧 Variable operations")
             .items(&options)
             .interact()?;
-        
+
         match choice {
             0 => {
                 // Add new variable
                 let name: String = Input::new()
                     .with_prompt("📝 Variable name")
                     .interact_text()?;
-                
+
                 if preset.template.variables.contains_key(&name) {
                     println!("⚠️  Variable '{}' already exists", name);
                     continue;
                 }
-                
+
                 let vars = define_template_variables(&vec![name.clone()])?;
                 if let Some(var_def) = vars.get(&name) {
-                    preset.template.variables.insert(name.clone(), var_def.clone());
+                    preset
+                        .template
+                        .variables
+                        .insert(name.clone(), var_def.clone());
                     println!("✅ Added variable '{}'", name.bright_green());
                     changes_made = true;
                 }
@@ -1454,18 +1719,21 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
                 if var_names.is_empty() {
                     continue;
                 }
-                
+
                 let var_choice = Select::new()
                     .with_prompt("🔧 Select variable to edit")
                     .items(&var_names)
                     .interact()?;
-                
+
                 let var_name = var_names[var_choice].clone();
                 println!("✏️  Editing variable: {}", var_name.bright_cyan());
-                
+
                 let new_vars = define_template_variables(&vec![var_name.clone()])?;
                 if let Some(new_var_def) = new_vars.get(&var_name) {
-                    preset.template.variables.insert(var_name.clone(), new_var_def.clone());
+                    preset
+                        .template
+                        .variables
+                        .insert(var_name.clone(), new_var_def.clone());
                     println!("✅ Updated variable '{}'", var_name.bright_green());
                     changes_made = true;
                 }
@@ -1475,18 +1743,18 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
                 if var_names.is_empty() {
                     continue;
                 }
-                
+
                 let var_choice = Select::new()
                     .with_prompt("🗑️  Select variable to remove")
                     .items(&var_names)
                     .interact()?;
-                
+
                 let var_name = var_names[var_choice].clone();
                 if Confirm::new()
                     .with_prompt(&format!("Remove variable '{}'?", var_name))
                     .default(false)
-                    .interact()? {
-                    
+                    .interact()?
+                {
                     preset.template.variables.remove(&var_name);
                     println!("✅ Removed variable '{}'", var_name.bright_red());
                     changes_made = true;
@@ -1499,13 +1767,13 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
             _ => break,
         }
     }
-    
+
     if changes_made {
         println!("✅ Variables updated");
     } else {
         println!("ℹ️  No variable changes made");
     }
-    
+
     Ok(changes_made)
 }
 
@@ -1514,7 +1782,13 @@ fn edit_preset_configuration(preset: &mut crate::preset::manager::Preset) -> Res
     let _ = preset;
 
     println!("{}", "📝 Editing Configuration".bright_yellow().bold());
-    println!("{}", "Preset runtime configuration was removed from the simplified model.".dimmed());
-    println!("{}", "Presets now only store prompt templates, variables, and workflow metadata.".dimmed());
+    println!(
+        "{}",
+        "Preset runtime configuration was removed from the simplified model.".dimmed()
+    );
+    println!(
+        "{}",
+        "Presets now only store prompt templates, variables, and workflow metadata.".dimmed()
+    );
     Ok(false)
 }

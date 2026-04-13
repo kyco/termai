@@ -34,7 +34,7 @@ impl BranchMessageRepository {
             "SELECT id, branch_id, message_id, sequence_number
              FROM branch_messages 
              WHERE branch_id = ?1 
-             ORDER BY sequence_number ASC"
+             ORDER BY sequence_number ASC",
         )?;
 
         let rows = stmt.query_map(params![branch_id], |row| {
@@ -59,12 +59,10 @@ impl BranchMessageRepository {
         let mut stmt = self.repo.conn.prepare(
             "SELECT message_id FROM branch_messages 
              WHERE branch_id = ?1 
-             ORDER BY sequence_number ASC"
+             ORDER BY sequence_number ASC",
         )?;
 
-        let rows = stmt.query_map(params![branch_id], |row| {
-            Ok(row.get::<_, String>(0)?)
-        })?;
+        let rows = stmt.query_map(params![branch_id], |row| Ok(row.get::<_, String>(0)?))?;
 
         let mut message_ids = Vec::new();
         for row in rows {
@@ -108,7 +106,7 @@ impl BranchMessageRepository {
     /// Resequence messages in a branch (fix gaps in sequence)
     fn resequence_branch_messages(&mut self, branch_id: &str) -> Result<()> {
         let messages = self.get_branch_messages(branch_id)?;
-        
+
         for (index, message) in messages.iter().enumerate() {
             let new_sequence = index as i32 + 1;
             if message.sequence_number != new_sequence {
@@ -125,7 +123,7 @@ impl BranchMessageRepository {
     /// Check if message exists in branch
     pub fn message_exists_in_branch(&self, branch_id: &str, message_id: &str) -> Result<bool> {
         let mut stmt = self.repo.conn.prepare(
-            "SELECT COUNT(*) FROM branch_messages WHERE branch_id = ?1 AND message_id = ?2"
+            "SELECT COUNT(*) FROM branch_messages WHERE branch_id = ?1 AND message_id = ?2",
         )?;
 
         let count: i32 = stmt.query_row(params![branch_id, message_id], |row| row.get(0))?;
@@ -134,13 +132,12 @@ impl BranchMessageRepository {
 
     /// Get branches containing a specific message
     pub fn get_branches_for_message(&self, message_id: &str) -> Result<Vec<String>> {
-        let mut stmt = self.repo.conn.prepare(
-            "SELECT DISTINCT branch_id FROM branch_messages WHERE message_id = ?1"
-        )?;
+        let mut stmt = self
+            .repo
+            .conn
+            .prepare("SELECT DISTINCT branch_id FROM branch_messages WHERE message_id = ?1")?;
 
-        let rows = stmt.query_map(params![message_id], |row| {
-            Ok(row.get::<_, String>(0)?)
-        })?;
+        let rows = stmt.query_map(params![message_id], |row| Ok(row.get::<_, String>(0)?))?;
 
         let mut branch_ids = Vec::new();
         for row in rows {
@@ -151,7 +148,11 @@ impl BranchMessageRepository {
     }
 
     /// Copy messages from one branch to another
-    pub fn copy_messages_to_branch(&mut self, from_branch_id: &str, to_branch_id: &str) -> Result<()> {
+    pub fn copy_messages_to_branch(
+        &mut self,
+        from_branch_id: &str,
+        to_branch_id: &str,
+    ) -> Result<()> {
         let messages = self.get_branch_messages(from_branch_id)?;
         let next_seq = self.get_next_sequence_number(to_branch_id)?;
 

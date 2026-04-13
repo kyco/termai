@@ -37,8 +37,11 @@ mod git_integration_tests {
             .success();
 
         // Create initial commit
-        fs::write(repo_path.join("README.md"), "# Test Repository\n\nThis is a test repository for TermAI Git integration tests.\n")?;
-        
+        fs::write(
+            repo_path.join("README.md"),
+            "# Test Repository\n\nThis is a test repository for TermAI Git integration tests.\n",
+        )?;
+
         Command::new("git")
             .args(&["add", "README.md"])
             .current_dir(repo_path)
@@ -222,7 +225,9 @@ mod tests {
             .current_dir(repo_path)
             .assert()
             .success()
-            .stdout(predicate::str::contains("🏷️  TermAI Git Tag & Release Management"))
+            .stdout(predicate::str::contains(
+                "🏷️  TermAI Git Tag & Release Management",
+            ))
             .stdout(predicate::str::contains("📋 Git Tags"))
             .stdout(predicate::str::contains("🤖 AI Release Analysis"));
     }
@@ -262,7 +267,9 @@ mod tests {
             .current_dir(repo_path)
             .assert()
             .success()
-            .stdout(predicate::str::contains("🔍 Analyzing Git repository and branch"))
+            .stdout(predicate::str::contains(
+                "🔍 Analyzing Git repository and branch",
+            ))
             .stdout(predicate::str::contains("📊 Branch Analysis"))
             .stdout(predicate::str::contains("ℹ️  Branch Information"))
             .stdout(predicate::str::contains("🔄 Branch Comparison"));
@@ -306,7 +313,9 @@ mod tests {
             .current_dir(repo_path)
             .assert()
             .success()
-            .stdout(predicate::str::contains("🔄 TermAI Interactive Rebase Assistant"))
+            .stdout(predicate::str::contains(
+                "🔄 TermAI Interactive Rebase Assistant",
+            ))
             .stdout(predicate::str::contains("📊 Rebase Status"))
             .stdout(predicate::str::contains("ℹ️ No rebase in progress"));
     }
@@ -369,7 +378,9 @@ mod tests {
             .current_dir(repo_path)
             .assert()
             .success()
-            .stdout(predicate::str::contains("⚔️ TermAI Conflict Resolution Assistant"))
+            .stdout(predicate::str::contains(
+                "⚔️ TermAI Conflict Resolution Assistant",
+            ))
             .stdout(predicate::str::contains("🔍 Detecting Merge Conflicts"))
             .stdout(predicate::str::contains("conflicts detected"));
     }
@@ -389,7 +400,9 @@ mod tests {
             .assert()
             .success()
             .stdout(predicate::str::contains("📚 Conflict Resolution Guide"))
-            .stdout(predicate::str::contains("🔍 Understanding Conflict Markers"))
+            .stdout(predicate::str::contains(
+                "🔍 Understanding Conflict Markers",
+            ))
             .stdout(predicate::str::contains("🛠️  Resolution Strategies"))
             .stdout(predicate::str::contains("🔧 Recommended Tools"))
             .stdout(predicate::str::contains("⚠️  Common Pitfalls"));
@@ -473,7 +486,7 @@ mod tests {
     fn test_error_handling_outside_git_repo() {
         // Test that commands handle non-git directories gracefully
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        
+
         // Test tag command outside git repo
         let mut cmd = cargo_bin_cmd!("termai");
         cmd.arg("tag")
@@ -481,15 +494,21 @@ mod tests {
             .current_dir(temp_dir.path())
             .assert()
             .failure()
-            .stderr(predicate::str::contains("No Git repository found").or(predicate::str::contains("failed")));
+            .stderr(
+                predicate::str::contains("No Git repository found")
+                    .or(predicate::str::contains("failed")),
+            );
 
-        // Test branch command outside git repo  
+        // Test branch command outside git repo
         let mut cmd = cargo_bin_cmd!("termai");
         cmd.arg("branch-summary")
             .current_dir(temp_dir.path())
             .assert()
             .failure()
-            .stderr(predicate::str::contains("No Git repository found").or(predicate::str::contains("failed")));
+            .stderr(
+                predicate::str::contains("No Git repository found")
+                    .or(predicate::str::contains("failed")),
+            );
 
         // Test rebase command outside git repo
         let mut cmd = cargo_bin_cmd!("termai");
@@ -498,7 +517,10 @@ mod tests {
             .current_dir(temp_dir.path())
             .assert()
             .failure()
-            .stderr(predicate::str::contains("No Git repository found").or(predicate::str::contains("failed")));
+            .stderr(
+                predicate::str::contains("No Git repository found")
+                    .or(predicate::str::contains("failed")),
+            );
 
         // Test conflicts command outside git repo
         let mut cmd = cargo_bin_cmd!("termai");
@@ -507,7 +529,10 @@ mod tests {
             .current_dir(temp_dir.path())
             .assert()
             .failure()
-            .stderr(predicate::str::contains("No Git repository found").or(predicate::str::contains("failed")));
+            .stderr(
+                predicate::str::contains("No Git repository found")
+                    .or(predicate::str::contains("failed")),
+            );
     }
 
     #[test]
@@ -536,7 +561,8 @@ mod tests {
   "version": "1.0.0",
   "description": "Test Node.js project"
 }"#,
-        ).expect("Failed to create package.json");
+        )
+        .expect("Failed to create package.json");
 
         let mut cmd = cargo_bin_cmd!("termai");
         cmd.arg("branch-summary")
@@ -582,7 +608,8 @@ mod tests {
             r#"pub mod oauth;
 pub mod session;
 "#,
-        ).expect("Failed to create auth mod.rs");
+        )
+        .expect("Failed to create auth mod.rs");
 
         Command::new("git")
             .args(&["add", "."])
@@ -619,7 +646,7 @@ pub mod session;
             for arg in cmd_args {
                 cmd.arg(arg);
             }
-            
+
             cmd.assert()
                 .success()
                 .stdout(predicate::str::contains("Usage:"));

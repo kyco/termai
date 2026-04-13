@@ -249,7 +249,7 @@ impl<'repo> DiffAnalyzer<'repo> {
     /// Detect programming language from file path
     fn detect_language(&self, path: &Option<&PathBuf>) -> Option<String> {
         let path = path.as_ref()?;
-        
+
         // First try extension-based detection
         if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
             let language = match extension {
@@ -299,10 +299,10 @@ impl<'repo> DiffAnalyzer<'repo> {
                 "makefile" => "Makefile",
                 _ => return None,
             };
-            
+
             return Some(language.to_string());
         }
-        
+
         // If no extension, try filename-based detection
         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
             let language = match filename.to_lowercase().as_str() {
@@ -315,10 +315,10 @@ impl<'repo> DiffAnalyzer<'repo> {
                 "go.mod" | "go.sum" => "Go Config",
                 _ => return None,
             };
-            
+
             return Some(language.to_string());
         }
-        
+
         None
     }
 
@@ -590,15 +590,16 @@ mod tests {
         let tree_id = index.write_tree().expect("Failed to write tree");
         let tree = repo.find_tree(tree_id).expect("Failed to find tree");
 
-        let _commit = repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            "Initial commit",
-            &tree,
-            &[],
-        )
-        .expect("Failed to create initial commit");
+        let _commit = repo
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                "Initial commit",
+                &tree,
+                &[],
+            )
+            .expect("Failed to create initial commit");
 
         drop(tree); // Explicitly drop the tree to release the borrow
         (temp_dir, repo)

@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Request structure for the /v1/responses/compact endpoint
 #[derive(Serialize, Debug, Clone)]
@@ -19,10 +19,7 @@ pub struct CompactRequest {
 #[serde(untagged)]
 pub enum CompactInputItem {
     /// A regular message to include in compaction
-    Message {
-        role: String,
-        content: String,
-    },
+    Message { role: String, content: String },
     /// An existing compaction item to include
     Compaction {
         #[serde(rename = "type")]
@@ -128,7 +125,11 @@ impl CompactRequest {
 
     /// Create a compact request with system instructions
     #[allow(dead_code)]
-    pub fn with_instructions(model: String, input: Vec<CompactInputItem>, instructions: String) -> Self {
+    pub fn with_instructions(
+        model: String,
+        input: Vec<CompactInputItem>,
+        instructions: String,
+    ) -> Self {
         Self {
             model,
             input,

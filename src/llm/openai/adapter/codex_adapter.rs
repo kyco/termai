@@ -3,7 +3,9 @@
 //! This adapter handles requests to the Codex API endpoint
 //! (chatgpt.com/backend-api/codex/responses) using OAuth tokens.
 
-use crate::llm::openai::model::codex_api::{CodexRequest, CodexResponse};
+use crate::llm::openai::model::codex_api::{
+    CodexContentItem, CodexOutput, CodexRequest, CodexResponse,
+};
 use anyhow::{anyhow, Result};
 use reqwest::Client;
 
@@ -18,24 +20,17 @@ impl CodexAdapter {
     ///
     /// Uses OAuth access token for authentication instead of API key.
     /// The Codex API requires streaming, so we parse SSE events and extract the final response.
-    pub async fn chat(
-        request: &CodexRequest,
-        access_token: &str,
-    ) -> Result<CodexResponse> {
-        let client = Client::builder()
-            .build()?;
+    pub async fn chat(request: &CodexRequest, access_token: &str) -> Result<CodexResponse> {
+        let client = Client::builder().build()?;
 
         // Log request info for debugging large inputs
-        let input_size = match &request.input {
-            Some(crate::llm::openai::model::codex_api::CodexInput::Text(text)) => text.len(),
-            Some(crate::llm::openai::model::codex_api::CodexInput::Messages(msgs)) => {
-                msgs.iter().map(|m| m.content.len()).sum()
-            }
-            None => 0,
-        };
+        let input_size: usize = request.input.iter().map(|m| m.content.len()).sum();
 
         if input_size > 10000 {
-            eprintln!("Codex Request: Large input detected ({} characters)", input_size);
+            eprintln!(
+                "Codex Request: Large input detected ({} characters)",
+                input_size
+            );
         }
 
         let response = client
@@ -81,6 +76,8 @@ impl CodexAdapter {
     fn parse_sse_response(sse_text: &str) -> Result<CodexResponse> {
         let mut final_response: Option<CodexResponse> = None;
         let mut accumulated_text = String::new();
+        let mut output_text_done: Option<String> = None;
+        let mut last_message_meta: Option<(String, String, String)> = None;
 
         for line in sse_text.lines() {
             // SSE format: "data: {...json...}" or "event: ..." etc.
@@ -95,6 +92,29 @@ impl CodexAdapter {
                     let event_type = event.get("type").and_then(|t| t.as_str());
 
                     match event_type {
+                        Some("response.output_item.added") => {
+                            if let Some(item) = event.get("item") {
+                                if item.get("type").and_then(|t| t.as_str()) == Some("message") {
+                                    let id = item
+                                        .get("id")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("msg_synthetic")
+                                        .to_string();
+                                    let status = item
+                                        .get("status")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("completed")
+                                        .to_string();
+                                    let role = item
+                                        .get("role")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("assistant")
+                                        .to_string();
+                                    last_message_meta = Some((id, status, role));
+                                }
+                            }
+                        }
+
                         // Accumulate text deltas
                         Some("response.output_text.delta") => {
                             if let Some(delta) = event.get("delta").and_then(|d| d.as_str()) {
@@ -109,13 +129,16 @@ impl CodexAdapter {
                                 if accumulated_text.is_empty() {
                                     accumulated_text = text.to_string();
                                 }
+                                output_text_done = Some(text.to_string());
                             }
                         }
 
                         // Full response completed - this is the authoritative response
                         Some("response.completed") => {
                             if let Some(response_obj) = event.get("response") {
-                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
+                                if let Ok(parsed) =
+                                    serde_json::from_value::<CodexResponse>(response_obj.clone())
+                                {
                                     final_response = Some(parsed);
                                 }
                             }
@@ -124,7 +147,9 @@ impl CodexAdapter {
                         // Also check for response.done (alternative event name)
                         Some("response.done") => {
                             if let Some(response_obj) = event.get("response") {
-                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
+                                if let Ok(parsed) =
+                                    serde_json::from_value::<CodexResponse>(response_obj.clone())
+                                {
                                     final_response = Some(parsed);
                                 }
                             }
@@ -133,13 +158,16 @@ impl CodexAdapter {
                         // Handle failed responses
                         Some("response.failed") => {
                             if let Some(response_obj) = event.get("response") {
-                                if let Ok(parsed) = serde_json::from_value::<CodexResponse>(response_obj.clone()) {
+                                if let Ok(parsed) =
+                                    serde_json::from_value::<CodexResponse>(response_obj.clone())
+                                {
                                     return Ok(parsed); // Return immediately on failure
                                 }
                             }
                             // Extract error message if available
                             if let Some(error) = event.get("error") {
-                                let error_msg = error.get("message")
+                                let error_msg = error
+                                    .get("message")
                                     .and_then(|m| m.as_str())
                                     .unwrap_or("Unknown error");
                                 return Err(anyhow!("Codex API failed: {}", error_msg));
@@ -159,9 +187,71 @@ impl CodexAdapter {
             }
         }
 
-        final_response.ok_or_else(|| {
-            anyhow!("No valid response found in SSE stream. Raw response:\n{}",
-                sse_text.chars().take(1000).collect::<String>())
-        })
+        let mut response = final_response.ok_or_else(|| {
+            anyhow!(
+                "No valid response found in SSE stream. Raw response:\n{}",
+                sse_text.chars().take(1000).collect::<String>()
+            )
+        })?;
+
+        if response.output.is_empty() {
+            let synthesized_text = output_text_done
+                .filter(|text| !text.is_empty())
+                .or_else(|| (!accumulated_text.is_empty()).then(|| accumulated_text.clone()));
+
+            if let Some(text) = synthesized_text {
+                let (id, status, role) = last_message_meta.unwrap_or_else(|| {
+                    (
+                        "msg_synthetic".to_string(),
+                        "completed".to_string(),
+                        "assistant".to_string(),
+                    )
+                });
+
+                response.output.push(CodexOutput::Message {
+                    id,
+                    status,
+                    role,
+                    content: vec![CodexContentItem::OutputText {
+                        text,
+                        annotations: vec![],
+                    }],
+                });
+            }
+        }
+
+        Ok(response)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CodexAdapter;
+
+    #[test]
+    fn test_parse_sse_response_recovers_text_when_completed_output_is_empty() {
+        let sse = r#"event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"msg_123","type":"message","status":"in_progress","content":[],"phase":"final_answer","role":"assistant"},"output_index":0,"sequence_number":2}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":"Hey!","item_id":"msg_123","output_index":0,"sequence_number":3}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","content_index":0,"delta":" How can I help?","item_id":"msg_123","output_index":0,"sequence_number":4}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","content_index":0,"text":"Hey! How can I help?","item_id":"msg_123","output_index":0,"sequence_number":5}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_123","object":"response","model":"gpt-5.4","status":"completed","error":null,"output":[],"usage":null},"sequence_number":6}
+"#;
+
+        let response = CodexAdapter::parse_sse_response(sse).unwrap();
+
+        assert_eq!(
+            response.extract_text().as_deref(),
+            Some("Hey! How can I help?")
+        );
+        assert_eq!(response.output.len(), 1);
     }
 }

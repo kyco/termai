@@ -21,26 +21,40 @@ impl ChatHelper {
         // All slash commands and their aliases for tab completion
         let command_list = vec![
             // General
-            "/help", "/h",
-            "/commands", "/cmd",
-            "/exit", "/quit", "/q",
+            "/help",
+            "/h",
+            "/commands",
+            "/cmd",
+            "/exit",
+            "/quit",
+            "/q",
             // Session
-            "/save", "/s",
-            "/clear", "/c",
-            "/retry", "/r",
-            "/branch", "/b",
+            "/save",
+            "/s",
+            "/clear",
+            "/c",
+            "/retry",
+            "/r",
+            "/branch",
+            "/b",
             // Context
-            "/context", "/ctx",
+            "/context",
+            "/ctx",
             "/add",
-            "/remove", "/rm",
+            "/remove",
+            "/rm",
             // AI & settings
-            "/model", "/m",
-            "/provider", "/p",
-            "/tools", "/t",
+            "/model",
+            "/m",
+            "/provider",
+            "/p",
+            "/tools",
+            "/t",
             "/status",
             "/theme",
             "/streaming",
-            "/settings", "/config",
+            "/settings",
+            "/config",
         ];
 
         for cmd in command_list {

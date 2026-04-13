@@ -108,7 +108,10 @@ impl BranchRepository {
             params![
                 branch.branch_name,
                 branch.description,
-                branch.last_activity.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
+                branch
+                    .last_activity
+                    .format("%Y-%m-%d %H:%M:%S%.f")
+                    .to_string(),
                 branch.status,
                 branch.id
             ],
@@ -130,7 +133,7 @@ impl BranchRepository {
     pub fn delete_branch(&mut self, branch_id: &str) -> Result<()> {
         // First get all child branches
         let children = self.get_child_branches(branch_id)?;
-        
+
         // Recursively delete child branches
         for child in children {
             self.delete_branch(&child.id)?;
@@ -176,9 +179,10 @@ impl BranchRepository {
 
     /// Count messages in a branch
     pub fn count_branch_messages(&self, branch_id: &str) -> Result<i32> {
-        let mut stmt = self.repo.conn.prepare(
-            "SELECT COUNT(*) FROM branch_messages WHERE branch_id = ?1"
-        )?;
+        let mut stmt = self
+            .repo
+            .conn
+            .prepare("SELECT COUNT(*) FROM branch_messages WHERE branch_id = ?1")?;
 
         let count: i32 = stmt.query_row(params![branch_id], |row| row.get(0))?;
         Ok(count)
@@ -188,7 +192,7 @@ impl BranchRepository {
     fn row_to_branch_entity(row: &Row) -> Result<BranchEntity, rusqlite::Error> {
         let created_at_str: String = row.get(5)?;
         let last_activity_str: String = row.get(6)?;
-        
+
         Ok(BranchEntity {
             id: row.get(0)?,
             session_id: row.get(1)?,
@@ -197,8 +201,11 @@ impl BranchRepository {
             description: row.get(4)?,
             created_at: NaiveDateTime::parse_from_str(&created_at_str, "%Y-%m-%d %H:%M:%S%.f")
                 .unwrap_or_else(|_| chrono::Local::now().naive_local()),
-            last_activity: NaiveDateTime::parse_from_str(&last_activity_str, "%Y-%m-%d %H:%M:%S%.f")
-                .unwrap_or_else(|_| chrono::Local::now().naive_local()),
+            last_activity: NaiveDateTime::parse_from_str(
+                &last_activity_str,
+                "%Y-%m-%d %H:%M:%S%.f",
+            )
+            .unwrap_or_else(|_| chrono::Local::now().naive_local()),
             status: row.get(7)?,
         })
     }

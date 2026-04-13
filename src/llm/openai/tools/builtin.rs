@@ -1,5 +1,5 @@
-use serde_json::json;
 use crate::llm::openai::model::responses_api::{FunctionTool, Tool};
+use serde_json::json;
 
 /// Create the bash tool definition for executing shell commands
 pub fn bash_tool() -> FunctionTool {
@@ -67,7 +67,8 @@ pub fn list_files_tool() -> FunctionTool {
     FunctionTool {
         tool_type: "function".to_string(),
         name: "list_files".to_string(),
-        description: "List the contents of a directory. Returns file and directory names.".to_string(),
+        description: "List the contents of a directory. Returns file and directory names."
+            .to_string(),
         parameters: json!({
             "type": "object",
             "properties": {

@@ -1,11 +1,10 @@
+use crate::branch::comparison::{BranchComparator, BranchComparison};
 /// Branch merging and integration module for TermAI
-/// 
+///
 /// This module provides sophisticated merging capabilities for conversation branches,
 /// allowing users to consolidate insights, resolve conflicts, and maintain conversation flow.
-
 use crate::branch::entity::branch_entity::BranchEntity;
 use crate::branch::service::BranchService;
-use crate::branch::comparison::{BranchComparator, BranchComparison};
 use crate::repository::db::SqliteRepository;
 use crate::session::model::message::Message;
 use anyhow::Result;
@@ -137,7 +136,7 @@ impl BranchMerger {
         // Analyze potential conflicts
         let comparison = BranchComparator::compare_branches(repo, source_branch_ids)?;
         let conflicts = Self::detect_conflicts(&comparison, &source_branches)?;
-        
+
         // Create resolution plan
         let resolution_plan = Self::create_resolution_plan(&conflicts, &strategy)?;
 
@@ -159,13 +158,13 @@ impl BranchMerger {
     ) -> Result<BranchMerge> {
         let source_branch = BranchService::get_branch(repo, source_branch_id)?
             .ok_or_else(|| anyhow::anyhow!("Source branch {} not found", source_branch_id))?;
-        
+
         let target_branch = BranchService::get_branch(repo, target_branch_id)?
             .ok_or_else(|| anyhow::anyhow!("Target branch {} not found", target_branch_id))?;
 
         // Get source messages
         let source_messages = BranchService::get_branch_messages(repo, source_branch_id)?;
-        
+
         // Validate indices
         for &index in selected_message_indices {
             if index >= source_messages.len() {
@@ -187,7 +186,10 @@ impl BranchMerger {
             resolution_plan: MergeResolutionPlan {
                 auto_resolvable_conflicts: Vec::new(),
                 user_decision_required: Vec::new(),
-                suggested_actions: vec![format!("Merged {} selected messages", selected_message_indices.len())],
+                suggested_actions: vec![format!(
+                    "Merged {} selected messages",
+                    selected_message_indices.len()
+                )],
                 estimated_result_quality: 85.0,
             },
         })
@@ -206,13 +208,13 @@ impl BranchMerger {
                 "UPDATE conversation_branches SET status = 'archived' WHERE id = ?1",
                 [branch_id],
             )?;
-            
+
             // Add archived metadata
             repo.conn.execute(
                 "INSERT OR REPLACE INTO branch_metadata (branch_id, key, value) VALUES (?1, ?2, ?3)",
                 [branch_id, "archived_reason", "merged"],
             )?;
-            
+
             archived_branches.push(branch_id.clone());
         }
 
@@ -232,8 +234,8 @@ impl BranchMerger {
         for branch in &branches {
             let should_cleanup = match cleanup_strategy {
                 CleanupStrategy::ArchiveOld => {
-                    branch.status == "archived" && 
-                    Self::is_branch_old(branch, 30) // 30 days
+                    branch.status == "archived" && Self::is_branch_old(branch, 30)
+                    // 30 days
                 }
                 CleanupStrategy::RemoveEmpty => {
                     let messages = BranchService::get_branch_messages(repo, &branch.id)?;
@@ -275,14 +277,14 @@ impl BranchMerger {
         for branch_id in branch_ids {
             if let Some(branch) = BranchService::get_branch(repo, branch_id)? {
                 let messages = BranchService::get_branch_messages(repo, branch_id)?;
-                
+
                 let branch_data = match export_format {
                     ExportFormat::Json => Self::export_branch_json(&branch, &messages)?,
                     ExportFormat::Markdown => Self::export_branch_markdown(&branch, &messages)?,
                     ExportFormat::PlainText => Self::export_branch_text(&branch, &messages)?,
                     ExportFormat::Csv => Self::export_branch_csv(&branch, &messages)?,
                 };
-                
+
                 exported_data.push_str(&branch_data);
                 exported_branches.push(branch);
             }
@@ -298,7 +300,7 @@ impl BranchMerger {
     /// Format merge preview for user review
     pub fn format_merge_preview(merge: &BranchMerge) -> String {
         let mut output = String::new();
-        
+
         output.push_str(&format!("{}\n", "📋 Merge Preview".bright_green().bold()));
         output.push_str(&format!("{}\n", "═".repeat(15).dimmed()));
         output.push_str("\n");
@@ -311,38 +313,82 @@ impl BranchMerger {
         }
 
         // Target branch
-        let target_name = merge.target_branch.branch_name.as_deref().unwrap_or("unnamed");
-        output.push_str(&format!("{} {}\n", "Target branch:".bright_cyan(), target_name.bright_white()));
-        
+        let target_name = merge
+            .target_branch
+            .branch_name
+            .as_deref()
+            .unwrap_or("unnamed");
+        output.push_str(&format!(
+            "{} {}\n",
+            "Target branch:".bright_cyan(),
+            target_name.bright_white()
+        ));
+
         // Strategy
         let strategy_desc = match merge.merge_strategy {
             MergeStrategy::Sequential => "Sequential merge (all messages in order)",
-            MergeStrategy::Intelligent => "Intelligent merge (remove duplicates, resolve conflicts)",
+            MergeStrategy::Intelligent => {
+                "Intelligent merge (remove duplicates, resolve conflicts)"
+            }
             MergeStrategy::Selective => "Selective merge (user-chosen messages only)",
             MergeStrategy::Summary => "Summary merge (consolidated overview)",
             MergeStrategy::BestOf => "Best-of merge (highest quality responses only)",
         };
-        output.push_str(&format!("{} {}\n", "Strategy:".bright_cyan(), strategy_desc.bright_white()));
-        
+        output.push_str(&format!(
+            "{} {}\n",
+            "Strategy:".bright_cyan(),
+            strategy_desc.bright_white()
+        ));
+
         output.push_str("\n");
 
         // Conflicts
         if !merge.conflicts.is_empty() {
-            output.push_str(&format!("{}\n", "⚠️  Conflicts Detected:".bright_yellow().bold()));
-            output.push_str(&format!("   {} conflicts require attention\n", merge.conflicts.len()));
-            
-            let high_severity = merge.conflicts.iter().filter(|c| c.severity == ConflictSeverity::High).count();
-            let medium_severity = merge.conflicts.iter().filter(|c| c.severity == ConflictSeverity::Medium).count();
-            let low_severity = merge.conflicts.iter().filter(|c| c.severity == ConflictSeverity::Low).count();
-            
+            output.push_str(&format!(
+                "{}\n",
+                "⚠️  Conflicts Detected:".bright_yellow().bold()
+            ));
+            output.push_str(&format!(
+                "   {} conflicts require attention\n",
+                merge.conflicts.len()
+            ));
+
+            let high_severity = merge
+                .conflicts
+                .iter()
+                .filter(|c| c.severity == ConflictSeverity::High)
+                .count();
+            let medium_severity = merge
+                .conflicts
+                .iter()
+                .filter(|c| c.severity == ConflictSeverity::Medium)
+                .count();
+            let low_severity = merge
+                .conflicts
+                .iter()
+                .filter(|c| c.severity == ConflictSeverity::Low)
+                .count();
+
             if high_severity > 0 {
-                output.push_str(&format!("   {} {} high-priority conflicts\n", "❗".bright_red(), high_severity));
+                output.push_str(&format!(
+                    "   {} {} high-priority conflicts\n",
+                    "❗".bright_red(),
+                    high_severity
+                ));
             }
             if medium_severity > 0 {
-                output.push_str(&format!("   {} {} medium-priority conflicts\n", "⚠️".bright_yellow(), medium_severity));
+                output.push_str(&format!(
+                    "   {} {} medium-priority conflicts\n",
+                    "⚠️".bright_yellow(),
+                    medium_severity
+                ));
             }
             if low_severity > 0 {
-                output.push_str(&format!("   {} {} low-priority conflicts (auto-resolvable)\n", "ℹ️".bright_blue(), low_severity));
+                output.push_str(&format!(
+                    "   {} {} low-priority conflicts (auto-resolvable)\n",
+                    "ℹ️".bright_blue(),
+                    low_severity
+                ));
             }
         } else {
             output.push_str(&format!("{}\n", "✅ No conflicts detected".bright_green()));
@@ -350,21 +396,29 @@ impl BranchMerger {
 
         // Resolution plan
         output.push_str("\n");
-        output.push_str(&format!("{}\n", "🎯 Resolution Plan:".bright_yellow().bold()));
+        output.push_str(&format!(
+            "{}\n",
+            "🎯 Resolution Plan:".bright_yellow().bold()
+        ));
         for action in &merge.resolution_plan.suggested_actions {
             output.push_str(&format!("   • {}\n", action));
         }
-        
+
         if merge.resolution_plan.user_decision_required.is_empty() {
-            output.push_str(&format!("   {} All conflicts can be auto-resolved\n", "✅".bright_green()));
+            output.push_str(&format!(
+                "   {} All conflicts can be auto-resolved\n",
+                "✅".bright_green()
+            ));
         } else {
-            output.push_str(&format!("   {} {} conflicts require your decision\n", 
-                "👤".bright_blue(), 
+            output.push_str(&format!(
+                "   {} {} conflicts require your decision\n",
+                "👤".bright_blue(),
                 merge.resolution_plan.user_decision_required.len()
             ));
         }
 
-        output.push_str(&format!("\n{} {:.1}%\n", 
+        output.push_str(&format!(
+            "\n{} {:.1}%\n",
             "Estimated result quality:".bright_cyan(),
             merge.resolution_plan.estimated_result_quality
         ));
@@ -382,7 +436,14 @@ impl BranchMerger {
         // Analyze message comparisons for conflicts
         for (seq_num, msg_comparison) in comparison.message_comparisons.iter().enumerate() {
             // Check for low similarity (potential conflict)
-            if msg_comparison.similarity_score < 0.3 && msg_comparison.messages.iter().filter(|m| m.is_some()).count() > 1 {
+            if msg_comparison.similarity_score < 0.3
+                && msg_comparison
+                    .messages
+                    .iter()
+                    .filter(|m| m.is_some())
+                    .count()
+                    > 1
+            {
                 // This would be a more sophisticated conflict detection
                 // For now, we'll create a placeholder conflict
                 conflicts.push(MergeConflict {
@@ -393,7 +454,9 @@ impl BranchMerger {
                         resolution_type: ResolutionType::KeepBest,
                         selected_messages: Vec::new(),
                         merged_content: None,
-                        rationale: "Messages have low similarity, suggest keeping highest quality response".to_string(),
+                        rationale:
+                            "Messages have low similarity, suggest keeping highest quality response"
+                                .to_string(),
                     },
                     severity: if msg_comparison.similarity_score < 0.1 {
                         ConflictSeverity::High
@@ -412,29 +475,34 @@ impl BranchMerger {
         conflicts: &[MergeConflict],
         strategy: &MergeStrategy,
     ) -> Result<MergeResolutionPlan> {
-        let auto_resolvable: Vec<usize> = conflicts.iter()
+        let auto_resolvable: Vec<usize> = conflicts
+            .iter()
             .enumerate()
             .filter(|(_, conflict)| {
-                conflict.severity == ConflictSeverity::Low || 
-                *strategy == MergeStrategy::BestOf
+                conflict.severity == ConflictSeverity::Low || *strategy == MergeStrategy::BestOf
             })
             .map(|(i, _)| i)
             .collect();
 
-        let user_decision_required: Vec<usize> = conflicts.iter()
+        let user_decision_required: Vec<usize> = conflicts
+            .iter()
             .enumerate()
             .filter(|(_, conflict)| conflict.severity == ConflictSeverity::High)
             .map(|(i, _)| i)
             .collect();
 
         let suggested_actions = match strategy {
-            MergeStrategy::Sequential => vec!["Merge all messages in chronological order".to_string()],
+            MergeStrategy::Sequential => {
+                vec!["Merge all messages in chronological order".to_string()]
+            }
             MergeStrategy::Intelligent => vec![
                 "Auto-resolve low-priority conflicts".to_string(),
                 "Present high-priority conflicts for user decision".to_string(),
             ],
             MergeStrategy::Selective => vec!["Present message selection interface".to_string()],
-            MergeStrategy::Summary => vec!["Generate consolidated summary of all branches".to_string()],
+            MergeStrategy::Summary => {
+                vec!["Generate consolidated summary of all branches".to_string()]
+            }
             MergeStrategy::BestOf => vec!["Keep only highest-scoring responses".to_string()],
         };
 
@@ -498,7 +566,7 @@ impl BranchMerger {
     /// Export branch to JSON format
     fn export_branch_json(branch: &BranchEntity, messages: &[Message]) -> Result<String> {
         use serde_json::json;
-        
+
         let branch_json = json!({
             "branch": {
                 "id": branch.id,
@@ -520,77 +588,85 @@ impl BranchMerger {
     /// Export branch to Markdown format
     fn export_branch_markdown(branch: &BranchEntity, messages: &[Message]) -> Result<String> {
         let mut output = String::new();
-        
+
         let branch_name = branch.branch_name.as_deref().unwrap_or("Unnamed Branch");
         output.push_str(&format!("# {}\n\n", branch_name));
-        
+
         if let Some(desc) = &branch.description {
             output.push_str(&format!("**Description:** {}\n\n", desc));
         }
-        
-        output.push_str(&format!("**Created:** {}\n", 
+
+        output.push_str(&format!(
+            "**Created:** {}\n",
             branch.created_at.format("%Y-%m-%d %H:%M:%S")
         ));
         output.push_str(&format!("**Status:** {}\n\n", branch.status));
-        
+
         output.push_str("## Messages\n\n");
-        
+
         for (i, message) in messages.iter().enumerate() {
             let role_icon = match message.role {
                 crate::llm::common::model::role::Role::User => "👤",
                 crate::llm::common::model::role::Role::Assistant => "🤖",
                 crate::llm::common::model::role::Role::System => "⚙️",
             };
-            
-            output.push_str(&format!("### {} Message {} ({:?})\n\n", role_icon, i + 1, message.role));
+
+            output.push_str(&format!(
+                "### {} Message {} ({:?})\n\n",
+                role_icon,
+                i + 1,
+                message.role
+            ));
             output.push_str(&format!("{}\n\n", message.content));
         }
-        
+
         Ok(output)
     }
 
     /// Export branch to plain text format
     fn export_branch_text(branch: &BranchEntity, messages: &[Message]) -> Result<String> {
         let mut output = String::new();
-        
+
         let branch_name = branch.branch_name.as_deref().unwrap_or("Unnamed Branch");
         output.push_str(&format!("Branch: {}\n", branch_name));
-        
+
         if let Some(desc) = &branch.description {
             output.push_str(&format!("Description: {}\n", desc));
         }
-        
-        output.push_str(&format!("Created: {}\n", 
+
+        output.push_str(&format!(
+            "Created: {}\n",
             branch.created_at.format("%Y-%m-%d %H:%M:%S")
         ));
         output.push_str(&format!("Status: {}\n", branch.status));
         output.push_str("\n");
-        
+
         for (i, message) in messages.iter().enumerate() {
             output.push_str(&format!("Message {} ({:?}):\n", i + 1, message.role));
             output.push_str(&format!("{}\n\n", message.content));
         }
-        
+
         Ok(output)
     }
 
     /// Export branch to CSV format
     fn export_branch_csv(branch: &BranchEntity, messages: &[Message]) -> Result<String> {
         let mut output = String::new();
-        
+
         // CSV header
         output.push_str("branch_id,branch_name,branch_description,branch_created,branch_status,message_id,message_role,message_content\n");
-        
+
         for message in messages {
             let branch_name = branch.branch_name.as_deref().unwrap_or("");
             let branch_desc = branch.description.as_deref().unwrap_or("");
-            
+
             // Escape CSV content
             let escaped_content = message.content.replace("\"", "\"\"");
             let escaped_desc = branch_desc.replace("\"", "\"\"");
             let escaped_name = branch_name.replace("\"", "\"\"");
-            
-            output.push_str(&format!("\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{:?}\",\"{}\"\n",
+
+            output.push_str(&format!(
+                "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{:?}\",\"{}\"\n",
                 branch.id,
                 escaped_name,
                 escaped_desc,
@@ -601,7 +677,7 @@ impl BranchMerger {
                 escaped_content
             ));
         }
-        
+
         Ok(output)
     }
 }

@@ -20,10 +20,7 @@ pub async fn handle_login_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
 
     // Check if already authenticated
     if token_manager.is_authenticated() {
-        println!(
-            "{}",
-            "You are already authenticated with Codex.".yellow()
-        );
+        println!("{}", "You are already authenticated with Codex.".yellow());
         println!();
 
         let status = token_manager.auth_status();
@@ -41,7 +38,10 @@ pub async fn handle_login_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
     println!("You need a ChatGPT Plus or Pro subscription to use Codex.");
     println!();
 
-    println!("{}", "Opening browser for authentication...".bright_yellow());
+    println!(
+        "{}",
+        "Opening browser for authentication...".bright_yellow()
+    );
     println!();
 
     // Start OAuth flow
@@ -58,7 +58,11 @@ pub async fn handle_login_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
     // Show expiry info
     println!(
         "Token expires: {}",
-        tokens.expires_at.format("%Y-%m-%d %H:%M:%S UTC").to_string().bright_white()
+        tokens
+            .expires_at
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string()
+            .bright_white()
     );
 
     if tokens.refresh_token.is_some() {
@@ -70,10 +74,7 @@ pub async fn handle_login_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
 
     println!();
     println!("{}", "You can now use Codex as your AI provider:".white());
-    println!(
-        "   {}",
-        "termai config set-provider codex".cyan()
-    );
+    println!("   {}", "termai config set-provider codex".cyan());
     println!("   {}", "termai chat".cyan());
     println!();
 
@@ -91,18 +92,21 @@ pub fn handle_logout_codex<R: ConfigRepository>(repo: &R) -> Result<()> {
     let token_manager = TokenManager::new(repo);
 
     if !token_manager.is_authenticated() {
-        println!("{}", "You are not currently authenticated with Codex.".yellow());
+        println!(
+            "{}",
+            "You are not currently authenticated with Codex.".yellow()
+        );
         return Ok(());
     }
 
     token_manager.clear_tokens()?;
 
-    println!("{}", "✅ Successfully logged out from Codex.".bright_green());
-    println!();
     println!(
         "{}",
-        "Your OAuth tokens have been removed.".white()
+        "✅ Successfully logged out from Codex.".bright_green()
     );
+    println!();
+    println!("{}", "Your OAuth tokens have been removed.".white());
     println!(
         "Run '{}' to authenticate again.",
         "termai auth login codex".cyan()
@@ -136,7 +140,10 @@ pub fn handle_codex_status<R: ConfigRepository>(repo: &R) -> Result<()> {
             println!();
             println!(
                 "Token expires: {}",
-                expires_at.format("%Y-%m-%d %H:%M:%S UTC").to_string().bright_white()
+                expires_at
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string()
+                    .bright_white()
             );
 
             // Calculate time remaining

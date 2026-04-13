@@ -1,7 +1,7 @@
-use serde::{Serialize, Deserialize};
 use crate::llm::common::constants::SYSTEM_PROMPT;
 use crate::llm::common::model::role::Role;
 use crate::session::entity::message_entity::MessageEntity;
+use serde::{Deserialize, Serialize};
 
 /// Type of message - standard text or compacted history
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -72,7 +72,10 @@ impl Message {
     pub fn to_entity(&self, session_id: &str) -> MessageEntity {
         let (message_type, compaction_metadata) = match &self.message_type {
             MessageType::Standard => ("standard".to_string(), None),
-            MessageType::Compaction { compaction_id, encrypted_content } => {
+            MessageType::Compaction {
+                compaction_id,
+                encrypted_content,
+            } => {
                 let metadata = CompactionMetadata {
                     compaction_id: compaction_id.clone(),
                     encrypted_content: encrypted_content.clone(),
@@ -108,7 +111,13 @@ impl Message {
 
     /// Create a new compaction message
     #[allow(dead_code)]
-    pub fn new_compaction(id: String, role: Role, content: String, compaction_id: String, encrypted_content: String) -> Self {
+    pub fn new_compaction(
+        id: String,
+        role: Role,
+        content: String,
+        compaction_id: String,
+        encrypted_content: String,
+    ) -> Self {
         Self {
             id,
             role,
@@ -139,11 +148,7 @@ pub fn messages_with_system_prompt(
 ) -> Vec<Message> {
     let mut new_messages = Vec::with_capacity(messages.len() + 1);
     let system_prompt = user_prompt.unwrap_or_else(|| SYSTEM_PROMPT.to_string());
-    new_messages.push(Message::new(
-        "".to_string(),
-        Role::System,
-        system_prompt,
-    ));
+    new_messages.push(Message::new("".to_string(), Role::System, system_prompt));
     for m in messages {
         new_messages.push(m.clone());
     }

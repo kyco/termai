@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Custom tool definition for GPT-5
 /// Allows freeform text input instead of structured JSON
@@ -7,13 +7,13 @@ pub struct CustomTool {
     /// Tool type - always "custom"
     #[serde(rename = "type")]
     pub tool_type: String,
-    
+
     /// Tool name
     pub name: String,
-    
+
     /// Tool description that guides the model on when and how to use it
     pub description: String,
-    
+
     /// Optional context-free grammar to constrain outputs
     pub grammar: Option<String>,
 }
@@ -45,10 +45,10 @@ impl CustomTool {
 pub struct AllowedToolsChoice {
     #[serde(rename = "type")]
     pub choice_type: String, // "allowed_tools"
-    
+
     /// Mode: "auto" (model may pick any) or "required" (model must invoke one)
     pub mode: AllowedToolsMode,
-    
+
     /// Subset of tools that can be used
     pub tools: Vec<AllowedToolReference>,
 }
@@ -64,10 +64,10 @@ pub enum AllowedToolsMode {
 pub struct AllowedToolReference {
     #[serde(rename = "type")]
     pub tool_type: String,
-    
+
     /// Tool name (for function tools)
     pub name: Option<String>,
-    
+
     /// Server label (for MCP tools)
     pub server_label: Option<String>,
 }
@@ -112,7 +112,7 @@ impl AllowedToolReference {
 pub struct PreambleConfig {
     /// Whether to enable preambles (explanations before tool calls)
     pub enabled: bool,
-    
+
     /// Custom instruction for preambles (optional)
     pub instruction: Option<String>,
 }
@@ -131,7 +131,9 @@ impl PreambleConfig {
     pub fn enabled() -> Self {
         Self {
             enabled: true,
-            instruction: Some("Before you call a tool, explain why you are calling it.".to_string()),
+            instruction: Some(
+                "Before you call a tool, explain why you are calling it.".to_string(),
+            ),
         }
     }
 

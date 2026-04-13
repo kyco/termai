@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 use crate::branch::entity::BranchEntity;
 use crate::branch::service::BranchService;
-use crate::session::model::message::Message;
 use crate::repository::db::SqliteRepository;
-use anyhow::{Result, Context};
+use crate::session::model::message::Message;
+use anyhow::{Context, Result};
 
 /// High-level branch management operations
 pub struct BranchManager;
@@ -19,7 +19,7 @@ impl BranchManager {
         context_hint: Option<&str>,
     ) -> Result<BranchEntity> {
         let branch_name = BranchService::generate_branch_name(session_id, context_hint);
-        
+
         BranchService::create_branch(
             repo,
             session_id,
@@ -39,7 +39,7 @@ impl BranchManager {
     ) -> Result<BranchEntity> {
         let branch_name = format!("explore-{}", topic.replace(" ", "-").to_lowercase());
         let description = format!("Exploring different approaches to {}", topic);
-        
+
         BranchService::create_branch(
             repo,
             session_id,
@@ -59,7 +59,7 @@ impl BranchManager {
     ) -> Result<BranchEntity> {
         let branch_name = format!("debug-{}", issue.replace(" ", "-").to_lowercase());
         let description = format!("Debugging session for {}", issue);
-        
+
         BranchService::create_branch(
             repo,
             session_id,
@@ -71,13 +71,16 @@ impl BranchManager {
     }
 
     /// List branches with summaries for a session
-    pub fn list_session_branches(repo: &SqliteRepository, session_id: &str) -> Result<Vec<BranchSummary>> {
+    pub fn list_session_branches(
+        repo: &SqliteRepository,
+        session_id: &str,
+    ) -> Result<Vec<BranchSummary>> {
         let branches = BranchService::get_session_branches(repo, session_id)?;
         let mut summaries = Vec::new();
 
         for branch in branches {
             let messages = BranchService::get_branch_messages(repo, &branch.id)?;
-            
+
             let summary = BranchSummary {
                 id: branch.id.clone(),
                 name: branch.display_name(),
@@ -101,16 +104,15 @@ impl BranchManager {
     }
 
     /// Get branch with context information
-    pub fn get_branch_with_context(repo: &SqliteRepository, branch_id: &str) -> Result<BranchContext> {
-        let branch = BranchService::get_branch(repo, branch_id)?
-            .context("Branch not found")?;
-        
+    pub fn get_branch_with_context(
+        repo: &SqliteRepository,
+        branch_id: &str,
+    ) -> Result<BranchContext> {
+        let branch = BranchService::get_branch(repo, branch_id)?.context("Branch not found")?;
+
         let messages = BranchService::get_branch_messages(repo, branch_id)?;
 
-        Ok(BranchContext {
-            branch,
-            messages,
-        })
+        Ok(BranchContext { branch, messages })
     }
 }
 

@@ -2,7 +2,7 @@ use crate::completion::values::CompletionValues;
 use crate::llm::openai::model::models_api::{
     infer_provider_from_model_id, model_matches_provider_alias,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Current chat session state including model and provider settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,10 +36,7 @@ impl ChatState {
     /// Create default chat state (claude provider, default claude model)
     #[allow(dead_code)]
     pub fn default() -> Self {
-        Self::new(
-            "claude".to_string(),
-            "claude-sonnet-4-20250514".to_string(),
-        )
+        Self::new("claude".to_string(), "claude-sonnet-4-20250514".to_string())
     }
 
     /// Enable or disable tools for this session
@@ -56,7 +53,7 @@ impl ChatState {
     /// Switch to a different provider
     pub fn switch_provider(&mut self, new_provider: String) -> Result<String, String> {
         let valid_providers = CompletionValues::provider_names();
-        
+
         if !valid_providers.contains(&new_provider) {
             return Err(format!(
                 "Invalid provider '{}'. Available providers: {}",
@@ -67,7 +64,7 @@ impl ChatState {
 
         self.provider = new_provider.clone();
         self.available_models = Self::get_models_for_provider(&new_provider);
-        
+
         // Set default model for the new provider
         self.model = self.get_default_model_for_provider(&new_provider);
 
@@ -80,7 +77,7 @@ impl ChatState {
     /// Switch to a different model, automatically switching provider if needed
     pub fn switch_model(&mut self, new_model: String) -> Result<String, String> {
         let all_models = CompletionValues::model_names();
-        
+
         if !all_models.contains(&new_model) {
             return Err(format!(
                 "Invalid model '{}'. Available models: {}",
@@ -96,7 +93,7 @@ impl ChatState {
         if !self.available_models.contains(&new_model) {
             // Automatically switch to the correct provider for this model
             let correct_provider = self.get_provider_for_model(&new_model);
-            
+
             if correct_provider == "unknown" {
                 return Err(format!(
                     "Cannot determine provider for model '{}'",
@@ -107,7 +104,7 @@ impl ChatState {
             // Switch provider automatically
             self.provider = correct_provider.clone();
             self.available_models = Self::get_models_for_provider(&correct_provider);
-            
+
             // Now set the model
             self.model = new_model.clone();
 
@@ -166,14 +163,23 @@ impl ChatState {
     /// List available models with descriptions
     pub fn list_models(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("📋 Available models for {} provider:\n", self.provider));
-        
+        output.push_str(&format!(
+            "📋 Available models for {} provider:\n",
+            self.provider
+        ));
+
         for (i, model) in self.available_models.iter().enumerate() {
             let marker = if model == &self.model { "👉" } else { "  " };
             let description = self.get_model_description(model);
-            output.push_str(&format!("{}  {}. {} - {}\n", marker, i + 1, model, description));
+            output.push_str(&format!(
+                "{}  {}. {} - {}\n",
+                marker,
+                i + 1,
+                model,
+                description
+            ));
         }
-        
+
         output.push_str("\nUse '/model <name>' to switch to a different model");
         output
     }
@@ -231,8 +237,10 @@ impl ChatState {
             "gpt-3.5-turbo" => "Fast, cost-effective model for simple tasks",
             // Claude 4 series models
             "claude-opus-4-1-20250805" => "Latest Opus model with enhanced capabilities",
-            "claude-opus-4-20250514" => "Most powerful Claude model for highly complex tasks", 
-            "claude-sonnet-4-20250514" => "Best overall Claude model, excels at writing and complex tasks",
+            "claude-opus-4-20250514" => "Most powerful Claude model for highly complex tasks",
+            "claude-sonnet-4-20250514" => {
+                "Best overall Claude model, excels at writing and complex tasks"
+            }
             // Claude 3.7 series models
             "claude-3-7-sonnet-20250219" => "Enhanced Sonnet model with improved performance",
             "claude-3-7-sonnet-latest" => "Latest version of Claude 3.7 Sonnet",
@@ -244,7 +252,7 @@ impl ChatState {
             "claude-3-opus-20240229" => "Previous generation powerful model for complex tasks",
             "claude-3-sonnet-20240229" => "Balanced legacy model for general use",
             "claude-3-haiku-20240307" => "Fast and efficient legacy model for simple tasks",
-            _ => "AI language model"
+            _ => "AI language model",
         }
     }
 

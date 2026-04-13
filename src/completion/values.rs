@@ -30,7 +30,7 @@ impl CompletionValues {
             "claude-opus-4-1-20250805".to_string(),
             "claude-opus-4-20250514".to_string(),
             "claude-sonnet-4-20250514".to_string(),
-            // Claude 3.7 series  
+            // Claude 3.7 series
             "claude-3-7-sonnet-20250219".to_string(),
             "claude-3-7-sonnet-latest".to_string(),
             // Claude 3.5 series

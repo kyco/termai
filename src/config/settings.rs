@@ -101,7 +101,10 @@ impl UserConfig {
     pub fn save_to_path(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create user config directory: {}", parent.display())
+                format!(
+                    "Failed to create user config directory: {}",
+                    parent.display()
+                )
             })?;
         }
 
@@ -198,15 +201,21 @@ impl ProjectConfig {
         let path = Self::file_path(root);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create project config directory: {}", parent.display())
+                format!(
+                    "Failed to create project config directory: {}",
+                    parent.display()
+                )
             })?;
         }
 
         let file = ProjectConfigFile {
             version: default_version(),
-            project: self.project_type.as_ref().map(|project_type| ProjectSection {
-                project_type: Some(project_type.clone()),
-            }),
+            project: self
+                .project_type
+                .as_ref()
+                .map(|project_type| ProjectSection {
+                    project_type: Some(project_type.clone()),
+                }),
             context: Some(self.context.clone()),
             privacy: Some(self.privacy.clone()),
         };
@@ -425,7 +434,11 @@ fn load_legacy_default_model<R: ConfigRepository>(
         ConfigKeys::CodexDefaultModel.to_key(),
     ]
     .into_iter()
-    .find_map(|key| config_service::fetch_by_key(repo, &key).ok().map(|config| config.value))
+    .find_map(|key| {
+        config_service::fetch_by_key(repo, &key)
+            .ok()
+            .map(|config| config.value)
+    })
 }
 
 fn model_matches_provider(model: &str, provider: &SettingsProvider) -> bool {
@@ -481,10 +494,7 @@ mod tests {
 
         let user_config = UserConfig::load_from_path(&user_config_path).unwrap();
         assert_eq!(user_config.default.provider, SettingsProvider::Codex);
-        assert_eq!(
-            user_config.default.model.as_deref(),
-            Some("gpt-5.3-codex")
-        );
+        assert_eq!(user_config.default.model.as_deref(), Some("gpt-5.3-codex"));
     }
 
     #[test]
@@ -550,7 +560,10 @@ redact = ["SECRET_.*"]
         assert!(settings.smart_context);
         assert_eq!(settings.token_budget, 8000);
         assert_eq!(settings.project.project_type.as_deref(), Some("rust"));
-        assert_eq!(settings.project.privacy.redact, vec!["SECRET_.*".to_string()]);
+        assert_eq!(
+            settings.project.privacy.redact,
+            vec!["SECRET_.*".to_string()]
+        );
     }
 
     #[test]
@@ -584,7 +597,10 @@ type = "python"
     #[test]
     fn test_model_matches_provider_accepts_gpt_5_4_for_codex_only() {
         assert!(model_matches_provider("gpt-5.4", &SettingsProvider::Codex));
-        assert!(!model_matches_provider("gpt-5.4", &SettingsProvider::Openai));
+        assert!(!model_matches_provider(
+            "gpt-5.4",
+            &SettingsProvider::Openai
+        ));
         assert!(model_matches_provider(
             "gpt-5.3-codex",
             &SettingsProvider::Codex
