@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use anyhow::{anyhow, Result};
+use std::io::{self, BufRead, BufReader, Write};
 use std::time::Duration;
 
 use crate::auth::callback_server::CallbackServer;
@@ -14,6 +15,8 @@ pub struct OAuthClient {
     config: OAuthConfig,
     http_client: reqwest::Client,
 }
+
+const AUTOMATIC_CALLBACK_TIMEOUT: Duration = Duration::from_secs(90);
 
 impl OAuthClient {
     /// Create a new OAuth client with default configuration
@@ -74,11 +77,25 @@ impl OAuthClient {
         }
 
         println!("Waiting for authentication...");
+        println!("If the browser redirects to localhost but TermAI does not detect it, you can paste the full redirect URL here after the automatic wait.");
 
-        // Wait for callback
+        // Wait for callback, then fall back to a pasted redirect URL if needed.
         let callback_port = 1455;
         let server = CallbackServer::new(callback_port);
-        let callback = server.wait_for_callback(Duration::from_secs(300))?;
+        let callback = match server.wait_for_callback(AUTOMATIC_CALLBACK_TIMEOUT) {
+            Ok(callback) => callback,
+            Err(err) => {
+                println!();
+                println!("Automatic localhost callback was not captured: {}", err);
+                println!("Paste the final redirect URL from your browser to continue.");
+
+                let stdin = io::stdin();
+                let stdout = io::stdout();
+                let mut reader = BufReader::new(stdin.lock());
+                let mut writer = stdout.lock();
+                Self::prompt_for_manual_callback(&mut reader, &mut writer, &state)?
+            }
+        };
 
         // Verify state to prevent CSRF
         if callback.state != state {
@@ -160,11 +177,104 @@ impl OAuthClient {
 
         Ok(token_response.into_tokens())
     }
+
+    fn prompt_for_manual_callback<R: BufRead, W: Write>(
+        reader: &mut R,
+        writer: &mut W,
+        expected_state: &str,
+    ) -> Result<crate::auth::callback_server::CallbackResult> {
+        writeln!(writer)?;
+        writeln!(
+            writer,
+            "Paste the full redirect URL from the browser address bar."
+        )?;
+        writeln!(
+            writer,
+            "Example: http://localhost:1455/auth/callback?code=...&state=..."
+        )?;
+
+        loop {
+            write!(writer, "Redirect URL: ")?;
+            writer.flush()?;
+
+            let mut input = String::new();
+            let bytes_read = reader.read_line(&mut input)?;
+            if bytes_read == 0 {
+                return Err(anyhow!("No redirect URL provided"));
+            }
+
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            match CallbackServer::parse_callback_url(trimmed) {
+                Ok(callback) if callback.state == expected_state => return Ok(callback),
+                Ok(_) => {
+                    writeln!(
+                        writer,
+                        "State mismatch. Paste the redirect URL from the same login attempt."
+                    )?;
+                }
+                Err(err) => {
+                    writeln!(writer, "Could not parse redirect URL: {}", err)?;
+                }
+            }
+        }
+    }
 }
 
 impl Default for OAuthClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_prompt_for_manual_callback_accepts_full_redirect_url() {
+        let input = b"http://localhost:1455/auth/callback?code=abc123&state=xyz789\n";
+        let mut reader = Cursor::new(input);
+        let mut output = Vec::new();
+
+        let result =
+            OAuthClient::prompt_for_manual_callback(&mut reader, &mut output, "xyz789").unwrap();
+
+        assert_eq!(result.code, "abc123");
+        assert_eq!(result.state, "xyz789");
+    }
+
+    #[test]
+    fn test_prompt_for_manual_callback_retries_until_valid_url() {
+        let input = b"\nnot-a-url\nhttp://localhost:1455/auth/callback?code=abc123&state=xyz789\n";
+        let mut reader = Cursor::new(input);
+        let mut output = Vec::new();
+
+        let result =
+            OAuthClient::prompt_for_manual_callback(&mut reader, &mut output, "xyz789").unwrap();
+
+        let rendered_output = String::from_utf8(output).unwrap();
+        assert_eq!(result.code, "abc123");
+        assert!(rendered_output.contains("Paste the full redirect URL"));
+        assert!(rendered_output.contains("Could not parse redirect URL"));
+    }
+
+    #[test]
+    fn test_prompt_for_manual_callback_rejects_state_mismatch() {
+        let input = b"http://localhost:1455/auth/callback?code=abc123&state=wrong\nhttp://localhost:1455/auth/callback?code=def456&state=xyz789\n";
+        let mut reader = Cursor::new(input);
+        let mut output = Vec::new();
+
+        let result =
+            OAuthClient::prompt_for_manual_callback(&mut reader, &mut output, "xyz789").unwrap();
+
+        let rendered_output = String::from_utf8(output).unwrap();
+        assert_eq!(result.code, "def456");
+        assert!(rendered_output.contains("State mismatch"));
     }
 }
 

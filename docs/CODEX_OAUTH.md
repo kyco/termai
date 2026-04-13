@@ -74,7 +74,7 @@ Local HTTP server that:
 - Waits for OAuth callback with authorization code
 - Parses query parameters (code, state, error)
 - Returns success/error HTML to browser
-- Implements 5-minute timeout
+- Falls back to manual redirect URL paste when the localhost callback is not captured
 
 #### 3. OAuth Client (`oauth_client.rs`)
 
@@ -149,6 +149,9 @@ Request/response format is similar but routed through ChatGPT backend.
 # Start OAuth flow (opens browser)
 termai config login-codex
 
+# If the localhost redirect does not reach TermAI, paste the final
+# http://localhost:1455/auth/callback?... URL back into the terminal
+
 # Check authentication status
 termai config codex-status
 
@@ -186,7 +189,7 @@ The refresh flow uses the stored refresh token to obtain new tokens without requ
 | "State mismatch" | CSRF protection triggered | Retry authentication |
 | "Token expired, no refresh token" | Refresh token missing/invalid | Run `login-codex` again |
 | "401 Unauthorized" | Session expired | Run `login-codex` again |
-| "Timeout waiting for callback" | Browser auth not completed | Complete auth within 5 minutes |
+| "Automatic localhost callback was not captured" | Browser could not reach the local callback server | Paste the full localhost redirect URL back into TermAI |
 
 ## Security Considerations
 

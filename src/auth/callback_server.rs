@@ -81,8 +81,9 @@ impl CallbackServer {
     }
 
     /// Parse the callback URL to extract the authorization code and state
-    fn parse_callback_url(url: &str) -> Result<CallbackResult> {
-        // URL format: /auth/callback?code=xxx&state=yyy
+    ///
+    /// Accepts either a relative callback path or the full localhost redirect URL.
+    pub(crate) fn parse_callback_url(url: &str) -> Result<CallbackResult> {
         let query_start = url.find('?').ok_or_else(|| anyhow!("No query parameters in callback URL"))?;
         let query = &url[query_start + 1..];
 
@@ -259,6 +260,14 @@ mod tests {
         let result = CallbackServer::parse_callback_url(url).unwrap();
         assert_eq!(result.code, "abc+123");
         assert_eq!(result.state, "xyz=789");
+    }
+
+    #[test]
+    fn test_parse_callback_url_from_full_localhost_redirect() {
+        let url = "http://localhost:1455/auth/callback?code=abc123&state=xyz789";
+        let result = CallbackServer::parse_callback_url(url).unwrap();
+        assert_eq!(result.code, "abc123");
+        assert_eq!(result.state, "xyz789");
     }
 
     #[test]
