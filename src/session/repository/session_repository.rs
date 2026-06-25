@@ -9,9 +9,11 @@ impl SessionRepository for SqliteRepository {
     type Error = rusqlite::Error;
 
     fn fetch_all_sessions(&self) -> Result<Vec<SessionEntity>, Self::Error> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, name, expires_at, current FROM sessions")?;
+        // Most-recently-used first: expires_at is bumped on every use, so this
+        // gives a stable, useful order for session listings (CLI and in-chat).
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, expires_at, current FROM sessions ORDER BY expires_at DESC",
+        )?;
         let rows = stmt.query_map([], row_to_session_entity())?;
 
         let mut sessions = Vec::new();

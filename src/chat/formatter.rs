@@ -521,9 +521,13 @@ impl ChatFormatter {
     }
 
     /// Enable or disable streaming
-    #[allow(dead_code)]
     pub fn set_streaming(&mut self, enabled: bool) {
         self.enable_streaming = enabled;
+    }
+
+    /// Whether streaming output is currently enabled (single source of truth).
+    pub fn is_streaming(&self) -> bool {
+        self.enable_streaming
     }
 
     /// Enable or disable markdown formatting
@@ -827,6 +831,86 @@ impl ChatFormatter {
         format!("💾 Session saved as '{}'", session_name)
             .bright_green()
             .to_string()
+    }
+
+    /// One-line banner shown under the welcome panel and after session switches,
+    /// so the user always knows which session/model they're talking to.
+    pub fn format_session_banner(
+        &self,
+        session_label: &str,
+        message_count: usize,
+        provider: &str,
+        model: &str,
+    ) -> String {
+        format!(
+            "  {} {}   {} {}   {} {}",
+            "session".dimmed(),
+            session_label.bright_cyan(),
+            "model".dimmed(),
+            format!("{}/{}", provider, model).bright_white(),
+            "messages".dimmed(),
+            message_count.to_string().bright_white(),
+        )
+    }
+
+    /// Render the saved-session list (from `/sessions`), marking the active one.
+    pub fn format_session_list(
+        &self,
+        sessions: &[crate::session::model::session::Session],
+        current_id: &str,
+        current_is_temporary: bool,
+    ) -> String {
+        let mut out = String::new();
+        out.push_str(&"📚 Saved Sessions".bright_blue().bold().to_string());
+        out.push('\n');
+
+        if sessions.is_empty() && !current_is_temporary {
+            out.push_str(
+                &"   No saved sessions yet — use /save <name> to keep this one."
+                    .dimmed()
+                    .to_string(),
+            );
+            return out;
+        }
+
+        if current_is_temporary {
+            out.push_str(&format!(
+                "  {} {} {}\n",
+                "›".bright_green().bold(),
+                "temporary (unsaved)".bright_yellow(),
+                "← current".dimmed()
+            ));
+        }
+
+        for s in sessions {
+            let is_current = s.id == current_id;
+            let marker = if is_current {
+                "›".bright_green().bold().to_string()
+            } else {
+                " ".to_string()
+            };
+            let current_tag = if is_current {
+                format!("  {}", "← current".dimmed())
+            } else {
+                String::new()
+            };
+            // Pad the plain name before coloring so ANSI codes don't skew width.
+            let name_col = format!("{:<28}", s.name);
+            out.push_str(&format!(
+                "  {} {} {}{}\n",
+                marker,
+                name_col.bright_cyan(),
+                format!("{} msg", s.messages.len()).dimmed(),
+                current_tag
+            ));
+        }
+
+        out.push_str(
+            &"  /load <name> to switch  •  /new for a fresh session  •  /rename <name>"
+                .dimmed()
+                .to_string(),
+        );
+        out
     }
 
     /// Format conversation cleared message

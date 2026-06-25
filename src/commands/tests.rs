@@ -167,6 +167,10 @@ mod tests {
         ) -> Result<(), Self::Error> {
             Ok(())
         }
+
+        fn delete_messages_for_session(&self, _session_id: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
     }
 
     fn create_temp_sqlite_repo() -> Result<SqliteRepository> {

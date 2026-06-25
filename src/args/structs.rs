@@ -72,13 +72,6 @@ pub struct ChatArgs {
     pub chunk_strategy: String,
 }
 
-impl ChatArgs {
-    /// Apply environment variable fallbacks to chat arguments
-    pub fn with_env_fallbacks(self) -> Self {
-        self
-    }
-}
-
 /// Arguments for one-shot ask questions
 #[derive(Args, Debug, Clone)]
 pub struct AskArgs {
@@ -127,13 +120,6 @@ pub struct AskArgs {
     /// Chunking strategy: module, functional, token, hierarchical
     #[arg(long, requires = "chunked_analysis", default_value = "hierarchical")]
     pub chunk_strategy: String,
-}
-
-impl AskArgs {
-    /// Apply environment variable fallbacks to ask arguments
-    pub fn with_env_fallbacks(self) -> Self {
-        self
-    }
 }
 
 /// Arguments for session management operations

@@ -45,4 +45,7 @@ where
         session_id: &str,
     ) -> Result<Vec<MessageEntity>, Self::Error>;
     fn add_message_to_session(&self, message: &MessageEntity) -> Result<(), Self::Error>;
+    /// Delete all messages belonging to a session without removing the session row.
+    /// Used by the in-chat `/clear` command so cleared history does not reappear on reload.
+    fn delete_messages_for_session(&self, session_id: &str) -> Result<(), Self::Error>;
 }

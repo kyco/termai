@@ -45,6 +45,7 @@ impl ChatState {
     }
 
     /// Toggle tools on/off and return the new state
+    #[allow(dead_code)]
     pub fn toggle_tools(&mut self) -> bool {
         self.tools_enabled = !self.tools_enabled;
         self.tools_enabled

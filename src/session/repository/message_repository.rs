@@ -10,9 +10,13 @@ impl MessageRepository for SqliteRepository {
         &self,
         session_id: &str,
     ) -> Result<Vec<MessageEntity>, Self::Error> {
+        // Order by the implicit rowid so messages always come back in insertion
+        // order. The primary key is a random UUID (TEXT), so without an explicit
+        // ORDER BY a future index or query-planner change could scramble the
+        // conversation; rowid is monotonic per insert and needs no schema change.
         let mut stmt = self
             .conn
-            .prepare("SELECT id, session_id, role, content, message_type, compaction_metadata FROM messages WHERE session_id = ?1")?;
+            .prepare("SELECT id, session_id, role, content, message_type, compaction_metadata FROM messages WHERE session_id = ?1 ORDER BY rowid ASC")?;
         let rows = stmt.query_map([session_id], row_to_message_entity())?;
 
         let mut messages = Vec::new();
@@ -33,6 +37,14 @@ impl MessageRepository for SqliteRepository {
                 message.message_type,
                 message.compaction_metadata
             ],
+        )?;
+        Ok(())
+    }
+
+    fn delete_messages_for_session(&self, session_id: &str) -> Result<(), Self::Error> {
+        self.conn.execute(
+            "DELETE FROM messages WHERE session_id = ?1",
+            params![session_id],
         )?;
         Ok(())
     }

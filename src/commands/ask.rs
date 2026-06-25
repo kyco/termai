@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 /// Handle the ask command for one-shot questions
 pub async fn handle_ask_command(args: &AskArgs, repo: &SqliteRepository) -> Result<()> {
-    let args = args.clone().with_env_fallbacks();
+    let args = args.clone();
     let settings = ResolvedSettings::load_for_current_dir_with_repo(
         repo,
         SettingsOverrides {

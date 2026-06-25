@@ -10,6 +10,10 @@ pub enum ChatCommand {
 
     // Session management
     Save(Option<String>),
+    NewSession(Option<String>),
+    ListSessions,
+    LoadSession(String),
+    RenameSession(String),
     Clear,
     Retry,
     Branch(Option<String>),
@@ -111,6 +115,24 @@ impl ChatCommand {
                 };
                 Some(ChatCommand::Save(name))
             }
+            "new" | "n" => {
+                let name = if parts.len() > 1 {
+                    Some(parts[1..].join(" "))
+                } else {
+                    None
+                };
+                Some(ChatCommand::NewSession(name))
+            }
+            "sessions" | "ls" | "list" => Some(ChatCommand::ListSessions),
+            "load" | "open" | "switch" => {
+                // Missing arg returns an empty name; the handler shows usage.
+                Some(ChatCommand::LoadSession(
+                    parts.get(1..).map(|p| p.join(" ")).unwrap_or_default(),
+                ))
+            }
+            "rename" => Some(ChatCommand::RenameSession(
+                parts.get(1..).map(|p| p.join(" ")).unwrap_or_default(),
+            )),
             "clear" | "c" => Some(ChatCommand::Clear),
             "retry" | "r" => Some(ChatCommand::Retry),
             "branch" | "b" => {
@@ -124,20 +146,12 @@ impl ChatCommand {
 
             // Context
             "context" | "ctx" => Some(ChatCommand::Context),
-            "add" => {
-                if parts.len() > 1 {
-                    Some(ChatCommand::AddContext(parts[1..].join(" ")))
-                } else {
-                    None
-                }
-            }
-            "remove" | "rm" => {
-                if parts.len() > 1 {
-                    Some(ChatCommand::RemoveContext(parts[1..].join(" ")))
-                } else {
-                    None
-                }
-            }
+            "add" => Some(ChatCommand::AddContext(
+                parts.get(1..).map(|p| p.join(" ")).unwrap_or_default(),
+            )),
+            "remove" | "rm" => Some(ChatCommand::RemoveContext(
+                parts.get(1..).map(|p| p.join(" ")).unwrap_or_default(),
+            )),
 
             // AI settings
             "model" | "m" => {
@@ -202,6 +216,10 @@ impl ChatCommand {
             ChatCommand::Commands => "Open command palette with all commands",
             ChatCommand::Exit | ChatCommand::Quit => "Exit chat mode",
             ChatCommand::Save(_) => "Save current session with optional name",
+            ChatCommand::NewSession(_) => "Start a new session (saves current first)",
+            ChatCommand::ListSessions => "List saved sessions",
+            ChatCommand::LoadSession(_) => "Load/switch to a saved session",
+            ChatCommand::RenameSession(_) => "Rename the active session",
             ChatCommand::Clear => "Clear conversation history",
             ChatCommand::Retry => "Regenerate the last AI response",
             ChatCommand::Branch(_) => "Create a new conversation branch",
@@ -244,7 +262,31 @@ impl ChatCommand {
             CommandEntry {
                 command: "/save [name]",
                 aliases: "/s",
-                description: "Save session with optional name",
+                description: "Save / name the current conversation",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/sessions",
+                aliases: "/ls, /list",
+                description: "List saved sessions",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/new [name]",
+                aliases: "/n",
+                description: "Start a fresh session (auto-saves current)",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/load <name>",
+                aliases: "/switch, /open",
+                description: "Switch to a saved session's history",
+                category: CommandCategory::Session,
+            },
+            CommandEntry {
+                command: "/rename <name>",
+                aliases: "",
+                description: "Rename the active session",
                 category: CommandCategory::Session,
             },
             CommandEntry {
@@ -354,13 +396,21 @@ impl ChatCommand {
 pub enum InputType {
     Command(ChatCommand),
     Message(String),
+    /// Looks like a slash command (starts with `/`) but matched no known verb.
+    UnknownCommand(String),
 }
 
 impl InputType {
-    /// Classify user input as either a command or a regular message
+    /// Classify user input as a command, an unknown command, or a regular message.
     pub fn classify(input: &str) -> Self {
-        if let Some(command) = ChatCommand::parse(input) {
+        let trimmed = input.trim();
+        if let Some(command) = ChatCommand::parse(trimmed) {
             InputType::Command(command)
+        } else if trimmed.starts_with('/') {
+            // Started with '/' but no verb matched — a typo'd command. Surface a
+            // hint instead of silently billing it to the model as a chat message.
+            let verb = trimmed.split_whitespace().next().unwrap_or(trimmed);
+            InputType::UnknownCommand(verb.to_string())
         } else {
             InputType::Message(input.to_string())
         }
@@ -438,6 +488,63 @@ mod tests {
             ChatCommand::parse("/streaming"),
             Some(ChatCommand::Streaming(None))
         );
+    }
+
+    #[test]
+    fn test_session_management_commands() {
+        assert_eq!(
+            ChatCommand::parse("/new"),
+            Some(ChatCommand::NewSession(None))
+        );
+        assert_eq!(
+            ChatCommand::parse("/new my-plan"),
+            Some(ChatCommand::NewSession(Some("my-plan".to_string())))
+        );
+        assert_eq!(
+            ChatCommand::parse("/n"),
+            Some(ChatCommand::NewSession(None))
+        );
+        assert_eq!(
+            ChatCommand::parse("/sessions"),
+            Some(ChatCommand::ListSessions)
+        );
+        assert_eq!(ChatCommand::parse("/ls"), Some(ChatCommand::ListSessions));
+        assert_eq!(ChatCommand::parse("/list"), Some(ChatCommand::ListSessions));
+        assert_eq!(
+            ChatCommand::parse("/load refactor"),
+            Some(ChatCommand::LoadSession("refactor".to_string()))
+        );
+        assert_eq!(
+            ChatCommand::parse("/switch refactor"),
+            Some(ChatCommand::LoadSession("refactor".to_string()))
+        );
+        // Missing arg parses to an empty name (handler shows usage), NOT unknown.
+        assert_eq!(
+            ChatCommand::parse("/load"),
+            Some(ChatCommand::LoadSession(String::new()))
+        );
+        assert_eq!(
+            ChatCommand::parse("/rename new-name"),
+            Some(ChatCommand::RenameSession("new-name".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_unknown_command_classification() {
+        match InputType::classify("/saev oops") {
+            InputType::UnknownCommand(verb) => assert_eq!(verb, "/saev"),
+            other => panic!("expected UnknownCommand, got {:?}", other),
+        }
+        // A known verb with a missing arg is NOT unknown.
+        match InputType::classify("/load") {
+            InputType::Command(ChatCommand::LoadSession(_)) => {}
+            other => panic!("expected LoadSession command, got {:?}", other),
+        }
+        // A normal message is unaffected.
+        match InputType::classify("what is 2 + 2?") {
+            InputType::Message(_) => {}
+            other => panic!("expected Message, got {:?}", other),
+        }
     }
 
     #[test]

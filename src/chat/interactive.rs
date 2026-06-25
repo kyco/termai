@@ -13,7 +13,6 @@ use crate::llm::common::model::role::Role;
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
 //use crate::session::model::message::Message;
-use crate::branch::BranchService;
 use crate::repository::db::SqliteRepository;
 use crate::session::model::session::Session;
 use crate::session::repository::{MessageRepository, SessionRepository};
@@ -39,6 +38,15 @@ where
     should_exit: bool,
     ctrl_c_pressed: bool,
     chat_state: ChatState,
+    /// A message/command supplied on the command line to run as the first turn.
+    initial_input: Option<String>,
+}
+
+/// The result of attempting to generate one AI turn.
+enum TurnOutcome {
+    Completed,
+    Cancelled,
+    Failed(anyhow::Error),
 }
 
 impl<'a, R, SR, MR> InteractiveSession<'a, R, SR, MR>
@@ -55,6 +63,7 @@ where
         sqlite_repo: &'a SqliteRepository,
         session: Session,
         context_files: Vec<Files>,
+        initial_input: Option<String>,
     ) -> Result<Self> {
         let repl = ChatRepl::new()?;
         let formatter = ChatFormatter::new();
@@ -62,7 +71,7 @@ where
         // Initialize chat state with current provider and model from config
         let chat_state = Self::initialize_chat_state(sqlite_repo)?;
 
-        Ok(Self {
+        let mut session = Self {
             repl,
             formatter,
             session,
@@ -74,7 +83,32 @@ where
             should_exit: false,
             ctrl_c_pressed: false,
             chat_state,
-        })
+            initial_input,
+        };
+        session.update_prompt();
+        Ok(session)
+    }
+
+    /// Rebuild the REPL prompt so it always reflects the active session and a
+    /// `*` marker when there are in-memory messages not yet on disk.
+    fn update_prompt(&mut self) {
+        let label = if self.session.temporary {
+            "temporary".to_string()
+        } else {
+            self.session.name.clone()
+        };
+        let unsaved = self.has_unsaved_messages();
+        let marker = if unsaved { "*" } else { "" };
+        self.repl
+            .set_prompt(format!("\x1b[36m{}\x1b[0m{} ❯ ", label, marker));
+    }
+
+    /// True when the conversation holds messages that are not yet persisted:
+    /// either the session is temporary (nothing is on disk) or a message still
+    /// has an unassigned id.
+    fn has_unsaved_messages(&self) -> bool {
+        (self.session.temporary && !self.session.messages.is_empty())
+            || self.session.messages.iter().any(|m| m.id.is_empty())
     }
 
     /// Start the interactive chat session
@@ -87,24 +121,33 @@ where
             self.display_context_info();
         }
 
+        // Run a command-line-supplied first turn (e.g. `termai chat "question"`).
+        if let Some(initial) = self.initial_input.take() {
+            if let Err(e) = self.process_input(&initial).await {
+                self.repl
+                    .print_message(&self.formatter.format_error(&e.to_string()));
+            }
+        }
+
         // Main chat loop
         loop {
             if self.should_exit {
                 break;
             }
 
-            // Continue with next input
-
             match self.repl.read_line() {
                 Ok(input) => {
-                    // Reset Ctrl+C flag when user provides input
-                    self.ctrl_c_pressed = false;
+                    // Only a real (non-empty) line disarms the exit prompt, so a
+                    // stray Enter between two Ctrl+C presses doesn't silently
+                    // cancel "press again to exit".
+                    if !input.trim().is_empty() {
+                        self.ctrl_c_pressed = false;
+                    }
 
                     if let Err(e) = self.process_input(&input).await {
                         self.repl
                             .print_message(&self.formatter.format_error(&e.to_string()));
                     }
-                    // Processing complete, loop will continue to next read_line()
                 }
                 Err(e) => {
                     if e.to_string().contains("Interrupted") {
@@ -123,6 +166,10 @@ where
                         // Ctrl+D pressed - exit gracefully
                         break;
                     } else {
+                        // Unrelated readline error: clear the exit arm so it
+                        // can't survive across error frames and trigger a
+                        // surprise single-Ctrl+C exit later.
+                        self.ctrl_c_pressed = false;
                         self.repl
                             .print_message(&self.formatter.format_error(&e.to_string()));
                     }
@@ -151,6 +198,14 @@ where
         match InputType::classify(input) {
             InputType::Command(command) => self.handle_command(command).await,
             InputType::Message(message) => self.handle_message(message).await,
+            InputType::UnknownCommand(verb) => {
+                self.repl
+                    .print_message(&self.formatter.format_warning(&format!(
+                        "Unknown command: {}. Type /help or ? to see available commands.",
+                        verb
+                    )));
+                Ok(())
+            }
         }
     }
 
@@ -167,26 +222,25 @@ where
                 self.repl.print_message(&palette_text);
             }
             ChatCommand::Save(name) => {
-                let session_name = name
-                    .unwrap_or_else(|| format!("chat_{}", Local::now().format("%Y%m%d_%H%M%S")));
-                self.session.name = session_name.clone();
-                sessions_service::session_add_messages(
-                    self.session_repo,
-                    self.message_repo,
-                    &mut self.session,
-                )?;
-                self.repl
-                    .print_message(&self.formatter.format_session_saved(&session_name));
+                self.handle_save_command(name)?;
+            }
+            ChatCommand::NewSession(name) => {
+                self.handle_new_session_command(name)?;
+            }
+            ChatCommand::ListSessions => {
+                self.handle_list_sessions_command()?;
+            }
+            ChatCommand::LoadSession(name) => {
+                self.handle_load_session_command(name)?;
+            }
+            ChatCommand::RenameSession(name) => {
+                self.handle_rename_session_command(name)?;
             }
             ChatCommand::Context => {
                 self.display_context_info();
             }
             ChatCommand::Clear => {
-                self.session.messages.clear();
-                self.repl.clear_screen();
-                self.display_welcome();
-                self.repl
-                    .print_message(&self.formatter.format_conversation_cleared());
+                self.handle_clear_command()?;
             }
             ChatCommand::Exit | ChatCommand::Quit => {
                 self.should_exit = true;
@@ -194,12 +248,19 @@ where
             ChatCommand::Retry => {
                 if let Some(last_message) = self.session.messages.last() {
                     if last_message.role == Role::Assistant {
-                        // Remove the last AI response and regenerate
+                        // Drop the last AI response and regenerate from the
+                        // preceding (raw) user message.
                         self.session.messages.pop();
                         if let Some(user_message) = self.session.messages.last() {
                             if user_message.role == Role::User {
                                 let content = user_message.content.clone();
-                                self.generate_ai_response(&content).await?;
+                                let ok = self.generate_ai_response(&content).await?;
+                                if ok {
+                                    // Re-sync the stored copy so the discarded
+                                    // assistant reply doesn't linger in the DB.
+                                    self.resync_persisted_history()?;
+                                }
+                                self.update_prompt();
                             }
                         }
                     } else {
@@ -249,85 +310,408 @@ where
         Ok(())
     }
 
-    /// Handle /tools command - toggle or set tool usage
-    fn handle_tools_command(&mut self, setting: Option<bool>) {
-        match setting {
-            Some(enabled) => {
-                self.chat_state.set_tools_enabled(enabled);
+    /// A user-facing label for the active session.
+    fn session_label(&self) -> String {
+        if self.session.temporary {
+            "temporary (unsaved)".to_string()
+        } else {
+            self.session.name.clone()
+        }
+    }
+
+    /// `/save [name]` — persist the conversation, promoting a temporary session
+    /// to a real one on first save (the fix for "I can't save an ad-hoc chat").
+    fn handle_save_command(&mut self, name: Option<String>) -> Result<()> {
+        if self.session.messages.is_empty() {
+            self.repl.print_message(
+                &self
+                    .formatter
+                    .format_warning("Nothing to save yet — send a message first."),
+            );
+            return Ok(());
+        }
+
+        if self.session.temporary {
+            let session_name =
+                name.unwrap_or_else(|| format!("chat_{}", Local::now().format("%Y%m%d_%H%M%S")));
+            if sessions_service::session_exists(self.session_repo, &session_name) {
+                self.repl.print_message(&self.formatter.format_warning(&format!(
+                    "A session named '{}' already exists. Pick another name, or /load {} to continue it.",
+                    session_name, session_name
+                )));
+                return Ok(());
             }
-            None => {
-                self.chat_state.toggle_tools();
+            sessions_service::promote_session(
+                self.session_repo,
+                self.message_repo,
+                &mut self.session,
+                &session_name,
+            )?;
+            self.repl
+                .print_message(&self.formatter.format_session_saved(&session_name));
+        } else {
+            // Already persistent: a new name renames; otherwise just flush.
+            if let Some(new_name) = name {
+                if new_name != self.session.name {
+                    if let Err(e) = sessions_service::rename_session(
+                        self.session_repo,
+                        &mut self.session,
+                        &new_name,
+                    ) {
+                        self.repl
+                            .print_message(&self.formatter.format_warning(&e.to_string()));
+                        return Ok(());
+                    }
+                }
+            }
+            sessions_service::session_add_messages(
+                self.session_repo,
+                self.message_repo,
+                &mut self.session,
+            )?;
+            self.repl
+                .print_message(&self.formatter.format_session_saved(&self.session.name));
+        }
+        self.update_prompt();
+        Ok(())
+    }
+
+    /// `/new [name]` — auto-save the current conversation, then swap to a blank
+    /// slate (provider/model and context selections are retained).
+    fn handle_new_session_command(&mut self, name: Option<String>) -> Result<()> {
+        if let Some(n) = &name {
+            if sessions_service::session_exists(self.session_repo, n) {
+                self.repl
+                    .print_message(&self.formatter.format_warning(&format!(
+                        "A session named '{}' already exists. Use /load {} to continue it.",
+                        n, n
+                    )));
+                return Ok(());
             }
         }
 
+        self.autosave_current()?;
+
+        self.session = match name {
+            Some(n) => sessions_service::session(self.session_repo, self.message_repo, &n)?,
+            None => Session::new_temporary(),
+        };
+
+        self.repl.clear_screen();
+        self.display_welcome();
+        self.update_prompt();
+        self.repl.print_message(
+            &self
+                .formatter
+                .format_success(&format!("Started new session: {}", self.session_label())),
+        );
+        Ok(())
+    }
+
+    /// `/sessions` — list saved sessions with message counts and active marker.
+    fn handle_list_sessions_command(&mut self) -> Result<()> {
+        let sessions = sessions_service::list_sessions(self.session_repo, self.message_repo)?;
+        let listing =
+            self.formatter
+                .format_session_list(&sessions, &self.session.id, self.session.temporary);
+        self.repl.print_message(&listing);
+        Ok(())
+    }
+
+    /// `/load <name>` (aka `/switch`) — swap another saved session's history in.
+    fn handle_load_session_command(&mut self, name: String) -> Result<()> {
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            self.repl.print_message(
+                &self
+                    .formatter
+                    .format_warning("Usage: /load <name>   (run /sessions to see saved sessions)"),
+            );
+            return Ok(());
+        }
+        if !self.session.temporary && name == self.session.name {
+            self.repl.print_message(
+                &self
+                    .formatter
+                    .format_warning(&format!("Already in session '{}'", name)),
+            );
+            return Ok(());
+        }
+        if !sessions_service::session_exists(self.session_repo, &name) {
+            self.repl
+                .print_message(&self.formatter.format_error(&format!(
+                    "Session '{}' not found. Run /sessions to see saved sessions.",
+                    name
+                )));
+            return Ok(());
+        }
+
+        self.autosave_current()?;
+
+        let loaded = sessions_service::load_session(self.session_repo, self.message_repo, &name)?;
+        self.session = loaded;
+        self.session.redaction_mapping = None;
+
+        self.repl.clear_screen();
+        self.display_welcome();
+        self.replay_history();
+        self.update_prompt();
+        self.repl.print_message(
+            &self
+                .formatter
+                .format_success(&format!("Switched to session '{}'", name)),
+        );
+        Ok(())
+    }
+
+    /// `/rename <name>` — rename the active session (saves it first if it was a
+    /// temporary/unsaved session).
+    fn handle_rename_session_command(&mut self, name: String) -> Result<()> {
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            self.repl
+                .print_message(&self.formatter.format_warning("Usage: /rename <new-name>"));
+            return Ok(());
+        }
+
+        if self.session.temporary {
+            if self.session.messages.is_empty() {
+                self.repl.print_message(
+                    &self
+                        .formatter
+                        .format_warning("Nothing to save yet — send a message first."),
+                );
+                return Ok(());
+            }
+            if sessions_service::session_exists(self.session_repo, &name) {
+                self.repl.print_message(
+                    &self
+                        .formatter
+                        .format_warning(&format!("A session named '{}' already exists.", name)),
+                );
+                return Ok(());
+            }
+            sessions_service::promote_session(
+                self.session_repo,
+                self.message_repo,
+                &mut self.session,
+                &name,
+            )?;
+            self.repl
+                .print_message(&self.formatter.format_session_saved(&name));
+        } else {
+            match sessions_service::rename_session(self.session_repo, &mut self.session, &name) {
+                Ok(()) => self.repl.print_message(
+                    &self
+                        .formatter
+                        .format_success(&format!("Renamed session to '{}'", name)),
+                ),
+                Err(e) => self
+                    .repl
+                    .print_message(&self.formatter.format_warning(&e.to_string())),
+            }
+        }
+        self.update_prompt();
+        Ok(())
+    }
+
+    /// `/clear` — wipe the conversation. For a persisted session this also
+    /// deletes the stored messages so cleared history does not reappear on
+    /// reload.
+    fn handle_clear_command(&mut self) -> Result<()> {
+        if !self.session.temporary {
+            self.message_repo
+                .delete_messages_for_session(&self.session.id)
+                .map_err(|e| anyhow!("Failed to clear stored messages: {:?}", e))?;
+        }
+        self.session.messages.clear();
+        self.session.redaction_mapping = None;
+        self.repl.clear_screen();
+        self.display_welcome();
+        self.update_prompt();
+        self.repl
+            .print_message(&self.formatter.format_conversation_cleared());
+        Ok(())
+    }
+
+    /// Auto-save the current conversation so /new, /load, and /exit never lose
+    /// work. Temporary sessions are promoted under an auto_save_<timestamp> name.
+    fn autosave_current(&mut self) -> Result<()> {
+        if self.session.messages.is_empty() {
+            return Ok(());
+        }
+        if self.session.temporary {
+            let base = format!("auto_save_{}", Local::now().format("%Y%m%d_%H%M%S"));
+            let name = if sessions_service::session_exists(self.session_repo, &base) {
+                format!(
+                    "{}_{}",
+                    base,
+                    &self.session.id[..8.min(self.session.id.len())]
+                )
+            } else {
+                base
+            };
+            sessions_service::promote_session(
+                self.session_repo,
+                self.message_repo,
+                &mut self.session,
+                &name,
+            )?;
+            self.repl.print_message(
+                &self
+                    .formatter
+                    .format_success(&format!("Auto-saved current conversation as '{}'", name)),
+            );
+        } else {
+            sessions_service::session_add_messages(
+                self.session_repo,
+                self.message_repo,
+                &mut self.session,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Rewrite the persisted message rows to exactly match the in-memory
+    /// conversation. Used after `/retry` so a discarded assistant reply doesn't
+    /// remain in the database. No-op for unsaved temporary sessions.
+    fn resync_persisted_history(&mut self) -> Result<()> {
+        if self.session.temporary {
+            return Ok(());
+        }
+        self.message_repo
+            .delete_messages_for_session(&self.session.id)
+            .map_err(|e| anyhow!("Failed to resync stored messages: {:?}", e))?;
+        for message in self.session.messages.iter_mut() {
+            message.id = String::new();
+        }
+        sessions_service::session_add_messages(
+            self.session_repo,
+            self.message_repo,
+            &mut self.session,
+        )?;
+        Ok(())
+    }
+
+    /// Replay a loaded session's prior messages (user/assistant turns only).
+    fn replay_history(&self) {
+        for message in &self.session.messages {
+            if message.role == Role::System {
+                continue;
+            }
+            let formatted = self
+                .formatter
+                .format_message(&message.role, &message.content, None);
+            self.repl.print_message(&formatted);
+        }
+    }
+
+    /// Handle /tools command - toggle or set tool usage
+    fn handle_tools_command(&mut self, setting: Option<bool>) {
+        let wants_enable = match setting {
+            Some(v) => v,
+            None => !self.chat_state.tools_enabled,
+        };
+
+        // Tools are only wired for the OpenAI provider; enabling them under
+        // claude/codex would be a silent no-op, so refuse rather than report a
+        // misleading success.
+        if wants_enable && self.chat_state.provider != "openai" {
+            self.repl.print_message(&self.formatter.format_warning(&format!(
+                "Tools are only supported with the OpenAI provider (current: {}). Run /provider openai first.",
+                self.chat_state.provider
+            )));
+            return;
+        }
+
+        self.chat_state.set_tools_enabled(wants_enable);
+
+        let detail = if self.chat_state.tools_enabled {
+            " The AI can execute bash commands, read/write files, and list directories."
+        } else {
+            ""
+        };
         let status = if self.chat_state.tools_enabled {
             "enabled"
         } else {
             "disabled"
         };
-
-        let provider_note = if self.chat_state.provider != "openai" {
-            format!("\n⚠️  Note: Tools are only supported with the OpenAI provider. Current provider: {}", self.chat_state.provider)
-        } else {
-            String::new()
-        };
-
-        self.repl.print_message(&self.formatter.format_success(&format!(
-            "Tools are now {}. The AI can execute bash commands, read/write files, and list directories.{}",
-            status,
-            provider_note
-        )));
+        self.repl.print_message(
+            &self
+                .formatter
+                .format_success(&format!("Tools are now {}.{}", status, detail)),
+        );
     }
 
     /// Handle regular chat messages
     async fn handle_message(&mut self, message: String) -> Result<()> {
-        // Add user message to session
+        // Add user message to session (rustyline already echoed the input).
         self.session.add_raw_message(message.clone(), Role::User);
 
-        // Don't display user message again - rustyline already showed it
-        // Just generate AI response
-        self.generate_ai_response(&message).await?;
-
+        let succeeded = self.generate_ai_response(&message).await?;
+        if !succeeded {
+            // The turn failed or was cancelled — drop the user message we just
+            // added so the conversation (and any later save) stays consistent.
+            if let Some(last) = self.session.messages.last() {
+                if last.role == Role::User {
+                    self.session.messages.pop();
+                }
+            }
+        }
+        self.update_prompt();
         Ok(())
     }
 
-    /// Generate AI response for the given user input
-    async fn generate_ai_response(&mut self, user_input: &str) -> Result<()> {
-        // Start thinking timer (no separate message needed)
+    /// Generate an AI response for the given (raw) user input. Returns whether a
+    /// response was successfully produced. Never pops the user message itself —
+    /// that ownership belongs to the caller.
+    async fn generate_ai_response(&mut self, user_input: &str) -> Result<bool> {
         let mut timer = ThinkingTimer::new();
         timer.start();
 
-        // Create input with context
-        let input_with_context = self.create_contextual_input(user_input);
-
-        // Add context to session
+        // Inject file context only into the wire payload — never into the stored
+        // conversation — so context isn't baked in and re-appended every turn.
+        let mut raw_backup: Option<String> = None;
         if !self.context_files.is_empty() {
-            // Update the last user message to include context
+            let augmented = self.create_contextual_input(user_input);
             if let Some(last_msg) = self.session.messages.last_mut() {
                 if last_msg.role == Role::User {
-                    last_msg.content = input_with_context;
+                    raw_backup = Some(last_msg.content.clone());
+                    last_msg.content = augmented;
                 }
             }
         }
 
-        // Redact sensitive information
+        // Redact sensitive information before it goes over the wire.
         self.session.redact(self.config_repo);
 
-        // Call AI service based on configured provider
-        let result = self.call_ai_service().await;
+        let outcome = self.call_ai_service_cancellable().await;
 
         timer.stop();
 
-        // Ensure thinking indicator is completely cleared before showing response
+        // Ensure the thinking indicator is fully cleared before output.
         print!("\r\x1b[2K");
         std::io::stdout().flush().unwrap();
 
-        match result {
-            Ok(_) => {
-                // Display AI response with enhanced formatting
+        // Restore real content, then revert the augmented user message back to
+        // the raw text the user typed — so persistence stores real, un-bloated
+        // history (not redaction placeholders or duplicated context).
+        self.session.unredact();
+        if let Some(raw) = raw_backup {
+            if let Some(idx) = self
+                .session
+                .messages
+                .iter()
+                .rposition(|m| m.role == Role::User)
+            {
+                self.session.messages[idx].content = raw;
+            }
+        }
+
+        match outcome {
+            TurnOutcome::Completed => {
                 if let Some(last_message) = self.session.messages.last() {
                     if last_message.role == Role::Assistant {
-                        // Use the new async formatter for enhanced markdown and syntax highlighting
                         if let Err(e) = self
                             .formatter
                             .format_message_async(
@@ -338,7 +722,6 @@ where
                             .await
                         {
                             eprintln!("Error formatting AI response: {}", e);
-                            // Fallback to basic formatting
                             let formatted_ai = self.formatter.format_message(
                                 &Role::Assistant,
                                 &last_message.content,
@@ -350,33 +733,42 @@ where
                     }
                 }
 
-                // Save session automatically
+                // Incrementally persist (no-op for an unsaved temporary session
+                // until the user /saves it; flush for a persisted session).
                 sessions_service::session_add_messages(
                     self.session_repo,
                     self.message_repo,
                     &mut self.session,
                 )?;
+                std::io::stdout().flush().unwrap();
+                Ok(true)
             }
-            Err(e) => {
+            TurnOutcome::Cancelled => {
+                self.repl
+                    .print_message(&self.formatter.format_warning("Generation cancelled."));
+                std::io::stdout().flush().unwrap();
+                Ok(false)
+            }
+            TurnOutcome::Failed(e) => {
                 self.repl
                     .print_message(&self.formatter.format_error(&format!("AI Error: {}", e)));
-
-                // Remove the failed user message to keep session clean
-                if let Some(last_msg) = self.session.messages.last() {
-                    if last_msg.role == Role::User {
-                        self.session.messages.pop();
-                    }
-                }
+                std::io::stdout().flush().unwrap();
+                Ok(false)
             }
         }
+    }
 
-        // Unredact for display
-        self.session.unredact();
-
-        // Ensure we return control properly
-        std::io::stdout().flush().unwrap();
-
-        Ok(())
+    /// Run the AI request, but let Ctrl+C cancel an in-flight generation and
+    /// drop the user back to the prompt instead of waiting (or killing the
+    /// whole process).
+    async fn call_ai_service_cancellable(&mut self) -> TurnOutcome {
+        tokio::select! {
+            result = self.call_ai_service() => match result {
+                Ok(()) => TurnOutcome::Completed,
+                Err(e) => TurnOutcome::Failed(e),
+            },
+            _ = tokio::signal::ctrl_c() => TurnOutcome::Cancelled,
+        }
     }
 
     /// Call the AI service based on current chat state provider
@@ -509,10 +901,17 @@ where
         }
     }
 
-    /// Display welcome message
+    /// Display welcome message + a one-line banner showing the active session.
     fn display_welcome(&self) {
         println!(); // Add spacing before welcome
         self.repl.print_message(&self.formatter.format_welcome());
+        self.repl
+            .print_message(&self.formatter.format_session_banner(
+                &self.session_label(),
+                self.session.messages.len(),
+                &self.chat_state.provider,
+                &self.chat_state.model,
+            ));
         println!(); // Add spacing after welcome
     }
 
@@ -525,79 +924,28 @@ where
         self.repl.print_message(&context_info);
     }
 
-    /// Save session and history when exiting
+    /// Save session and history when exiting. Auto-saves an unsaved conversation
+    /// so nothing is ever lost on exit.
     async fn save_on_exit(&mut self) -> Result<()> {
-        // Save command history
         self.repl.save_history()?;
-
-        // Auto-save session if it has messages and no name
-        if !self.session.messages.is_empty() && self.session.name == "temporary" {
-            let auto_name = format!("auto_save_{}", Local::now().format("%Y%m%d_%H%M%S"));
-            self.session.name = auto_name.clone();
-            sessions_service::session_add_messages(
-                self.session_repo,
-                self.message_repo,
-                &mut self.session,
-            )?;
-            self.repl.print_message(
-                &self
-                    .formatter
-                    .format_success(&format!("Auto-saved session as '{}'", auto_name)),
-            );
-        }
-
+        self.autosave_current()?;
         Ok(())
     }
 
-    /// Handle the /branch command
-    async fn handle_branch_command(&mut self, name: Option<String>) -> Result<()> {
-        // Generate branch name with context hint
-        let branch_name = if let Some(name) = name.clone() {
-            name
+    /// Handle the /branch command. In-chat branching isn't implemented yet;
+    /// be honest about it and point at the working CLI path rather than
+    /// pretending to create a branch.
+    async fn handle_branch_command(&mut self, _name: Option<String>) -> Result<()> {
+        let save_hint = if self.session.temporary {
+            " Save it first with /save <name>."
         } else {
-            BranchService::generate_branch_name(&self.session.id, None)
+            ""
         };
-
-        // Create branch from current session state
-        // Note: Need &mut SqliteRepository but we only have &SqliteRepository
-        // This is a limitation of the current design. For now, show what the command would do:
-        let message = if name.is_some() {
-            format!(
-                "🌿 Would create branch '{}' from current conversation state",
-                branch_name
-            )
-        } else {
-            format!(
-                "🌿 Would create auto-named branch '{}' from current conversation state",
-                branch_name
-            )
-        };
-
-        // Display the branch creation message
-        self.repl
-            .print_message(&self.formatter.format_success(&message));
-
-        // Show branch creation info
-        let info_lines = vec![
-            "📋 Branch would include:".to_string(),
-            format!(
-                "   • {} messages from current conversation",
-                self.session.messages.len()
-            ),
-            "   • Full conversation context preserved".to_string(),
-            "   • Ready for exploring alternative approaches".to_string(),
-        ];
-
-        for line in info_lines {
-            println!("  {}", line); // Simple formatting for info lines
-        }
-
-        // TODO: Actually create the branch when we have mutable access to repo
-        // For now, this demonstrates the UI and command structure
-        self.repl.print_message(&self.formatter.format_warning(
-            "⚠️  Branch creation temporarily disabled - requires mutable database access",
-        ));
-
+        self.repl.print_message(&self.formatter.format_warning(&format!(
+            "Branching isn't available inside chat yet. Use `termai session branch {}` from the command line.{}",
+            if self.session.temporary { "<name>" } else { &self.session.name },
+            save_hint
+        )));
         Ok(())
     }
 
@@ -629,26 +977,19 @@ where
         }
     }
 
-    /// Handle /streaming command
+    /// Handle /streaming command — explicit on/off, or toggle when no argument.
     fn handle_streaming_command(&mut self, setting: Option<bool>) {
-        match setting {
-            Some(enabled) => {
-                self.formatter.set_streaming(enabled);
-                let status = if enabled { "enabled" } else { "disabled" };
-                self.repl.print_message(
-                    &self
-                        .formatter
-                        .format_success(&format!("Streaming output {}", status)),
-                );
-            }
-            None => {
-                // Toggle: we don't track the current state externally, so just
-                // tell the user how to use the command
-                self.repl.print_message(
-                    "Usage: /streaming on  - enable streaming output\n       /streaming off - disable streaming output",
-                );
-            }
-        }
+        let enabled = match setting {
+            Some(v) => v,
+            None => !self.formatter.is_streaming(),
+        };
+        self.formatter.set_streaming(enabled);
+        let status = if enabled { "enabled" } else { "disabled" };
+        self.repl.print_message(
+            &self
+                .formatter
+                .format_success(&format!("Streaming output {}", status)),
+        );
     }
 
     /// Display a settings overview panel
@@ -657,9 +998,9 @@ where
             &self.chat_state.provider,
             &self.chat_state.model,
             self.chat_state.tools_enabled,
-            true, // streaming default
+            self.formatter.is_streaming(),
             self.context_files.len(),
-            &self.session.name,
+            &self.session_label(),
         );
         self.repl.print_message(&overview);
     }

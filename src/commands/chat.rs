@@ -2,6 +2,7 @@
 /// This delegates to the existing InteractiveSession implementation
 use crate::args::ChatArgs;
 use crate::chat::InteractiveSession;
+use crate::llm::common::model::role::Role;
 use crate::path::extract::extract_content;
 use crate::path::model::Files;
 use crate::preset::builtin::BuiltinPresets;
@@ -13,8 +14,7 @@ use colored::*;
 
 /// Handle the chat command for interactive conversations
 pub async fn handle_chat_command(args: &ChatArgs, repo: &SqliteRepository) -> Result<()> {
-    // Apply environment variable fallbacks
-    let args = args.clone().with_env_fallbacks();
+    let args = args.clone();
 
     let input = &args.input;
     let session_name = &args.session;
@@ -31,7 +31,7 @@ pub async fn handle_chat_command(args: &ChatArgs, repo: &SqliteRepository) -> Re
     };
 
     // Get or create session
-    let session = if last_session {
+    let mut session = if last_session {
         // Resume the most recent session
         let session = sessions_service::get_most_recent_session(repo, repo)?;
 
@@ -111,6 +111,13 @@ pub async fn handle_chat_command(args: &ChatArgs, repo: &SqliteRepository) -> Re
         Session::new_temporary()
     };
 
+    // Seed an optional system prompt as a System message (once per session).
+    if let Some(system_prompt) = &args.system_prompt {
+        if !session.messages.iter().any(|m| m.role == Role::System) {
+            session.add_raw_message(system_prompt.clone(), Role::System);
+        }
+    }
+
     // Show preset suggestions before starting interactive session
     show_preset_suggestions(
         &context_files,
@@ -118,16 +125,19 @@ pub async fn handle_chat_command(args: &ChatArgs, repo: &SqliteRepository) -> Re
     )
     .await?;
 
-    // Create interactive session
-    let mut interactive_session =
-        InteractiveSession::new(repo, repo, repo, repo, session, context_files)?;
+    // Pass any command-line message through so it runs as the first turn.
+    let initial_input = input.clone();
 
-    // If we have initial input, handle it first
-    if let Some(initial_input) = input {
-        println!("🤖 Processing initial input: {}", initial_input);
-        println!();
-        // The interactive session will handle this input
-    }
+    // Create interactive session
+    let mut interactive_session = InteractiveSession::new(
+        repo,
+        repo,
+        repo,
+        repo,
+        session,
+        context_files,
+        initial_input,
+    )?;
 
     // Start the interactive session
     interactive_session.run().await

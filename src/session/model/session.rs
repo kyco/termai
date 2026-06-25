@@ -104,7 +104,7 @@ impl Session {
                     });
                 }
                 None => {
-                    println!("no redaction mapping: {:#?}", message);
+                    // No redaction mapping in effect — keep the message as-is.
                     unredacted.push(message.clone())
                 }
             }

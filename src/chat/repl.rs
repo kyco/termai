@@ -31,6 +31,15 @@ impl ChatHelper {
             // Session
             "/save",
             "/s",
+            "/sessions",
+            "/ls",
+            "/list",
+            "/new",
+            "/n",
+            "/load",
+            "/switch",
+            "/open",
+            "/rename",
             "/clear",
             "/c",
             "/retry",
@@ -172,6 +181,7 @@ impl Helper for ChatHelper {}
 pub struct ChatRepl {
     editor: Editor<ChatHelper, FileHistory>,
     prompt: String,
+    history_path: std::path::PathBuf,
 }
 
 impl ChatRepl {
@@ -186,13 +196,31 @@ impl ChatRepl {
         let mut editor = Editor::with_config(config)?;
         editor.set_helper(Some(helper));
 
-        // Load history if it exists
-        let _ = editor.load_history(".termai_history");
+        // Store history under the user's config dir (not the current working
+        // directory) so it follows the user across projects and doesn't litter
+        // a stray `.termai_history` into every folder chat is launched from.
+        let history_path = Self::resolve_history_path();
+        let _ = editor.load_history(&history_path);
 
         Ok(Self {
             editor,
-            prompt: "❯ ".to_string(), // Restore the prompt
+            prompt: "❯ ".to_string(),
+            history_path,
         })
+    }
+
+    /// Resolve the history file path. Stored next to the app's database under
+    /// `~/.config/termai` (matching the DB location resolved in main.rs), so it
+    /// follows the user across projects instead of littering each CWD. Falls
+    /// back to the legacy in-CWD file only if no home directory is available.
+    fn resolve_history_path() -> std::path::PathBuf {
+        if let Some(home) = dirs::home_dir() {
+            let termai_dir = home.join(".config").join("termai");
+            let _ = std::fs::create_dir_all(&termai_dir);
+            termai_dir.join("history")
+        } else {
+            std::path::PathBuf::from(".termai_history")
+        }
     }
 
     /// Read a line of input from the user
@@ -218,8 +246,7 @@ impl ChatRepl {
         }
     }
 
-    /// Update the prompt (e.g., to show context or status)
-    #[allow(dead_code)]
+    /// Update the prompt (e.g., to reflect the active session / model)
     pub fn set_prompt(&mut self, prompt: String) {
         self.prompt = prompt;
     }
@@ -233,7 +260,7 @@ impl ChatRepl {
     /// Save command history
     pub fn save_history(&mut self) -> Result<()> {
         self.editor
-            .save_history(".termai_history")
+            .save_history(&self.history_path)
             .map_err(|e| anyhow!("Failed to save history: {}", e))?;
         Ok(())
     }
