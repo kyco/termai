@@ -33,7 +33,7 @@ pub fn is_chat_model_id(id: &str) -> bool {
 pub fn is_codex_provider_model_id(id: &str) -> bool {
     matches!(
         id,
-        "gpt-5.4" | "gpt-5.4-pro" | "gpt-5.4-mini" | "gpt-5.4-nano"
+        "gpt-5.5" | "gpt-5.4" | "gpt-5.4-pro" | "gpt-5.4-mini" | "gpt-5.4-nano"
     ) || id.contains("codex")
 }
 
@@ -195,6 +195,12 @@ mod tests {
     fn test_filter_models_for_openai_codex_provider() {
         let models = vec![
             ModelObject {
+                id: "gpt-5.5".into(),
+                object: "model".into(),
+                created: 1686935005,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
                 id: "gpt-5.4".into(),
                 object: "model".into(),
                 created: 1686935004,
@@ -223,12 +229,21 @@ mod tests {
         let codex_models = filter_models_for_provider(&models, "openai-codex");
         let ids: Vec<&str> = codex_models.iter().map(|m| m.id.as_str()).collect();
 
-        assert_eq!(ids, vec!["gpt-5.4", "gpt-5.4-mini", "gpt-5.2-codex"]);
+        assert_eq!(
+            ids,
+            vec!["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.2-codex"]
+        );
     }
 
     #[test]
     fn test_filter_models_for_openai_provider_excludes_codex_models() {
         let models = vec![
+            ModelObject {
+                id: "gpt-5.5".into(),
+                object: "model".into(),
+                created: 1686935005,
+                owned_by: "openai".into(),
+            },
             ModelObject {
                 id: "gpt-5.4".into(),
                 object: "model".into(),
@@ -256,7 +271,8 @@ mod tests {
     }
 
     #[test]
-    fn test_infer_provider_treats_gpt_5_4_as_codex() {
+    fn test_infer_provider_treats_codex_routed_models_as_codex() {
+        assert_eq!(infer_provider_from_model_id("gpt-5.5"), Some("codex"));
         assert_eq!(infer_provider_from_model_id("gpt-5.4"), Some("codex"));
         assert_eq!(infer_provider_from_model_id("gpt-5.3-codex"), Some("codex"));
         assert_eq!(infer_provider_from_model_id("gpt-5.2"), Some("openai"));

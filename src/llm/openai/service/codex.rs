@@ -13,7 +13,7 @@ use crate::session::model::session::Session;
 use anyhow::{anyhow, Result};
 
 /// Default model for Codex API
-const DEFAULT_CODEX_MODEL: &str = "gpt-5.4";
+const DEFAULT_CODEX_MODEL: &str = "gpt-5.5";
 
 fn build_request(session: &Session, model_param: Option<&str>) -> Result<CodexRequest> {
     let model = model_param.unwrap_or(DEFAULT_CODEX_MODEL).to_string();
@@ -128,13 +128,26 @@ mod tests {
     use crate::session::model::session::Session;
 
     #[test]
+    fn test_build_request_uses_default_codex_model() {
+        let mut session = Session::new_temporary();
+        session
+            .messages
+            .push(Message::new(String::new(), Role::User, "hey".to_string()));
+
+        let request = build_request(&session, None).unwrap();
+        let json = serde_json::to_value(&request).unwrap();
+
+        assert_eq!(json["model"], "gpt-5.5");
+    }
+
+    #[test]
     fn test_build_request_serializes_single_turn_input_as_array() {
         let mut session = Session::new_temporary();
         session
             .messages
             .push(Message::new(String::new(), Role::User, "hey".to_string()));
 
-        let request = build_request(&session, Some("gpt-5.4")).unwrap();
+        let request = build_request(&session, Some("gpt-5.5")).unwrap();
         let json = serde_json::to_value(&request).unwrap();
 
         assert!(json["input"].is_array());
@@ -166,7 +179,7 @@ mod tests {
             "Follow-up".to_string(),
         ));
 
-        let request = build_request(&session, Some("gpt-5.4")).unwrap();
+        let request = build_request(&session, Some("gpt-5.5")).unwrap();
         let json = serde_json::to_value(&request).unwrap();
 
         assert_eq!(json["instructions"], "Be concise.");

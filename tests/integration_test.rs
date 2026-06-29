@@ -86,7 +86,7 @@ fn test_thinking_timer() {
 }
 
 #[test]
-fn test_config_show_preserves_codex_gpt_5_4_defaults() {
+fn test_config_show_preserves_legacy_codex_gpt_5_4_defaults() {
     let temp_dir = TempDir::new().unwrap();
     let home_dir = temp_dir.path();
     let xdg_config_home = home_dir.join(".config");

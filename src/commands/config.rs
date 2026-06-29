@@ -43,7 +43,7 @@ pub async fn handle_config_command(
             "Delete ~/.config/termai/config.toml for defaults, then use 'termai auth logout <provider>' if you also want to clear credentials.",
         ),
         ConfigAction::Env => handle_supported_env_command(),
-        
+
         // Project configuration commands
         ConfigAction::Init { project_type, template, force } => {
             handle_config_init(project_type.as_deref(), template.as_deref(), *force)

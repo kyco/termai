@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Codex API request structure
 #[derive(Serialize, Debug, Clone)]
 pub struct CodexRequest {
-    /// The model to use (e.g., "gpt-5.2-codex")
+    /// The model to use (e.g., "gpt-5.5")
     pub model: String,
 
     /// Instructions/system prompt for the model
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_request_serializes_input_as_message_array() {
         let request = CodexRequest::from_messages(
-            "gpt-5.4".to_string(),
+            "gpt-5.5".to_string(),
             vec![CodexMessage {
                 role: "user".to_string(),
                 content: "hey".to_string(),

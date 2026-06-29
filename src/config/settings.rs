@@ -43,7 +43,7 @@ impl SettingsProvider {
         match self {
             Self::Claude => "claude-sonnet-4-20250514",
             Self::Openai => "gpt-5.2",
-            Self::Codex => "gpt-5.4",
+            Self::Codex => "gpt-5.5",
         }
     }
 }
@@ -590,17 +590,48 @@ type = "python"
     }
 
     #[test]
-    fn test_codex_recommended_model_uses_gpt_5_4() {
-        assert_eq!(SettingsProvider::Codex.recommended_model(), "gpt-5.4");
+    fn test_codex_recommended_model_uses_gpt_5_5() {
+        assert_eq!(SettingsProvider::Codex.recommended_model(), "gpt-5.5");
     }
 
     #[test]
-    fn test_model_matches_provider_accepts_gpt_5_4_for_codex_only() {
-        assert!(model_matches_provider("gpt-5.4", &SettingsProvider::Codex));
+    fn test_resolved_settings_defaults_codex_to_gpt_5_5() {
+        let temp_dir = TempDir::new().unwrap();
+        let user_config_path = temp_dir.path().join("config.toml");
+
+        std::fs::write(
+            &user_config_path,
+            r#"
+version = 1
+
+[default]
+provider = "codex"
+"#,
+        )
+        .unwrap();
+
+        let settings = ResolvedSettings::load(
+            ResolvedSettingsPaths {
+                user_config_path,
+                project_root: None,
+            },
+            SettingsOverrides::default(),
+        )
+        .unwrap();
+
+        assert_eq!(settings.default_provider, SettingsProvider::Codex);
+        assert_eq!(settings.default_model, None);
+        assert_eq!(settings.selected_model(), "gpt-5.5");
+    }
+
+    #[test]
+    fn test_model_matches_provider_accepts_codex_routed_models_for_codex_only() {
+        assert!(model_matches_provider("gpt-5.5", &SettingsProvider::Codex));
         assert!(!model_matches_provider(
-            "gpt-5.4",
+            "gpt-5.5",
             &SettingsProvider::Openai
         ));
+        assert!(model_matches_provider("gpt-5.4", &SettingsProvider::Codex));
         assert!(model_matches_provider(
             "gpt-5.3-codex",
             &SettingsProvider::Codex
@@ -608,7 +639,7 @@ type = "python"
     }
 
     #[test]
-    fn test_resolved_settings_keeps_codex_gpt_5_4_model() {
+    fn test_resolved_settings_keeps_legacy_codex_gpt_5_4_model() {
         let temp_dir = TempDir::new().unwrap();
         let user_config_path = temp_dir.path().join("config.toml");
 
