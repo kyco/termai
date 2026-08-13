@@ -14,12 +14,15 @@ impl Role {
             _ => Role::User,
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             Role::System => "system".to_string(),
             Role::User => "user".to_string(),
             Role::Assistant => "assistant".to_string(),
-        }
+        };
+        write!(f, "{}", s)
     }
 }

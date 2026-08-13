@@ -118,7 +118,7 @@ impl SetupWizard {
         );
         println!();
 
-        let providers = vec![
+        let providers = [
             Provider::Claude,
             Provider::OpenAI,
             Provider::OpenAICodex,

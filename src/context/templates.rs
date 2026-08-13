@@ -18,6 +18,7 @@ pub struct ContextTemplate {
 }
 
 impl ContextTemplate {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         description: String,

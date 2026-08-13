@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn test_theme_manager_creation() {
         let manager = ThemeManager::new();
-        assert!(manager.available_themes.len() > 0);
+        assert!(!manager.available_themes.is_empty());
         assert!(manager.available_themes.contains_key("default"));
         assert!(manager.available_themes.contains_key("dark"));
         assert!(manager.available_themes.contains_key("light"));

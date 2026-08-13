@@ -23,6 +23,7 @@ pub struct SmartContextEntity {
 
 impl SmartContextEntity {
     #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: String,
         session_id: String,

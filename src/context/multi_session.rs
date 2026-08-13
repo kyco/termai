@@ -143,7 +143,7 @@ impl MultiSessionManager {
         let total_files: usize = self.chunks.iter().map(|c| c.files.len()).sum();
         let total_tokens: usize = self.chunks.iter().map(|c| c.estimated_tokens).sum();
 
-        summary.push_str(&format!("📊 **Statistics**\n"));
+        summary.push_str("📊 **Statistics**\n");
         summary.push_str(&format!(
             "   • Total chunks analyzed: {}\n",
             self.chunks.len()

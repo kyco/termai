@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::chat::commands::{ChatCommand, InputType};
     use crate::chat::formatter::ChatFormatter;
@@ -15,7 +16,7 @@ mod tests {
                     // Consume '['
                     chars.next();
                     // Skip until the final byte of the CSI sequence (usually a letter like 'm')
-                    while let Some(next) = chars.next() {
+                    for next in chars.by_ref() {
                         if next.is_ascii_alphabetic() {
                             break;
                         }

@@ -193,6 +193,7 @@ impl SmartContextRepository for SmartContextRepositoryImpl {
 }
 
 /// Helper function to create a new SmartContextEntity with generated ID
+#[allow(clippy::too_many_arguments)]
 pub fn create_smart_context_entity(
     session_id: String,
     project_path: String,
@@ -290,7 +291,7 @@ mod tests {
         assert_eq!(found_entity.project_path, "/path/to/project");
         assert_eq!(found_entity.project_type, "rust");
         assert_eq!(found_entity.max_tokens, Some(4000));
-        assert_eq!(found_entity.chunked_analysis, false);
+        assert!(!found_entity.chunked_analysis);
         assert_eq!(found_entity.total_tokens, Some(1500));
     }
 

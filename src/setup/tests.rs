@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use super::super::validator::ApiKeyValidator;
     use super::super::wizard::SetupWizard;
@@ -26,11 +27,9 @@ mod tests {
 
         pub fn with_data(initial_data: HashMap<String, String>) -> Self {
             let mut entities = HashMap::new();
-            let mut next_id = 1;
-            for (key, value) in initial_data.into_iter() {
+            for (next_id, (key, value)) in (1..).zip(initial_data) {
                 let entity = ConfigEntity::new_with_id(next_id, &key, &value);
                 entities.insert(key, entity);
-                next_id += 1;
             }
             let entities_len = entities.len();
             Self {

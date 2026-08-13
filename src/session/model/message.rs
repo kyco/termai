@@ -4,9 +4,10 @@ use crate::session::entity::message_entity::MessageEntity;
 use serde::{Deserialize, Serialize};
 
 /// Type of message - standard text or compacted history
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub enum MessageType {
     /// Standard text message
+    #[default]
     Standard,
     /// Compacted conversation history from OpenAI
     Compaction {
@@ -15,12 +16,6 @@ pub enum MessageType {
         /// Encrypted content blob
         encrypted_content: String,
     },
-}
-
-impl Default for MessageType {
-    fn default() -> Self {
-        MessageType::Standard
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -137,7 +132,7 @@ impl Message {
 }
 
 #[allow(dead_code)]
-pub fn contains_system_prompt(messages: &Vec<Message>) -> bool {
+pub fn contains_system_prompt(messages: &[Message]) -> bool {
     messages.iter().any(|m| m.role == Role::System)
 }
 

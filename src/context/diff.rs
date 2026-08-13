@@ -513,7 +513,7 @@ impl ContextDiff {
         }
 
         // Sort by modification time (newest first)
-        snapshot_files.sort_by(|a, b| b.1.cmp(&a.1));
+        snapshot_files.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Remove old snapshots beyond keep_count
         for (path, _) in snapshot_files.into_iter().skip(keep_count) {

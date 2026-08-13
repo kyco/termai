@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use chrono;
 use comrak::{markdown_to_html, ComrakOptions};
 use serde_json::Value;
 use std::fs;
@@ -383,7 +382,7 @@ impl ConversationExporter {
                     chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
                 ));
             }
-            content.push_str("\n");
+            content.push('\n');
 
             // Convert markdown code blocks to plain text
             let plain_content = self.markdown_to_plain_text(&message.content);
@@ -659,8 +658,12 @@ mod tests {
 
             let output_path = temp_dir.path().join(filename);
             let exporter = ConversationExporter::new(ExportConfig::default());
-            let result =
-                exporter.export_messages(&[message.clone()], format, &output_path, Some("Test"));
+            let result = exporter.export_messages(
+                std::slice::from_ref(&message),
+                format,
+                &output_path,
+                Some("Test"),
+            );
 
             assert!(result.is_ok(), "Failed to export format: {:?}", format);
             assert!(output_path.exists(), "Export file was not created");

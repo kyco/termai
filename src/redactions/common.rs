@@ -91,8 +91,8 @@ mod tests {
         // Verify each stored value is a valid UUID.
         for key in ["duplicate", "unique"].iter() {
             let uuid_value = result
-                .get(&key.to_string())
-                .expect(&format!("Key '{}' should be present in the map.", key));
+                .get(*key)
+                .unwrap_or_else(|| panic!("Key '{}' should be present in the map.", key));
             assert!(
                 uuid::Uuid::parse_str(uuid_value).is_ok(),
                 "Value for key '{}' is not a valid UUID.",

@@ -6,7 +6,7 @@ use anyhow::Result;
 
 pub fn write_open_ai_key<R: ConfigRepository>(repo: &R, chat_gpt_api_key: &Args) -> Result<()> {
     if let Some(ref chat_gpt_api_key) = chat_gpt_api_key.chat_gpt_api_key {
-        config_service::write_config(repo, &ConfigKeys::ChatGptApiKey.to_key(), &chat_gpt_api_key)
+        config_service::write_config(repo, &ConfigKeys::ChatGptApiKey.to_key(), chat_gpt_api_key)
     } else {
         Ok(())
     }

@@ -106,7 +106,7 @@ impl PresetManager {
             if path.is_file()
                 && path
                     .extension()
-                    .map_or(false, |ext| ext == "yaml" || ext == "yml")
+                    .is_some_and(|ext| ext == "yaml" || ext == "yml")
             {
                 match self.load_preset_info(&path) {
                     Ok(mut info) => {

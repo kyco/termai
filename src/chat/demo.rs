@@ -11,7 +11,7 @@ pub async fn demo_enhanced_chat_formatting() -> Result<()> {
     let mut formatter = ChatFormatter::new();
 
     // Demo different types of responses that would come from an AI
-    let sample_responses = vec![
+    let sample_responses = [
         (
             "Simple response",
             "Hello! I'm your AI assistant. How can I help you today?",

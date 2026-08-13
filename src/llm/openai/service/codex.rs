@@ -113,8 +113,8 @@ pub async fn chat(
 fn extract_text_from_content(content: Vec<CodexContentItem>) -> String {
     content
         .into_iter()
-        .filter_map(|item| match item {
-            CodexContentItem::OutputText { text, .. } => Some(text),
+        .map(|item| match item {
+            CodexContentItem::OutputText { text, .. } => text,
         })
         .collect::<Vec<String>>()
         .join("\n")

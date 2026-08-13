@@ -21,6 +21,7 @@ impl<R: SmartContextRepository> SmartContextService<R> {
     }
 
     /// Discover smart context and associate it with a session
+    #[allow(clippy::too_many_arguments)]
     pub async fn discover_and_store_context(
         &self,
         session_id: String,
@@ -39,7 +40,7 @@ impl<R: SmartContextRepository> SmartContextService<R> {
             if let Ok(existing_context) = SessionSmartContext::from_entity(&existing_entity) {
                 // Check if existing context is still valid
                 if existing_context.is_valid_for_query(
-                    query_hash.as_ref().map(|s| s.as_str()),
+                    query_hash.as_deref(),
                     None, // TODO: Add config hash support
                 ) && existing_context.project_path == project_path.to_string_lossy()
                 {
@@ -169,7 +170,7 @@ impl<R: SmartContextRepository> SmartContextService<R> {
             // Check query hash matches
             let query_hash = query.map(|q| self.hash_string(q));
             Ok(context.is_valid_for_query(
-                query_hash.as_ref().map(|s| s.as_str()),
+                query_hash.as_deref(),
                 None, // TODO: Add config hash
             ))
         } else {

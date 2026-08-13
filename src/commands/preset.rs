@@ -222,10 +222,10 @@ async fn handle_list_presets(
             };
 
             println!(
-                "│ {} │ {} │ {} │ {} │",
+                "│ {} │ {} │ {:<32} │ {} │",
                 format!("{:<19}", name_display).bright_green(),
                 format!("{:<11}", preset.category).bright_cyan(),
-                format!("{:<32}", description_truncated),
+                description_truncated,
                 format!("{:<7}", usage_display).bright_white()
             );
         }
@@ -250,6 +250,7 @@ async fn handle_list_presets(
 }
 
 /// Handle using a preset
+#[allow(clippy::too_many_arguments)]
 async fn handle_use_preset(
     manager: &PresetManager,
     name: &str,
@@ -695,7 +696,7 @@ async fn handle_delete_preset(manager: &PresetManager, name: &str, force: bool) 
     if !force {
         use dialoguer::Confirm;
         if !Confirm::new()
-            .with_prompt(&format!(
+            .with_prompt(format!(
                 "Are you sure you want to delete preset '{}'?",
                 name
             ))
@@ -768,7 +769,7 @@ async fn handle_edit_preset(
 
         use dialoguer::Confirm;
         if !Confirm::new()
-            .with_prompt(&format!(
+            .with_prompt(format!(
                 "Built-in presets cannot be edited directly. Create a custom copy of '{}'?",
                 name
             ))
@@ -1261,7 +1262,7 @@ fn format_files_for_template(files: &[Files]) -> String {
                 "java" => result.push_str("java"),
                 "kt" => result.push_str("kotlin"),
                 "cpp" | "cc" | "cxx" => result.push_str("cpp"),
-                "c" => result.push_str("c"),
+                "c" => result.push('c'),
                 "cs" => result.push_str("csharp"),
                 "php" => result.push_str("php"),
                 "rb" => result.push_str("ruby"),
@@ -1283,7 +1284,7 @@ fn format_files_for_template(files: &[Files]) -> String {
     result
 }
 
-/// Helper functions for enhanced preset creation
+// Helper functions for enhanced preset creation
 
 /// Detect template variables from content using regex
 fn detect_template_variables(content: &str) -> Vec<String> {
@@ -1358,7 +1359,7 @@ fn define_template_variables(
 
         let description: String = Input::new()
             .with_prompt("  📋 Description")
-            .with_initial_text(&format!("Description for {}", var_name))
+            .with_initial_text(format!("Description for {}", var_name))
             .interact_text()?;
 
         let type_selection = Select::new()
@@ -1588,10 +1589,10 @@ async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Re
 
                 preset.template.template = new_content;
                 println!("✅ Template updated via external editor");
-                return Ok(true);
+                Ok(true)
             } else {
                 println!("ℹ️  No template changes made");
-                return Ok(false);
+                Ok(false)
             }
         }
         1 => {
@@ -1604,10 +1605,10 @@ async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Re
             if new_content != preset.template.template {
                 preset.template.template = new_content;
                 println!("✅ Template updated");
-                return Ok(true);
+                Ok(true)
             } else {
                 println!("ℹ️  No template changes made");
-                return Ok(false);
+                Ok(false)
             }
         }
         2 => {
@@ -1627,7 +1628,7 @@ async fn edit_preset_template(preset: &mut crate::preset::manager::Preset) -> Re
                 return Box::pin(edit_preset_template(preset)).await;
             }
 
-            return Ok(false);
+            Ok(false)
         }
         _ => Ok(false),
     }
@@ -1704,7 +1705,7 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
                     continue;
                 }
 
-                let vars = define_template_variables(&vec![name.clone()])?;
+                let vars = define_template_variables(std::slice::from_ref(&name))?;
                 if let Some(var_def) = vars.get(&name) {
                     preset
                         .template
@@ -1728,7 +1729,7 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
                 let var_name = var_names[var_choice].clone();
                 println!("✏️  Editing variable: {}", var_name.bright_cyan());
 
-                let new_vars = define_template_variables(&vec![var_name.clone()])?;
+                let new_vars = define_template_variables(std::slice::from_ref(&var_name))?;
                 if let Some(new_var_def) = new_vars.get(&var_name) {
                     preset
                         .template
@@ -1751,7 +1752,7 @@ fn edit_preset_variables(preset: &mut crate::preset::manager::Preset) -> Result<
 
                 let var_name = var_names[var_choice].clone();
                 if Confirm::new()
-                    .with_prompt(&format!("Remove variable '{}'?", var_name))
+                    .with_prompt(format!("Remove variable '{}'?", var_name))
                     .default(false)
                     .interact()?
                 {

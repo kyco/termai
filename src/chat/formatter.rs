@@ -425,26 +425,26 @@ impl ChatFormatter {
         let trimmed = line.trim();
 
         // Handle headers - improved styling with better visual separation
-        if trimmed.starts_with("### ") {
-            let title = &trimmed[4..]; // Remove "### "
+        if let Some(title) = trimmed.strip_prefix("### ") {
+            // Remove "### "
             return format!("🔷 {}", title)
                 .bright_cyan()
                 .bold()
                 .to_string()
                 .into();
-        } else if trimmed.starts_with("##") {
-            let title = if trimmed.starts_with("## ") {
-                &trimmed[3..] // Remove "## "
+        } else if let Some(stripped) = trimmed.strip_prefix("##") {
+            let title = if let Some(with_space) = trimmed.strip_prefix("## ") {
+                with_space // Remove "## "
             } else {
-                &trimmed[2..] // Remove "##"
+                stripped // Remove "##"
             };
             return format!("🔵 {}", title.trim())
                 .bright_blue()
                 .bold()
                 .to_string()
                 .into();
-        } else if trimmed.starts_with("# ") {
-            let title = &trimmed[2..]; // Remove "# "
+        } else if let Some(title) = trimmed.strip_prefix("# ") {
+            // Remove "# "
             return format!("🟢 {}", title)
                 .bright_green()
                 .bold()
@@ -476,8 +476,8 @@ impl ChatFormatter {
         }
 
         // Handle blockquotes
-        if trimmed.starts_with("> ") {
-            return format!("│ {}", &trimmed[2..])
+        if let Some(stripped) = trimmed.strip_prefix("> ") {
+            return format!("│ {}", stripped)
                 .bright_magenta()
                 .italic()
                 .to_string()
@@ -789,7 +789,8 @@ impl ChatFormatter {
     pub fn format_context_info(&self, context_size: usize, files: &[String]) -> String {
         let mut info = String::new();
         info.push_str(
-            &format!("📁 Context Information:\n")
+            &"📁 Context Information:\n"
+                .to_string()
                 .bright_blue()
                 .bold()
                 .to_string(),

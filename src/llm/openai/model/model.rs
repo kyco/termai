@@ -46,9 +46,9 @@ pub enum Model {
     Davinci002,
 }
 
-impl Model {
-    pub fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for Model {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             Model::Gpt53Codex => "gpt-5.3-codex".to_owned(),
             Model::Gpt5 => "gpt-5.2".to_owned(),
             Model::Gpt5Mini => "gpt-5-mini".to_owned(),
@@ -89,6 +89,7 @@ impl Model {
             Model::Gpt35TurboInstruct => "gpt-3.5-turbo-instruct".to_owned(),
             Model::Babbage002 => "babbage-002".to_owned(),
             Model::Davinci002 => "davinci-002".to_owned(),
-        }
+        };
+        write!(f, "{}", s)
     }
 }

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use super::super::{dispatch_command, handle_legacy_patterns};
     use crate::args::{

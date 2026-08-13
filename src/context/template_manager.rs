@@ -180,19 +180,19 @@ impl TemplateManager {
             config_example.push_str(&format!("max_tokens = {}\n", max_tokens));
         }
 
-        config_example.push_str(&format!("include = [\n"));
+        config_example.push_str("include = [\n");
         for pattern in &template.include_patterns {
             config_example.push_str(&format!("  \"{}\",\n", pattern));
         }
         config_example.push_str("]\n\n");
 
-        config_example.push_str(&format!("exclude = [\n"));
+        config_example.push_str("exclude = [\n");
         for pattern in &template.exclude_patterns {
             config_example.push_str(&format!("  \"{}\",\n", pattern));
         }
         config_example.push_str("]\n\n");
 
-        config_example.push_str(&format!("priority_patterns = [\n"));
+        config_example.push_str("priority_patterns = [\n");
         for pattern in &template.priority_patterns {
             config_example.push_str(&format!("  \"{}\",\n", pattern));
         }

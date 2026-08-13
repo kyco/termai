@@ -9,16 +9,12 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum SettingsProvider {
+    #[default]
     Claude,
     Openai,
     Codex,
-}
-
-impl Default for SettingsProvider {
-    fn default() -> Self {
-        Self::Claude
-    }
 }
 
 impl SettingsProvider {
