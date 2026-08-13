@@ -2,16 +2,15 @@
 
 > A powerful, privacy-focused AI assistant for your terminal
 
-TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports both OpenAI and Anthropic
-Claude APIs (now with Claude Opus 4 support) with a focus on privacy, speed, and developer productivity.
+TermAI is a versatile command-line AI assistant built in Rust that brings the power of modern large language models directly to your terminal. It supports Anthropic Claude, OpenAI GPT-5.x, and OpenAI Codex (via ChatGPT subscription OAuth) with a focus on privacy, speed, and developer productivity.
 
 ![Terminal AI Assistant](https://img.shields.io/badge/Terminal-AI_Assistant-blueviolet) ![Smart Context](https://img.shields.io/badge/🧠_Smart-Context_Discovery-brightgreen) ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)
 
 ## ✨ Features
 
 - **🎯 Interactive Setup Wizard**: Get started in under 2 minutes with guided configuration
-- **🤖 Multi-Provider Support**: Works with both OpenAI and Claude APIs
-- **🚀 Claude Opus 4**: Now powered by Anthropic's most capable model with superior intelligence
+- **🤖 Multi-Provider Support**: Works with Claude, OpenAI GPT-5.x, and Codex (ChatGPT OAuth)
+- **🚀 Modern Models**: Claude Sonnet 4 (`claude-sonnet-4-20250514`) and GPT-5.x family (`gpt-5.4` for Codex) by default
 - **🧠 Smart Context Discovery**: Revolutionary intelligent project analysis that automatically selects the most relevant files
 - **🔄 AI-Powered Git Integration**: Complete Git workflow automation with intelligent commit messages, code reviews, and conflict resolution
 - **📁 Local Context Understanding**: Analyze your code and files for more relevant responses
@@ -97,8 +96,7 @@ termai --smart-context "Add error handling to the user authentication" .
 
 ### ⚡ Key Benefits
 
-- **🎯 90%+ Accuracy**: Finds the right files automatically using advanced relevance scoring
-- **🚀 10x Faster**: No more manually hunting for relevant files
+- **🎯 Automatic Discovery**: Finds relevant files using relevance scoring, so you spend less time hunting for them
 - **💡 Token Optimized**: Stays within API limits while including maximum relevant context
 - **🔍 Multi-Language**: Supports Rust, JavaScript/TypeScript, Python, Go, Java, Kotlin projects
 - **📊 Intelligent Ranking**: Prioritizes entry points, recent changes, and dependency relationships
@@ -272,21 +270,54 @@ termai setup --skip-validation        # Skip API key validation
 
 # View and manage configuration
 termai config show                     # Display current settings
-termai config env                      # Show environment variables
-termai config reset                    # Clear all configuration
 
-# Set API keys and providers
-termai config set-claude KEY           # Configure Claude API
-termai config set-openai KEY           # Configure OpenAI API  
-termai config set-provider claude      # Set default provider
+# Authenticate providers (recommended)
+termai auth login claude               # Configure Claude API key
+termai auth login openai               # Configure OpenAI API key
+termai auth login codex                # Log in to Codex via ChatGPT OAuth
+termai auth status claude              # Check authentication status
+termai auth logout codex               # Remove stored credentials
+
+# Choose models
+termai config set-model                # Interactive model selector
+termai config set-model gpt-5.4       # Set model directly
+termai config list-models              # List available models
 ```
+
+> The older `termai config set-claude/set-openai/set-provider`, `config env`, and `config reset` commands still work but are deprecated and hidden; prefer `termai auth` and `termai config set-model`.
+
+### 🔑 Provider Authentication
+
+```bash
+termai auth login <provider>           # Log in (claude | openai | codex)
+termai auth status <provider>          # Show authentication status
+termai auth logout <provider>          # Remove stored credentials
+```
+
+- **claude** / **openai**: prompts for an API key and stores it locally.
+- **codex**: authenticates via OAuth using your ChatGPT Plus/Pro subscription — no API key needed. See [CODEX_OAUTH.md](CODEX_OAUTH.md) for details.
+
+You can also switch provider and model mid-conversation with the `/provider` and `/model` commands inside `termai chat`.
+
+### 📝 Presets & Templates
+
+Reusable prompt templates with variables, categories, and Git integration:
+
+```bash
+termai preset list                     # List available presets
+termai preset use code-review .        # Run a preset with project context
+termai preset create my-preset         # Create your own preset
+termai preset show code-review         # Inspect a preset
+```
+
+See the [Preset Guide](preset-guide.md) and [Preset Quick Reference](preset-quick-reference.md) for the full workflow.
 
 ### 💬 Session Management
 
 ```bash
 # List and manage sessions
 termai sessions list                   # Show all sessions
-termai sessions list --limit 5 --sort date # Show recent 5 sessions
+termai sessions --limit 5 --sort date list # Show recent 5 sessions
 termai sessions show session_name      # View session details
 termai sessions delete session_name    # Remove a session
 
@@ -294,6 +325,21 @@ termai sessions delete session_name    # Remove a session
 termai chat --session my_project       # Continue specific session
 termai ask --session code_review "Explain this function" ./src/lib.rs
 ```
+
+#### 🌿 Conversation Branching
+
+Sessions support git-style conversation branches, so you can explore alternative directions without losing history:
+
+```bash
+termai sessions branch my_session --name experiment   # Branch from a session
+termai sessions tree my_session                       # Visualize the branch tree
+termai sessions branches my_session                   # List branches
+termai sessions switch my_session experiment          # Switch branches
+termai sessions compare my_session main experiment    # Compare branches
+termai sessions merge my_session experiment --into main # Merge branches
+```
+
+Additional branch tools: `bookmark`, `search`, `stats`, `selective-merge`, `archive`, `cleanup`, and `export`. Run `termai sessions --help` for the full list.
 
 ### 🔒 Privacy & Redaction
 
@@ -313,9 +359,10 @@ termai redact reset                     # Clear all patterns
 termai ask --directories src,tests,docs "Document this project" .
 termai chat --directory src --exclude "*.test.js,node_modules" "Review the code" .
 
-# Provider and model selection
-termai ask --provider openai "Generate API documentation" .
-termai chat --provider claude --model claude-3-5-sonnet-20241022 "Code review" .
+# Provider and model selection (set once, applies to ask/chat)
+termai auth login openai               # Authenticate a provider
+termai config set-model                # Pick the default model interactively
+# ...or switch on the fly inside `termai chat` with /provider and /model
 
 # System prompts and customization
 termai ask --system-prompt "You are a Rust expert" "Optimize this code" ./main.rs
@@ -343,24 +390,15 @@ echo 'source ~/.termai-completion.bash' >> ~/.bashrc
 
 ### 🔍 Environment Variables
 
-TermAI supports environment variables for flexible configuration:
+TermAI supports environment variables for API keys:
 
 ```bash
-# API Keys
-export OPENAI_API_KEY="your-key"
-export CLAUDE_API_KEY="your-key"
-
-# Provider settings  
-export TERMAI_PROVIDER="claude"
-export TERMAI_MODEL="claude-3-5-sonnet-20241022"
-
-# Context settings
-export TERMAI_MAX_CONTEXT_TOKENS="4000"
-export TERMAI_SYSTEM_PROMPT="You are a helpful coding assistant"
-
-# View current environment
-termai config env
+export OPENAI_API_KEY="your-key"       # OpenAI API key
+export CLAUDE_API_KEY="your-key"       # Claude API key
+export ANTHROPIC_API_KEY="your-key"    # Alternative to CLAUDE_API_KEY
 ```
+
+These are the only supported environment variables. Provider, model, and behavior settings are managed with `termai auth`, `termai config set-model`, and `.termai.toml`.
 
 ## 📖 Usage Examples
 
@@ -620,22 +658,6 @@ termai tag create
 git tag v2.1.0 -m "$(termai tag release-notes --from v2.0.0)"
 ```
 
-### 🎬 Workflow Demos
-
-See TermAI's Git integration in action:
-
-![Commit Generation Demo](https://github.com/user/termAI/raw/main/docs/gifs/commit-demo.gif)
-*AI-powered commit message generation with interactive refinement*
-
-![Code Review Demo](https://github.com/user/termAI/raw/main/docs/gifs/review-demo.gif)
-*Comprehensive code review with security and performance analysis*
-
-![Branch Analysis Demo](https://github.com/user/termAI/raw/main/docs/gifs/branch-demo.gif)
-*Smart branch analysis and PR description generation*
-
-![Conflict Resolution Demo](https://github.com/user/termAI/raw/main/docs/gifs/conflicts-demo.gif)
-*AI-assisted merge conflict resolution with strategy recommendations*
-
 ### 🎨 Beautiful Terminal Experience
 
 All Git commands feature:
@@ -725,15 +747,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔮 Future Plans
 
-- Stream responses for faster feedback
-- ✅ Enhanced shell completion with dynamic session/model completion
 - Voice input/output support
 - Additional LLM providers (Gemini, Cohere, etc.)
 - Custom fine-tuned models
 - Enhanced smart context with semantic code analysis
 - Team collaboration features for shared context templates
-- Man page generation for offline documentation
-- Command discovery aids with intelligent suggestions
 
 ---                                                                                                                                                                                                                
 

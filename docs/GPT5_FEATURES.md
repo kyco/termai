@@ -240,14 +240,6 @@ zero_data_retention = false
 2. **Feature Not Available**: Some features require the Responses API
 3. **Performance**: Try reducing reasoning effort or verbosity for faster responses
 
-### Debug Information
-
-Enable debug mode to see which API and features are being used:
-
-```bash
-TERMAI_DEBUG=1 termai chat
-```
-
 ## Implementation Details
 
 The GPT-5.2 integration includes:

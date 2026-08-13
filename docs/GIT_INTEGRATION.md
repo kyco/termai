@@ -685,15 +685,12 @@ src/
 ### Environment Variables
 
 ```bash
-# AI Provider Configuration
-export TERMAI_PROVIDER=claude          # or openai
-export TERMAI_CLAUDE_API_KEY=your_key
-export TERMAI_OPENAI_API_KEY=your_key
-
-# Git Integration Settings  
-export TERMAI_GIT_PAGER=less          # Pager for Git output
-export TERMAI_GIT_EDITOR=vim          # Editor for interactive operations
+# API keys (the only supported environment variables)
+export CLAUDE_API_KEY=your_key         # or ANTHROPIC_API_KEY
+export OPENAI_API_KEY=your_key
 ```
+
+Provider and model are configured with `termai auth login <provider>` and `termai config set-model`.
 
 ### Git Configuration
 

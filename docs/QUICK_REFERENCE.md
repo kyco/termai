@@ -28,10 +28,12 @@ termai ask --smart-context --chunked-analysis "full review" .
 
 ```bash
 termai config show                  # View current settings
-termai config set-provider claude   # Set default provider
-termai config set-openai KEY        # Set OpenAI API key
-termai config set-claude KEY        # Set Claude API key
-termai config env                   # Show environment variables
+termai auth login claude            # Set Claude API key
+termai auth login openai            # Set OpenAI API key
+termai auth login codex             # Codex OAuth via ChatGPT subscription
+termai auth status claude           # Check authentication
+termai config set-model             # Choose default model (interactive)
+termai config list-models           # List available models
 ```
 
 ## 💬 Sessions
@@ -71,7 +73,6 @@ echo 'source ~/.termai-completion.bash' >> ~/.bashrc
 | `--preview-context` | Preview selected files before processing |
 | `--session NAME` | Use named session |
 | `--system-prompt TEXT` | Custom system prompt |
-| `--provider claude\|openai` | Choose AI provider |
 | `--directory DIR` | Include specific directory |
 | `--exclude PATTERNS` | Exclude file patterns |
 | `--max-context-tokens NUM` | Limit context size |
@@ -80,11 +81,11 @@ echo 'source ~/.termai-completion.bash' >> ~/.bashrc
 
 ```bash
 export OPENAI_API_KEY="your-key"
-export CLAUDE_API_KEY="your-key" 
-export TERMAI_PROVIDER="claude"
-export TERMAI_SMART_CONTEXT="true"
-export TERMAI_MAX_CONTEXT_TOKENS="4000"
+export CLAUDE_API_KEY="your-key"
+export ANTHROPIC_API_KEY="your-key"   # alternative to CLAUDE_API_KEY
 ```
+
+These are the only supported environment variables; provider and model are set via `termai auth` and `termai config set-model`.
 
 ## 🎯 Common Workflows
 

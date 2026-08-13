@@ -38,10 +38,12 @@ TermAI uses an intuitive subcommand structure for better discoverability and org
 ### Setup and Configuration
 - `termai setup` - Interactive setup wizard (recommended for first-time setup)
 - `termai config show` - Display current configuration with visual status
-- `termai config set-claude <KEY>` - Set Claude API key
-- `termai config set-openai <KEY>` - Set OpenAI API key  
-- `termai config set-provider claude` - Set default provider (claude or openai)
-- `termai config reset` - Clear all configuration (with confirmation)
+- `termai auth login <provider>` - Authenticate a provider (claude | openai | codex)
+- `termai auth status <provider>` - Show authentication status
+- `termai auth logout <provider>` - Remove stored credentials
+- `termai config set-model [model]` - Set default model (interactive if omitted)
+- `termai config list-models` - List available models
+- (Legacy, hidden but still working: `config set-claude/set-openai/set-provider/reset/env`)
 
 ### One-Shot Questions
 - `termai ask "your question"` - Quick question without starting interactive session
@@ -59,9 +61,9 @@ TermAI uses an intuitive subcommand structure for better discoverability and org
 - `termai chat -d src/ -d tests/` - Multiple directories as context
 
 ### Session Management
-- `termai session list` - List all saved sessions with details
-- `termai session show <name>` - View session details and message history
-- `termai session delete <name>` - Delete session (with confirmation)
+- `termai sessions list` - List all saved sessions with details
+- `termai sessions show <name>` - View session details and message history
+- `termai sessions delete <name>` - Delete session (with confirmation)
 
 ### Privacy and Redaction
 - `termai redact add "pattern"` - Add pattern to be redacted (e.g., email, name)

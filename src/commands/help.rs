@@ -310,7 +310,7 @@ impl HelpSystem {
         println!("   Manage chat sessions and conversation history");
         println!();
         println!("{}", "USAGE:".bright_yellow().bold());
-        println!("   {}", "termai session <COMMAND>".cyan());
+        println!("   {}", "termai sessions <COMMAND>".cyan());
         println!();
         println!("{}", "COMMANDS:".bright_yellow().bold());
         println!(
@@ -329,15 +329,15 @@ impl HelpSystem {
         println!("{}", "EXAMPLES:".bright_yellow().bold());
         println!(
             "   {}                   # List all sessions",
-            "termai session list".cyan()
+            "termai sessions list".cyan()
         );
         println!(
             "   {}        # Delete specific session",
-            "termai session delete debug".cyan()
+            "termai sessions delete debug".cyan()
         );
         println!(
             "   {}          # Show session details",
-            "termai session show debug".cyan()
+            "termai sessions show debug".cyan()
         );
         println!();
         println!("{}", "SESSION INFO INCLUDES:".bright_yellow().bold());

@@ -56,8 +56,8 @@ termai ask --smart-context "Add error handling" .
 - `--chunk-strategy <strategy>` - Chunking strategy: module|functional|token|hierarchical
 - `--session <name>` - Use or create named session
 - `--system-prompt <prompt>` - Custom system prompt
-- `--provider <provider>` - AI provider: claude|openai
-- `--model <model>` - Specific model to use
+
+> Note: `ask` and `chat` have no `--provider`/`--model` flags. Set the provider and model with `termai auth login <provider>` and `termai config set-model`, or switch mid-chat with the `/provider` and `/model` commands.
 
 ### `termai chat [input]`
 Start an interactive chat session.
@@ -126,20 +126,26 @@ Manage TermAI configuration settings.
 #### View Configuration
 ```bash
 termai config show             # Display current settings
-termai config env              # Show environment variables with current values
 ```
 
-#### Set API Keys
+#### Provider Authentication
 ```bash
-termai config set-openai <key>    # Configure OpenAI API key
-termai config set-claude <key>    # Configure Claude API key
-termai config set-provider <name> # Set default provider (claude|openai)
+termai auth login <provider>   # Log in (claude | openai | codex)
+termai auth status <provider>  # Show authentication status
+termai auth logout <provider>  # Remove stored credentials
 ```
 
-#### Reset Configuration
+Claude and OpenAI use API keys; Codex authenticates via OAuth with a ChatGPT Plus/Pro subscription (see [CODEX_OAUTH.md](CODEX_OAUTH.md)).
+
+#### Model Selection
 ```bash
-termai config reset            # Clear all configuration settings
+termai config set-model            # Interactive model selector
+termai config set-model gpt-5.4    # Set model directly
+termai config list-models          # List available models
+termai config list-models --provider claude --refresh
 ```
+
+> The legacy `termai config set-openai/set-claude/set-provider`, `config env`, and `config reset` commands still work but are deprecated and hidden; prefer `termai auth` and `termai config set-model`.
 
 ---
 
@@ -151,9 +157,12 @@ Manage conversation sessions for organizing your work.
 #### List Sessions
 ```bash
 termai sessions list                    # Show all sessions
-termai sessions list --limit 10         # Show first 10 sessions
-termai sessions list --sort date        # Sort by date (name|date|messages)
+termai sessions --limit 10 list         # Show first 10 sessions
+termai sessions --sort date list        # Sort by date (name|date|messages)
+termai sessions --filter api list       # Filter sessions by name pattern
 ```
+
+Note: `--limit`, `--sort`, `--filter`, and `--verbose` are options on `termai sessions` itself and go before the `list` subcommand.
 
 #### Session Details
 ```bash
@@ -243,45 +252,15 @@ termai completion fish > ~/.config/fish/completions/termai.fish
 
 ## Environment Variables
 
-TermAI supports environment variables for flexible configuration:
+TermAI supports environment variables for API keys only:
 
-### API Keys
 ```bash
 OPENAI_API_KEY          # OpenAI API key
 CLAUDE_API_KEY          # Claude API key
+ANTHROPIC_API_KEY       # Alternative to CLAUDE_API_KEY
 ```
 
-### Provider Settings
-```bash
-TERMAI_PROVIDER         # Default provider (claude|openai)
-TERMAI_MODEL            # Default model name
-```
-
-### Context Settings
-```bash
-TERMAI_MAX_CONTEXT_TOKENS    # Default context token limit
-TERMAI_SYSTEM_PROMPT         # Default system prompt
-TERMAI_SMART_CONTEXT         # Enable smart context (true|false)
-TERMAI_PREVIEW_CONTEXT       # Enable context preview (true|false)
-```
-
-### Session Settings  
-```bash
-TERMAI_DEFAULT_SESSION       # Default session name
-TERMAI_AUTO_SAVE_SESSIONS    # Auto-save sessions (true|false)
-```
-
-### Advanced Settings
-```bash
-TERMAI_CHUNK_STRATEGY        # Default chunking strategy
-TERMAI_CHUNKED_ANALYSIS      # Enable chunked analysis (true|false)
-TERMAI_EXCLUDE_PATTERNS      # Default exclude patterns (comma-separated)
-```
-
-### View Environment Variables
-```bash
-termai config env            # Show all environment variables with values
-```
+Provider, model, context, and session behavior are configured with `termai auth`, `termai config set-model`, and `.termai.toml` — not environment variables.
 
 ---
 
@@ -304,8 +283,8 @@ termai ask --smart-context --chunked-analysis "Analyze" .  # Handle large codeba
 ### ⚙️ Configuration
 ```bash
 termai config show                     # View settings
-termai config set-provider claude      # Set default provider
-termai config env                      # View environment variables
+termai auth login claude               # Authenticate a provider
+termai config set-model                # Choose a model
 ```
 
 ### 💬 Sessions
