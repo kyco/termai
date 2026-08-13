@@ -33,7 +33,16 @@ pub fn is_chat_model_id(id: &str) -> bool {
 pub fn is_codex_provider_model_id(id: &str) -> bool {
     matches!(
         id,
-        "gpt-5.4" | "gpt-5.4-pro" | "gpt-5.4-mini" | "gpt-5.4-nano"
+        // GPT-5.6 family (bare "gpt-5.6" is an accepted alias for Sol)
+        "gpt-5.6-sol"
+            | "gpt-5.6-terra"
+            | "gpt-5.6-luna"
+            | "gpt-5.6"
+            // GPT-5.4 family
+            | "gpt-5.4"
+            | "gpt-5.4-pro"
+            | "gpt-5.4-mini"
+            | "gpt-5.4-nano"
     ) || id.contains("codex")
 }
 
@@ -195,6 +204,18 @@ mod tests {
     fn test_filter_models_for_openai_codex_provider() {
         let models = vec![
             ModelObject {
+                id: "gpt-5.6-sol".into(),
+                object: "model".into(),
+                created: 1686935006,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
+                id: "gpt-5.6-luna".into(),
+                object: "model".into(),
+                created: 1686935005,
+                owned_by: "openai".into(),
+            },
+            ModelObject {
                 id: "gpt-5.4".into(),
                 object: "model".into(),
                 created: 1686935004,
@@ -223,7 +244,16 @@ mod tests {
         let codex_models = filter_models_for_provider(&models, "openai-codex");
         let ids: Vec<&str> = codex_models.iter().map(|m| m.id.as_str()).collect();
 
-        assert_eq!(ids, vec!["gpt-5.4", "gpt-5.4-mini", "gpt-5.2-codex"]);
+        assert_eq!(
+            ids,
+            vec![
+                "gpt-5.6-sol",
+                "gpt-5.6-luna",
+                "gpt-5.4",
+                "gpt-5.4-mini",
+                "gpt-5.2-codex"
+            ]
+        );
     }
 
     #[test]
@@ -259,6 +289,18 @@ mod tests {
     fn test_infer_provider_treats_gpt_5_4_as_codex() {
         assert_eq!(infer_provider_from_model_id("gpt-5.4"), Some("codex"));
         assert_eq!(infer_provider_from_model_id("gpt-5.3-codex"), Some("codex"));
+        assert_eq!(infer_provider_from_model_id("gpt-5.2"), Some("openai"));
+    }
+
+    #[test]
+    fn test_infer_provider_treats_gpt_5_6_family_as_codex() {
+        assert_eq!(infer_provider_from_model_id("gpt-5.6-sol"), Some("codex"));
+        assert_eq!(infer_provider_from_model_id("gpt-5.6-terra"), Some("codex"));
+        assert_eq!(infer_provider_from_model_id("gpt-5.6-luna"), Some("codex"));
+        // Bare "gpt-5.6" is an accepted alias routing to Sol
+        assert_eq!(infer_provider_from_model_id("gpt-5.6"), Some("codex"));
+        // Existing mappings remain intact
+        assert_eq!(infer_provider_from_model_id("gpt-5.4"), Some("codex"));
         assert_eq!(infer_provider_from_model_id("gpt-5.2"), Some("openai"));
     }
 

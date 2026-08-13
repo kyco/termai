@@ -985,7 +985,7 @@ where
                         "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
                     ))?;
 
-                openai::service::codex::chat(&access_token, session, Some(&chat_state.model))
+                openai::service::codex::chat(&access_token, session, Some(&chat_state.model), None)
                     .await?;
             }
             _ => {

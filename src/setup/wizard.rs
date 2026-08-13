@@ -424,7 +424,7 @@ impl SetupWizard {
         let preferred_model = match provider {
             "claude" => "claude-sonnet-4-20250514",
             "openai" => "gpt-5.2",
-            "codex" => "gpt-5.4",
+            "codex" => "gpt-5.6-sol",
             _ => "",
         };
         let default_idx = available_models
@@ -452,8 +452,13 @@ impl SetupWizard {
 
     fn get_model_description(model: &str) -> &'static str {
         match model {
+            // GPT-5.6 series
+            "gpt-5.6-sol" => "Flagship GPT-5.6 Codex model (Recommended)",
+            "gpt-5.6-terra" => "Balanced GPT-5.6 model for everyday coding",
+            "gpt-5.6-luna" => "Fastest GPT-5.6 model for quick tasks",
+            "gpt-5.6" => "Alias for gpt-5.6-sol (flagship)",
             // GPT-5.4 series
-            "gpt-5.4" => "Default Codex model for subscribers (Recommended)",
+            "gpt-5.4" => "Previous default Codex model for subscribers",
             "gpt-5.4-pro" => "Higher-compute GPT-5.4 for harder problems",
             "gpt-5.4-mini" => "Faster GPT-5.4 model for high-volume coding",
             "gpt-5.4-nano" => "Small GPT-5.4 model for simple, fast tasks",

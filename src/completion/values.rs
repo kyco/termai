@@ -41,6 +41,12 @@ impl CompletionValues {
             "claude-3-opus-20240229".to_string(),
             "claude-3-sonnet-20240229".to_string(),
             "claude-3-haiku-20240307".to_string(),
+            // GPT-5.6 series routed through Codex OAuth in TermAI
+            // ("gpt-5.6" is an accepted alias routing to Sol)
+            "gpt-5.6-sol".to_string(),
+            "gpt-5.6-terra".to_string(),
+            "gpt-5.6-luna".to_string(),
+            "gpt-5.6".to_string(),
             // GPT-5.4 series routed through Codex OAuth in TermAI
             "gpt-5.4".to_string(),
             "gpt-5.4-pro".to_string(),
@@ -179,6 +185,19 @@ mod tests {
         assert!(!models.is_empty());
         assert!(models.iter().any(|m| m.contains("claude")));
         assert!(models.iter().any(|m| m.contains("gpt")));
+    }
+
+    #[test]
+    fn test_model_names_include_gpt_5_6_family_newest_first() {
+        let models = CompletionValues::model_names();
+        for id in ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.6"] {
+            assert!(models.contains(&id.to_string()), "missing {}", id);
+        }
+
+        // GPT-5.6 entries are listed ahead of the GPT-5.4 entries.
+        let sol_idx = models.iter().position(|m| m == "gpt-5.6-sol").unwrap();
+        let gpt54_idx = models.iter().position(|m| m == "gpt-5.4").unwrap();
+        assert!(sol_idx < gpt54_idx);
     }
 
     #[test]

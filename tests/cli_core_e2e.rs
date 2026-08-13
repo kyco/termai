@@ -252,6 +252,43 @@ fn config_set_model_with_explicit_name_roundtrips_through_show() {
 }
 
 #[test]
+fn config_set_model_gpt_5_6_sol_roundtrips_through_show() {
+    let home = temp_home();
+    // gpt-5.6-sol is part of the built-in catalog: no network required.
+    termai(home.path())
+        .args(["config", "set-model", "gpt-5.6-sol"])
+        .write_stdin("")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Default model set to"));
+
+    termai(home.path())
+        .args(["config", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Default provider: codex"))
+        .stdout(predicate::str::contains("Default model: gpt-5.6-sol"));
+}
+
+#[test]
+fn config_list_models_codex_shows_gpt_5_6_family() {
+    let home = temp_home();
+    // Filtering to codex without an API key uses the built-in catalog: no
+    // network required.
+    termai(home.path())
+        .args(["config", "list-models", "--provider", "codex"])
+        .write_stdin("")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Available Models"))
+        .stdout(predicate::str::contains("OpenAI Codex (ChatGPT Plus/Pro)"))
+        .stdout(predicate::str::contains("gpt-5.6-sol"))
+        .stdout(predicate::str::contains("gpt-5.6-terra"))
+        .stdout(predicate::str::contains("gpt-5.6-luna"))
+        .stdout(predicate::str::contains("gpt-5.6"));
+}
+
+#[test]
 fn config_set_model_rejects_invalid_model_gracefully() {
     let home = temp_home();
     termai(home.path())

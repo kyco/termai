@@ -487,7 +487,7 @@ async fn generate_with_codex(prompt: &str, access_token: &str, model: &str) -> R
             prompt.to_string(),
         ));
 
-    crate::llm::openai::service::codex::chat(access_token, &mut session, Some(model)).await?;
+    crate::llm::openai::service::codex::chat(access_token, &mut session, Some(model), None).await?;
 
     if let Some(last_message) = session.messages.last() {
         return Ok(last_message.content.clone());

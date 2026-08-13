@@ -10,7 +10,7 @@ TermAI is a versatile command-line AI assistant built in Rust that brings the po
 
 - **🎯 Interactive Setup Wizard**: Get started in under 2 minutes with guided configuration
 - **🤖 Multi-Provider Support**: Works with Claude, OpenAI GPT-5.x, and Codex (ChatGPT OAuth)
-- **🚀 Modern Models**: Claude Sonnet 4 (`claude-sonnet-4-20250514`) and GPT-5.x family (`gpt-5.4` for Codex) by default
+- **🚀 Modern Models**: Claude Sonnet 4 (`claude-sonnet-4-20250514`) and GPT-5.x family (`gpt-5.6-sol` for Codex) by default
 - **🧠 Smart Context Discovery**: Revolutionary intelligent project analysis that automatically selects the most relevant files
 - **🔄 AI-Powered Git Integration**: Complete Git workflow automation with intelligent commit messages, code reviews, and conflict resolution
 - **📁 Local Context Understanding**: Analyze your code and files for more relevant responses
@@ -280,7 +280,7 @@ termai auth logout codex               # Remove stored credentials
 
 # Choose models
 termai config set-model                # Interactive model selector
-termai config set-model gpt-5.4       # Set model directly
+termai config set-model gpt-5.6-sol   # Set model directly
 termai config list-models              # List available models
 ```
 

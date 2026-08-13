@@ -140,7 +140,7 @@ Claude and OpenAI use API keys; Codex authenticates via OAuth with a ChatGPT Plu
 #### Model Selection
 ```bash
 termai config set-model            # Interactive model selector
-termai config set-model gpt-5.4    # Set model directly
+termai config set-model gpt-5.6-sol  # Set model directly
 termai config list-models          # List available models
 termai config list-models --provider claude --refresh
 ```

@@ -258,7 +258,8 @@ async fn call_codex_api(
     session.messages = messages;
 
     // Use the Codex chat service
-    crate::llm::openai::service::codex::chat(&access_token, &mut session, Some(model)).await?;
+    crate::llm::openai::service::codex::chat(&access_token, &mut session, Some(model), None)
+        .await?;
 
     // Extract the assistant's response from the updated session
     if let Some(last_message) = session.messages.last() {

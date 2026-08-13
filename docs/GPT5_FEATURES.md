@@ -6,8 +6,9 @@ This document outlines the GPT-5.2 features implemented in TermAI, including usa
 
 TermAI now fully supports GPT-5.2's advanced capabilities, including:
 
+- **GPT-5.6 Model Family (Codex)**: `gpt-5.6-sol` (flagship), `gpt-5.6-terra` (balanced), `gpt-5.6-luna` (fastest); bare `gpt-5.6` is an alias for Sol
 - **GPT-5.2 Model Family**: `gpt-5.2`, `gpt-5.2-chat-latest`, `gpt-5.2-pro`, `gpt-5-mini`, `gpt-5-nano`
-- **Enhanced Reasoning**: None, Low, Medium, High, XHigh reasoning efforts
+- **Enhanced Reasoning**: None, Low, Medium, High, XHigh, Max, Ultra reasoning efforts (`max`/`ultra` are GPT-5.6 Sol only)
 - **Verbosity Control**: Low, Medium, High response lengths
 - **Dual API Support**: Both Chat Completions and new Responses API
 - **Custom Tools**: Freeform text input with optional grammar constraints
@@ -42,6 +43,13 @@ Smaller options are also available:
 - **`gpt-5-mini`**: Cost-optimized reasoning, balances speed/cost/capability
 - **`gpt-5-nano`**: High-throughput tasks, simple instruction-following
 
+The GPT-5.6 family (Codex OAuth default) offers three variants:
+
+- **`gpt-5.6-sol`**: Flagship model; the only model supporting `max` and `ultra` reasoning efforts
+- **`gpt-5.6-terra`**: Balanced model for everyday coding and agent tasks
+- **`gpt-5.6-luna`**: Fastest model for quick, high-volume tasks
+- **`gpt-5.6`**: Accepted alias routing to Sol
+
 ## New Features
 
 ### 1. Enhanced Reasoning Effort
@@ -59,6 +67,10 @@ reasoning_effort: ReasoningEffort::None
 - `Medium`: Balanced reasoning
 - `High`: Thorough reasoning for complex problems
 - `XHigh`: Maximum reasoning effort for the hardest problems (default for TermAI OpenAI chat)
+- `Max`: Highest single-model effort (GPT-5.6 Sol only)
+- `Ultra`: Multi-agent mode (~4 subagents; GPT-5.6 Sol only)
+
+`max` and `ultra` are sent as `reasoning.effort` on the Responses/Codex request. TermAI allows them on any model but warns when the selected model is not `gpt-5.6-sol` (or the `gpt-5.6` alias); the API may reject the request.
 
 ### 2. Verbosity Control
 

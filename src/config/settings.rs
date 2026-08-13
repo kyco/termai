@@ -39,7 +39,7 @@ impl SettingsProvider {
         match self {
             Self::Claude => "claude-sonnet-4-20250514",
             Self::Openai => "gpt-5.2",
-            Self::Codex => "gpt-5.4",
+            Self::Codex => "gpt-5.6-sol",
         }
     }
 }
@@ -586,8 +586,24 @@ type = "python"
     }
 
     #[test]
-    fn test_codex_recommended_model_uses_gpt_5_4() {
-        assert_eq!(SettingsProvider::Codex.recommended_model(), "gpt-5.4");
+    fn test_codex_recommended_model_uses_gpt_5_6_sol() {
+        assert_eq!(SettingsProvider::Codex.recommended_model(), "gpt-5.6-sol");
+    }
+
+    #[test]
+    fn test_model_matches_provider_accepts_gpt_5_6_family_for_codex_only() {
+        for model in ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.6"] {
+            assert!(
+                model_matches_provider(model, &SettingsProvider::Codex),
+                "{} should match codex",
+                model
+            );
+            assert!(
+                !model_matches_provider(model, &SettingsProvider::Openai),
+                "{} should not match openai",
+                model
+            );
+        }
     }
 
     #[test]
@@ -601,6 +617,37 @@ type = "python"
             "gpt-5.3-codex",
             &SettingsProvider::Codex
         ));
+    }
+
+    #[test]
+    fn test_resolved_settings_keeps_codex_gpt_5_6_sol_model() {
+        let temp_dir = TempDir::new().unwrap();
+        let user_config_path = temp_dir.path().join("config.toml");
+
+        std::fs::write(
+            &user_config_path,
+            r#"
+version = 1
+
+[default]
+provider = "codex"
+model = "gpt-5.6-sol"
+"#,
+        )
+        .unwrap();
+
+        let settings = ResolvedSettings::load(
+            ResolvedSettingsPaths {
+                user_config_path,
+                project_root: None,
+            },
+            SettingsOverrides::default(),
+        )
+        .unwrap();
+
+        assert_eq!(settings.default_provider, SettingsProvider::Codex);
+        assert_eq!(settings.default_model.as_deref(), Some("gpt-5.6-sol"));
+        assert_eq!(settings.selected_model(), "gpt-5.6-sol");
     }
 
     #[test]

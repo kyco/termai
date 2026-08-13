@@ -5,12 +5,14 @@
 
 #![allow(dead_code)]
 
+use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
+use crate::llm::openai::model::responses_api::ReasoningConfig;
 use serde::{Deserialize, Serialize};
 
 /// Codex API request structure
 #[derive(Serialize, Debug, Clone)]
 pub struct CodexRequest {
-    /// The model to use (e.g., "gpt-5.2-codex")
+    /// The model to use (e.g., "gpt-5.6-sol")
     pub model: String,
 
     /// Instructions/system prompt for the model
@@ -26,6 +28,11 @@ pub struct CodexRequest {
     /// Temperature for sampling
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
+
+    /// Reasoning configuration (same shape as the Responses API:
+    /// `{"reasoning": {"effort": "..."}}`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<ReasoningConfig>,
 
     /// Whether to store the conversation (must be false for Codex)
     pub store: bool,
@@ -116,6 +123,7 @@ impl CodexRequest {
             input: messages,
             stream: true,
             temperature: None,
+            reasoning: None,
             store: false,
         }
     }
@@ -123,6 +131,12 @@ impl CodexRequest {
     /// Set the system instructions
     pub fn with_instructions(mut self, instructions: String) -> Self {
         self.instructions = Some(instructions);
+        self
+    }
+
+    /// Set the reasoning effort (serialized as `reasoning.effort`)
+    pub fn with_reasoning_effort(mut self, effort: ReasoningEffort) -> Self {
+        self.reasoning = Some(ReasoningConfig { effort });
         self
     }
 }
@@ -154,23 +168,47 @@ impl CodexResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{CodexMessage, CodexRequest};
+    use super::{CodexMessage, CodexRequest, ReasoningEffort};
 
-    #[test]
-    fn test_request_serializes_input_as_message_array() {
-        let request = CodexRequest::from_messages(
-            "gpt-5.4".to_string(),
+    fn simple_request(model: &str) -> CodexRequest {
+        CodexRequest::from_messages(
+            model.to_string(),
             vec![CodexMessage {
                 role: "user".to_string(),
                 content: "hey".to_string(),
             }],
         )
-        .with_instructions("Be concise.".to_string());
+    }
+
+    #[test]
+    fn test_request_serializes_input_as_message_array() {
+        let request = simple_request("gpt-5.6-sol").with_instructions("Be concise.".to_string());
 
         let json = serde_json::to_value(&request).unwrap();
 
         assert!(json["input"].is_array());
         assert_eq!(json["input"][0]["role"], "user");
         assert_eq!(json["input"][0]["content"], "hey");
+    }
+
+    #[test]
+    fn test_request_omits_reasoning_by_default() {
+        let json = serde_json::to_value(simple_request("gpt-5.6-sol")).unwrap();
+        assert!(json.get("reasoning").is_none());
+    }
+
+    #[test]
+    fn test_request_serializes_max_and_ultra_reasoning_effort() {
+        let json = serde_json::to_value(
+            simple_request("gpt-5.6-sol").with_reasoning_effort(ReasoningEffort::Max),
+        )
+        .unwrap();
+        assert_eq!(json["reasoning"]["effort"], "max");
+
+        let json = serde_json::to_value(
+            simple_request("gpt-5.6-sol").with_reasoning_effort(ReasoningEffort::Ultra),
+        )
+        .unwrap();
+        assert_eq!(json["reasoning"]["effort"], "ultra");
     }
 }

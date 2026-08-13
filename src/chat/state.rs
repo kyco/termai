@@ -148,7 +148,7 @@ impl ChatState {
         match provider {
             "claude" => "claude-sonnet-4-20250514".to_string(),
             "openai" => "gpt-5.2".to_string(),
-            "codex" | "openai-codex" | "openai_codex" => "gpt-5.4".to_string(),
+            "codex" | "openai-codex" | "openai_codex" => "gpt-5.6-sol".to_string(),
             _ => "claude-sonnet-4-20250514".to_string(),
         }
     }
@@ -187,7 +187,12 @@ impl ChatState {
     /// Get a description for a model
     fn get_model_description(&self, model: &str) -> &'static str {
         match model {
-            // GPT-5.4 Codex-default models (ChatGPT Plus/Pro via OAuth)
+            // GPT-5.6 Codex-default models (ChatGPT Plus/Pro via OAuth)
+            "gpt-5.6-sol" => "Flagship GPT-5.6 model; supports max/ultra reasoning effort",
+            "gpt-5.6-terra" => "Balanced GPT-5.6 model for everyday coding and agent tasks",
+            "gpt-5.6-luna" => "Fastest GPT-5.6 model for quick, high-volume tasks",
+            "gpt-5.6" => "Alias for gpt-5.6-sol (flagship GPT-5.6)",
+            // GPT-5.4 Codex models (ChatGPT Plus/Pro via OAuth)
             "gpt-5.4" => "Default Codex model for coding and multi-step agent workflows",
             "gpt-5.4-pro" => "Higher-compute GPT-5.4 variant for tougher problems",
             "gpt-5.4-mini" => "Faster GPT-5.4 variant for high-volume coding workflows",
@@ -304,7 +309,14 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(state.provider, "codex");
-        assert_eq!(state.model, "gpt-5.4");
+        assert_eq!(state.model, "gpt-5.6-sol");
+        assert!(state.available_models.contains(&"gpt-5.6-sol".to_string()));
+        assert!(state
+            .available_models
+            .contains(&"gpt-5.6-terra".to_string()));
+        assert!(state.available_models.contains(&"gpt-5.6-luna".to_string()));
+        assert!(state.available_models.contains(&"gpt-5.6".to_string()));
+        // Older Codex-routed models remain available
         assert!(state.available_models.contains(&"gpt-5.4".to_string()));
     }
 
@@ -326,6 +338,12 @@ mod tests {
         assert_eq!(state.model, "claude-sonnet-4-20250514");
         assert_eq!(state.provider, "claude"); // Provider should automatically switch
 
+        let result = state.switch_model("gpt-5.6-sol".to_string());
+        assert!(result.is_ok());
+        assert_eq!(state.model, "gpt-5.6-sol");
+        assert_eq!(state.provider, "codex");
+
+        // gpt-5.4 still routes to codex
         let result = state.switch_model("gpt-5.4".to_string());
         assert!(result.is_ok());
         assert_eq!(state.model, "gpt-5.4");
