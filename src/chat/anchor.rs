@@ -33,6 +33,8 @@ pub struct StatusInfo {
     pub session: String,
     pub token_estimate: usize,
     pub tools_enabled: bool,
+    /// Non-default reasoning effort, e.g. "ultra" (appended as `· ultra`).
+    pub effort: Option<String>,
 }
 
 /// Live spinner segment shown while a response streams.
@@ -233,13 +235,17 @@ pub fn build_lines(state: &AnchorState, width: usize) -> AnchorLayout {
             } else {
                 "tools off"
             };
-            format!(
+            let mut s = format!(
                 "  {} · {} · {} · {}",
                 state.status.model,
                 state.status.session,
                 format_tokens(state.status.token_estimate),
                 tools
-            )
+            );
+            if let Some(effort) = &state.status.effort {
+                s.push_str(&format!(" · {}", effort));
+            }
+            s
         }
     };
     lines.push(dim(&truncate_to_width(&status_text, width)));
@@ -381,6 +387,7 @@ mod tests {
                 session: "git-help".to_string(),
                 token_estimate: 2400,
                 tools_enabled: false,
+                effort: None,
             },
             spinner: None,
             queued: 0,
@@ -545,6 +552,25 @@ mod tests {
         assert_eq!(format_tokens(812), "812 tok");
         assert_eq!(format_tokens(2400), "2.4k tok");
         assert_eq!(format_tokens(13370), "13.4k tok");
+    }
+
+    #[test]
+    fn effort_shows_in_status_when_set() {
+        let mut state = idle_state("");
+        state.status.model = "gpt-5.6-sol".to_string();
+        state.status.effort = Some("ultra".to_string());
+        let layout = build_lines(&state, 80);
+        assert_eq!(
+            strip_ansi(&layout.lines[2]),
+            "  gpt-5.6-sol · git-help · 2.4k tok · tools off · ultra"
+        );
+    }
+
+    #[test]
+    fn effort_absent_from_status_by_default() {
+        let layout = build_lines(&idle_state(""), 80);
+        assert!(!strip_ansi(&layout.lines[2]).contains("ultra"));
+        assert!(strip_ansi(&layout.lines[2]).ends_with("tools off"));
     }
 
     #[test]

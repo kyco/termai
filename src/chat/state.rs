@@ -2,6 +2,7 @@ use crate::completion::values::CompletionValues;
 use crate::llm::openai::model::models_api::{
     infer_provider_from_model_id, model_matches_provider_alias,
 };
+use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use serde::{Deserialize, Serialize};
 
 /// Current chat session state including model and provider settings
@@ -19,6 +20,11 @@ pub struct ChatState {
     /// Whether tools (bash, file operations) are enabled for this session
     #[serde(default)]
     pub tools_enabled: bool,
+
+    /// Session-scoped reasoning effort override (set via /effort). Takes
+    /// precedence over the persisted `reasoning_effort` config key.
+    #[serde(default)]
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl ChatState {
@@ -30,6 +36,7 @@ impl ChatState {
             model,
             available_models,
             tools_enabled: false,
+            reasoning_effort: None,
         }
     }
 
@@ -48,6 +55,21 @@ impl ChatState {
     pub fn toggle_tools(&mut self) -> bool {
         self.tools_enabled = !self.tools_enabled;
         self.tools_enabled
+    }
+
+    /// Set (or clear) the session-scoped reasoning effort override
+    pub fn set_reasoning_effort(&mut self, effort: Option<ReasoningEffort>) {
+        self.reasoning_effort = effort;
+    }
+
+    /// Resolve the effective reasoning effort: the session override (set via
+    /// /effort) beats the persisted config value; both unset means the
+    /// provider default (no effort sent).
+    pub fn effective_reasoning_effort(
+        &self,
+        configured: Option<ReasoningEffort>,
+    ) -> Option<ReasoningEffort> {
+        self.reasoning_effort.clone().or(configured)
     }
 
     /// Switch to a different provider
@@ -348,6 +370,36 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(state.model, "gpt-5.4");
         assert_eq!(state.provider, "codex");
+    }
+
+    #[test]
+    fn test_session_effort_override_beats_config_value() {
+        use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
+
+        let mut state = ChatState::new("codex".to_string(), "gpt-5.6-sol".to_string());
+
+        // Unset everywhere: provider default (no effort sent).
+        assert_eq!(state.effective_reasoning_effort(None), None);
+
+        // Only the config key set: config value applies.
+        assert_eq!(
+            state.effective_reasoning_effort(Some(ReasoningEffort::High)),
+            Some(ReasoningEffort::High)
+        );
+
+        // Session /effort set: it beats the config value.
+        state.set_reasoning_effort(Some(ReasoningEffort::Ultra));
+        assert_eq!(
+            state.effective_reasoning_effort(Some(ReasoningEffort::High)),
+            Some(ReasoningEffort::Ultra)
+        );
+
+        // Clearing the session override falls back to the config value.
+        state.set_reasoning_effort(None);
+        assert_eq!(
+            state.effective_reasoning_effort(Some(ReasoningEffort::High)),
+            Some(ReasoningEffort::High)
+        );
     }
 
     #[test]

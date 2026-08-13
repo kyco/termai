@@ -257,8 +257,9 @@ async fn call_codex_api(
     let mut session = Session::new_temporary();
     session.messages = messages;
 
-    // Use the Codex chat service
-    crate::llm::openai::service::codex::chat(&access_token, &mut session, Some(model), None)
+    // Use the Codex chat service, honoring any configured reasoning effort
+    let effort = crate::config::service::config_service::fetch_reasoning_effort(repo);
+    crate::llm::openai::service::codex::chat(&access_token, &mut session, Some(model), effort)
         .await?;
 
     // Extract the assistant's response from the updated session

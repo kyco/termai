@@ -72,6 +72,15 @@ reasoning_effort: ReasoningEffort::None
 
 `max` and `ultra` are sent as `reasoning.effort` on the Responses/Codex request. TermAI allows them on any model but warns when the selected model is not `gpt-5.6-sol` (or the `gpt-5.6` alias); the API may reject the request.
 
+Enable an effort persistently or per chat session:
+
+```bash
+termai config set-effort ultra     # Persist for ask/chat/commit Codex calls
+termai config set-effort default   # Clear the override
+```
+
+In interactive chat, `/effort ultra` overrides the configured value for the current session; `/effort` alone shows the current value, and `/effort default` clears the session override.
+
 ### 2. Verbosity Control
 
 Control response length independently of reasoning:

@@ -6,6 +6,7 @@ use crate::config::settings::{
     ResolvedSettings, SettingsOverrides, SettingsProvider, UserConfig,
 };
 use crate::llm::openai::model::models_api::{infer_provider_from_model_id, ModelObject};
+use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use crate::repository::db::SqliteRepository;
 use anyhow::{Context, Result};
 use colored::*;
@@ -76,6 +77,7 @@ pub async fn handle_config_command(
         ConfigAction::SetModel { model } => {
             handle_set_model(repo, model.as_deref()).await
         }
+        ConfigAction::SetEffort { effort } => handle_set_effort(repo, effort),
         ConfigAction::ListModels { provider, refresh } => {
             handle_list_models(repo, provider.as_ref(), *refresh).await
         }
@@ -101,6 +103,14 @@ fn handle_config_show(repo: &SqliteRepository) -> Result<()> {
         "{} {}",
         "Default model:".bright_green(),
         settings.selected_model().bright_cyan()
+    );
+    println!(
+        "{} {}",
+        "Reasoning effort:".bright_green(),
+        match config_service::fetch_reasoning_effort(repo) {
+            Some(effort) => effort.to_string().bright_cyan(),
+            None => "default".dimmed(),
+        }
     );
     println!(
         "{} {}",
@@ -251,6 +261,64 @@ fn handle_set_api_key(
         "   {}",
         format!("termai auth status {}", suggested_provider).cyan()
     );
+
+    Ok(())
+}
+
+/// Handle `config set-effort <value>`: persist a reasoning effort override
+/// for OpenAI/Codex requests, or clear it with "default"/"clear"/"unset".
+fn handle_set_effort(repo: &SqliteRepository, effort: &str) -> Result<()> {
+    use crate::config::model::keys::ConfigKeys;
+
+    const VALID_VALUES: &str = "none, low, medium, high, xhigh, max, ultra";
+
+    let key = ConfigKeys::ReasoningEffort.to_key();
+
+    if matches!(effort, "default" | "clear" | "unset") {
+        config_service::write_config(repo, &key, "").context("Failed to clear reasoning effort")?;
+        println!(
+            "{}",
+            "✅ Reasoning effort reset to the provider default"
+                .green()
+                .bold()
+        );
+        return Ok(());
+    }
+
+    let parsed = match effort.parse::<ReasoningEffort>() {
+        Ok(parsed) => parsed,
+        Err(_) => {
+            println!("{}", "❌ Invalid reasoning effort".red().bold());
+            println!();
+            println!(
+                "{} {}",
+                "💡 Valid values:".bright_yellow().bold(),
+                VALID_VALUES.bright_white()
+            );
+            println!(
+                "   {}  # Clear the override",
+                "termai config set-effort default".cyan()
+            );
+            return Ok(());
+        }
+    };
+
+    config_service::write_config(repo, &key, &parsed.to_string())
+        .context("Failed to save reasoning effort")?;
+
+    println!(
+        "{} {}",
+        "✅ Reasoning effort set to".green().bold(),
+        parsed.to_string().bright_cyan().bold()
+    );
+
+    if parsed.requires_sol() {
+        println!(
+            "   {}",
+            "max/ultra effort requires gpt-5.6-sol; other models may be rejected by the API"
+                .yellow()
+        );
+    }
 
     Ok(())
 }

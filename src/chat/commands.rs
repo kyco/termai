@@ -22,6 +22,7 @@ pub enum ChatCommand {
     // AI settings
     Model(Option<String>),
     Provider(Option<String>),
+    Effort(Option<String>),
     Tools(Option<bool>),
     Status,
     Theme(Option<String>),
@@ -156,6 +157,14 @@ impl ChatCommand {
                 };
                 Some(ChatCommand::Provider(provider))
             }
+            "effort" => {
+                let effort = if parts.len() > 1 {
+                    Some(parts[1..].join(" "))
+                } else {
+                    None
+                };
+                Some(ChatCommand::Effort(effort))
+            }
             "tools" | "t" => {
                 let setting = if parts.len() > 1 {
                     match parts[1].to_lowercase().as_str() {
@@ -210,6 +219,7 @@ impl ChatCommand {
             ChatCommand::RemoveContext(_) => "Remove file or directory from context",
             ChatCommand::Model(_) => "Switch AI model or show current",
             ChatCommand::Provider(_) => "Switch AI provider or show current",
+            ChatCommand::Effort(_) => "Set reasoning effort for this session or show current",
             ChatCommand::Tools(_) => "Toggle tool usage (OpenAI only)",
             ChatCommand::Status => "Show current session status",
             ChatCommand::Theme(_) => "Switch display theme or list themes",
@@ -295,6 +305,12 @@ impl ChatCommand {
                 command: "/provider [name]",
                 aliases: "/p",
                 description: "Switch provider (claude/openai/codex)",
+                category: CommandCategory::AiSettings,
+            },
+            CommandEntry {
+                command: "/effort [level]",
+                aliases: "",
+                description: "Set reasoning effort (max/ultra: Sol only)",
                 category: CommandCategory::AiSettings,
             },
             CommandEntry {
@@ -456,6 +472,36 @@ mod tests {
             InputType::Message(msg) => assert_eq!(msg, "Hello, how are you?"),
             _ => panic!("Expected regular message"),
         }
+    }
+
+    #[test]
+    fn test_effort_command_parsing() {
+        assert_eq!(
+            ChatCommand::parse("/effort"),
+            Some(ChatCommand::Effort(None))
+        );
+        assert_eq!(
+            ChatCommand::parse("/effort ultra"),
+            Some(ChatCommand::Effort(Some("ultra".to_string())))
+        );
+        assert_eq!(
+            ChatCommand::parse("/effort max"),
+            Some(ChatCommand::Effort(Some("max".to_string())))
+        );
+        assert_eq!(
+            ChatCommand::parse("/effort default"),
+            Some(ChatCommand::Effort(Some("default".to_string())))
+        );
+    }
+
+    #[test]
+    fn test_command_palette_contains_effort() {
+        let palette = ChatCommand::command_palette();
+        let entry = palette
+            .iter()
+            .find(|e| e.command.starts_with("/effort"))
+            .expect("palette should contain /effort");
+        assert_eq!(entry.category, CommandCategory::AiSettings);
     }
 
     #[test]

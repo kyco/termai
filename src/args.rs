@@ -241,6 +241,12 @@ pub enum ConfigAction {
         /// Optional model name (omit to open the interactive selector)
         model: Option<String>,
     },
+    /// Set reasoning effort for OpenAI/Codex requests
+    #[command(name = "set-effort")]
+    SetEffort {
+        /// Effort level (none|low|medium|high|xhigh|max|ultra), or "default" to clear
+        effort: String,
+    },
     /// List available models
     #[command(name = "list-models")]
     ListModels {

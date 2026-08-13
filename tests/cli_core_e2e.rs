@@ -289,6 +289,46 @@ fn config_list_models_codex_shows_gpt_5_6_family() {
 }
 
 #[test]
+fn config_set_effort_ultra_roundtrips_through_show() {
+    let home = temp_home();
+    termai(home.path())
+        .args(["config", "set-effort", "ultra"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Reasoning effort set to ultra"));
+
+    termai(home.path())
+        .args(["config", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Reasoning effort: ultra"));
+
+    // Clearing restores the provider default.
+    termai(home.path())
+        .args(["config", "set-effort", "default"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Reasoning effort reset"));
+
+    termai(home.path())
+        .args(["config", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Reasoning effort: default"));
+}
+
+#[test]
+fn config_set_effort_rejects_invalid_value_gracefully() {
+    let home = temp_home();
+    termai(home.path())
+        .args(["config", "set-effort", "mega"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Invalid reasoning effort"))
+        .stdout(predicate::str::contains("ultra"));
+}
+
+#[test]
 fn config_set_model_rejects_invalid_model_gracefully() {
     let home = temp_home();
     termai(home.path())

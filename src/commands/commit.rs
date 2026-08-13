@@ -245,7 +245,8 @@ async fn generate_ai_commit_message(
                     "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
                 )
             })?;
-            generate_with_codex(&prompt, &access_token, &selected_model).await?
+            let effort = config_service::fetch_reasoning_effort(repo);
+            generate_with_codex(&prompt, &access_token, &selected_model, effort).await?
         }
     };
 
@@ -472,7 +473,12 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str)
     bail!("No response content from OpenAI Chat Completions API")
 }
 
-async fn generate_with_codex(prompt: &str, access_token: &str, model: &str) -> Result<String> {
+async fn generate_with_codex(
+    prompt: &str,
+    access_token: &str,
+    model: &str,
+    effort: Option<crate::llm::openai::model::reasoning_effort::ReasoningEffort>,
+) -> Result<String> {
     let mut session = crate::session::model::session::Session::new_temporary();
     session.messages.push(crate::session::model::message::Message::new(
         "".to_string(),
@@ -487,7 +493,8 @@ async fn generate_with_codex(prompt: &str, access_token: &str, model: &str) -> R
             prompt.to_string(),
         ));
 
-    crate::llm::openai::service::codex::chat(access_token, &mut session, Some(model), None).await?;
+    crate::llm::openai::service::codex::chat(access_token, &mut session, Some(model), effort)
+        .await?;
 
     if let Some(last_message) = session.messages.last() {
         return Ok(last_message.content.clone());

@@ -691,11 +691,18 @@ where
     }
 
     fn status_info(&self) -> StatusInfo {
+        let effort = self
+            .chat_state
+            .effective_reasoning_effort(
+                crate::config::service::config_service::fetch_reasoning_effort(self.config_repo),
+            )
+            .map(|effort| effort.to_string());
         StatusInfo {
             model: self.chat_state.model.clone(),
             session: self.session.name.clone(),
             token_estimate: Self::estimate_tokens(&self.session),
             tools_enabled: self.chat_state.tools_enabled,
+            effort,
         }
     }
 
@@ -799,6 +806,9 @@ where
             ChatCommand::Provider(provider_name) => {
                 self.handle_provider_command(provider_name).await?;
             }
+            ChatCommand::Effort(effort) => {
+                self.handle_effort_command(effort);
+            }
             ChatCommand::Tools(setting) => {
                 self.handle_tools_command(setting);
             }
@@ -816,6 +826,64 @@ where
             }
         }
         Ok(())
+    }
+
+    /// Handle /effort command - show or set the session reasoning effort
+    fn handle_effort_command(&mut self, effort: Option<String>) {
+        use crate::llm::openai::model::reasoning_effort::{
+            sol_only_effort_warning, ReasoningEffort,
+        };
+
+        const VALID_VALUES: &str = "none, low, medium, high, xhigh, max, ultra";
+
+        match effort {
+            None => {
+                let configured = crate::config::service::config_service::fetch_reasoning_effort(
+                    self.config_repo,
+                );
+                let current = match self.chat_state.effective_reasoning_effort(configured) {
+                    Some(effort) => effort.to_string(),
+                    None => "default (provider default)".to_string(),
+                };
+                self.say(&format!(
+                    "🧠 Reasoning effort: {}\n   Valid values: {} (or 'default' to clear)",
+                    current, VALID_VALUES
+                ));
+            }
+            Some(value) => {
+                let value = value.to_lowercase();
+                if matches!(value.as_str(), "default" | "clear" | "unset") {
+                    self.chat_state.set_reasoning_effort(None);
+                    self.say(
+                        &self
+                            .formatter
+                            .format_success("Reasoning effort reset to default for this session"),
+                    );
+                    return;
+                }
+
+                match value.parse::<ReasoningEffort>() {
+                    Ok(parsed) => {
+                        if let Some(warning) =
+                            sol_only_effort_warning(&self.chat_state.model, &parsed)
+                        {
+                            self.say(&self.formatter.format_warning(&warning));
+                        }
+                        self.chat_state.set_reasoning_effort(Some(parsed.clone()));
+                        self.say(&self.formatter.format_success(&format!(
+                            "Reasoning effort set to {} for this session",
+                            parsed
+                        )));
+                    }
+                    Err(_) => {
+                        self.say(&self.formatter.format_warning(&format!(
+                            "Invalid reasoning effort '{}'. Valid values: {}",
+                            value, VALID_VALUES
+                        )));
+                    }
+                }
+            }
+        }
     }
 
     /// Handle /tools command - toggle or set tool usage
@@ -985,8 +1053,17 @@ where
                         "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
                     ))?;
 
-                openai::service::codex::chat(&access_token, session, Some(&chat_state.model), None)
-                    .await?;
+                // Session /effort override beats the persisted config value.
+                let effort = chat_state.effective_reasoning_effort(
+                    config_service::fetch_reasoning_effort(config_repo),
+                );
+                openai::service::codex::chat(
+                    &access_token,
+                    session,
+                    Some(&chat_state.model),
+                    effort,
+                )
+                .await?;
             }
             _ => {
                 return Err(anyhow!("Unsupported provider: {}", chat_state.provider));

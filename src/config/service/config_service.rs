@@ -2,6 +2,7 @@ use crate::config::entity::config_entity::ConfigEntity;
 use crate::config::env::EnvResolver;
 use crate::config::model::keys::ConfigKeys;
 use crate::config::repository::ConfigRepository;
+use crate::llm::openai::model::reasoning_effort::ReasoningEffort;
 use anyhow::{anyhow, Result};
 
 pub fn write_config<R: ConfigRepository>(repo: &R, key: &str, value: &str) -> Result<()> {
@@ -68,4 +69,16 @@ pub fn has_config<R: ConfigRepository>(repo: &R, key: &str) -> bool {
         key if key == ConfigKeys::ChatGptApiKey.to_key() => EnvResolver::openai_api_key().is_some(),
         _ => false,
     }
+}
+
+/// Fetch the configured reasoning effort override, if any.
+///
+/// Returns `None` when the key is unset, empty (cleared), or holds an
+/// unparseable value, so default request behavior is preserved.
+pub fn fetch_reasoning_effort<R: ConfigRepository>(repo: &R) -> Option<ReasoningEffort> {
+    repo.fetch_by_key(&ConfigKeys::ReasoningEffort.to_key())
+        .ok()
+        .map(|config| config.value)
+        .filter(|value| !value.is_empty())
+        .and_then(|value| value.parse::<ReasoningEffort>().ok())
 }

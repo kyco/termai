@@ -17,6 +17,8 @@ pub enum ConfigKeys {
     ClaudeDefaultModel,
     /// Default model for Codex provider
     CodexDefaultModel,
+    /// Reasoning effort override for OpenAI/Codex requests
+    ReasoningEffort,
     /// Cached OpenAI models (JSON)
     OpenAIModelsCache,
     /// Timestamp when models were last fetched
@@ -37,6 +39,7 @@ impl ConfigKeys {
             Self::OpenAIDefaultModel => "openai_default_model".to_owned(),
             Self::ClaudeDefaultModel => "claude_default_model".to_owned(),
             Self::CodexDefaultModel => "codex_default_model".to_owned(),
+            Self::ReasoningEffort => "reasoning_effort".to_owned(),
             Self::OpenAIModelsCache => "openai_models_cache".to_owned(),
             Self::OpenAIModelsCacheTimestamp => "openai_models_cache_timestamp".to_owned(),
         }
