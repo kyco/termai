@@ -115,7 +115,7 @@ async fn main() -> Result<()> {
     );
     println!(
         "   {}             # Manage sessions",
-        "termai session list".cyan()
+        "termai sessions list".cyan()
     );
     println!(
         "   {}              # View configuration",
@@ -149,10 +149,29 @@ fn db_path() -> Result<PathBuf> {
         dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
     let default_dir = home_dir.join(".config/termai");
     create_dir_all(&default_dir).context("Failed to create TermAI configuration directory")?;
-    Ok(default_dir.join("app.db"))
+    let db_file = default_dir.join("app.db");
+
+    // Restrict permissions on the secret store: the config dir and database
+    // contain API keys/tokens. Applied on every startup so existing installs
+    // are fixed too. No-op on non-unix platforms.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&default_dir, std::fs::Permissions::from_mode(0o700))
+            .context("Failed to restrict permissions on TermAI configuration directory")?;
+        if !db_file.exists() {
+            // Create the (empty) database file so permissions can be applied
+            // before SQLite ever writes secrets to it.
+            std::fs::File::create(&db_file).context("Failed to create TermAI database file")?;
+        }
+        std::fs::set_permissions(&db_file, std::fs::Permissions::from_mode(0o600))
+            .context("Failed to restrict permissions on TermAI database file")?;
+    }
+
+    Ok(db_file)
 }
 
-/// Enhanced error handlers for main initialization
+// Enhanced error handlers for main initialization
 
 fn enhance_database_path_error(error: anyhow::Error) -> anyhow::Error {
     let guidance = format!(

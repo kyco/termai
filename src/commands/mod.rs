@@ -44,7 +44,7 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
             setup::handle_setup_command(repo, setup_args)
                 .await
                 .context("❌ Setup wizard failed")
-                .map_err(|e| enhance_setup_error(e))?;
+                .map_err(enhance_setup_error)?;
             Ok(true)
         }
         Some(Commands::Config {
@@ -86,28 +86,28 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
             chat::handle_chat_command(chat_args, repo)
                 .await
                 .context("❌ Chat session failed")
-                .map_err(|e| enhance_chat_error(e))?;
+                .map_err(enhance_chat_error)?;
             Ok(true)
         }
         Some(Commands::Ask(ask_args)) => {
             ask::handle_ask_command(ask_args, repo)
                 .await
                 .context("❌ Ask command failed")
-                .map_err(|e| enhance_ask_error(e))?;
+                .map_err(enhance_ask_error)?;
             Ok(true)
         }
         Some(Commands::Commit(commit_args)) => {
             commit::handle_commit_command(commit_args, repo)
                 .await
                 .context("❌ Commit command failed")
-                .map_err(|e| enhance_commit_error(e))?;
+                .map_err(enhance_commit_error)?;
             Ok(true)
         }
         Some(Commands::Review(review_args)) => {
             review::handle_review_command(review_args, repo)
                 .await
                 .context("❌ Review command failed")
-                .map_err(|e| enhance_review_error(e))?;
+                .map_err(enhance_review_error)?;
             Ok(true)
         }
         Some(Commands::BranchSummary(branch_args)) => {
@@ -119,7 +119,7 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
                 )
                 .await
                 .context("❌ Release notes generation failed")
-                .map_err(|e| enhance_branch_error(e))?;
+                .map_err(enhance_branch_error)?;
             } else if branch_args.pr_description {
                 branch::generate_pr_description(
                     branch_args.branch.as_deref(),
@@ -128,17 +128,17 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
                 )
                 .await
                 .context("❌ PR description generation failed")
-                .map_err(|e| enhance_branch_error(e))?;
+                .map_err(enhance_branch_error)?;
             } else if branch_args.suggest_name {
                 branch::suggest_branch_name(branch_args.context.as_deref(), repo)
                     .await
                     .context("❌ Branch naming suggestions failed")
-                    .map_err(|e| enhance_branch_error(e))?;
+                    .map_err(enhance_branch_error)?;
             } else {
                 branch::handle_branch_summary_command(branch_args.branch.as_deref(), repo)
                     .await
                     .context("❌ Branch analysis failed")
-                    .map_err(|e| enhance_branch_error(e))?;
+                    .map_err(enhance_branch_error)?;
             }
             Ok(true)
         }
@@ -146,42 +146,42 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
             hooks::handle_hooks_command(&hooks_args.action, hooks_args.hook_type.as_deref(), repo)
                 .await
                 .context("❌ Hooks command failed")
-                .map_err(|e| enhance_hooks_error(e))?;
+                .map_err(enhance_hooks_error)?;
             Ok(true)
         }
         Some(Commands::Stash(stash_args)) => {
             stash::handle_stash_command(stash_args, repo)
                 .await
                 .context("❌ Stash command failed")
-                .map_err(|e| enhance_stash_error(e))?;
+                .map_err(enhance_stash_error)?;
             Ok(true)
         }
         Some(Commands::Tag(tag_args)) => {
             tag::handle_tag_command(tag_args, repo)
                 .await
                 .context("❌ Tag command failed")
-                .map_err(|e| enhance_tag_error(e))?;
+                .map_err(enhance_tag_error)?;
             Ok(true)
         }
         Some(Commands::Rebase(rebase_args)) => {
             rebase::handle_rebase_command(rebase_args, repo)
                 .await
                 .context("❌ Rebase command failed")
-                .map_err(|e| enhance_rebase_error(e))?;
+                .map_err(enhance_rebase_error)?;
             Ok(true)
         }
         Some(Commands::Conflicts(conflicts_args)) => {
             conflicts::handle_conflicts_command(conflicts_args, repo)
                 .await
                 .context("❌ Conflicts command failed")
-                .map_err(|e| enhance_conflicts_error(e))?;
+                .map_err(enhance_conflicts_error)?;
             Ok(true)
         }
         Some(Commands::Preset(preset_args)) => {
             preset::handle_preset_command(preset_args, repo)
                 .await
                 .context("❌ Preset command failed")
-                .map_err(|e| enhance_preset_error(e))?;
+                .map_err(enhance_preset_error)?;
             Ok(true)
         }
         Some(Commands::Completion {
@@ -191,7 +191,7 @@ pub async fn dispatch_command(args: &Args, repo: &SqliteRepository) -> Result<bo
             let mut cmd = Args::command();
             completion::handle_completion_command(action, completion_args, &mut cmd)
                 .context("❌ Completion generation failed")
-                .map_err(|e| enhance_completion_error(e))?;
+                .map_err(enhance_completion_error)?;
             Ok(true)
         }
         Some(Commands::Complete { args }) => {
@@ -288,12 +288,23 @@ fn print_config(repo: &SqliteRepository) -> Result<()> {
     println!("📋 Current Configuration");
     println!("═══════════════════════");
     for config in configs {
-        println!("{} = {}", config.key, config.value);
+        // Never print stored secrets in cleartext: mask API keys and tokens
+        // the same way `termai config env` does.
+        let is_secret = config.key.contains("api_key") || config.key.contains("token");
+        let display_value = if is_secret {
+            config::redact_env_value(&config.value)
+        } else {
+            config.value.clone()
+        };
+        println!("{} = {}", config.key, display_value);
     }
     Ok(())
 }
 
-/// Enhanced error handlers that provide actionable guidance messages
+// Enhanced error handlers that provide actionable guidance messages.
+// They format the incoming error with `{:#}` so the full error chain
+// (context banner + specific root cause) is preserved in the output instead
+// of being swallowed by the generic banner.
 
 fn enhance_setup_error(error: anyhow::Error) -> anyhow::Error {
     let guidance = format!(
@@ -304,7 +315,7 @@ fn enhance_setup_error(error: anyhow::Error) -> anyhow::Error {
         "Ensure you have a stable internet connection for API validation".cyan(),
         "Delete ~/.config/termai/config.toml if you need to reset durable defaults".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_config_error(
@@ -319,7 +330,7 @@ fn enhance_config_error(
         "Run 'termai config show' to see current settings".cyan(),
         "Use 'termai setup' to reconfigure from scratch".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_redact_error(
@@ -334,7 +345,7 @@ fn enhance_redact_error(
         "Run 'termai redact list' to see current patterns".cyan(),
         "Use 'termai config show' to verify redaction configuration".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_session_error(
@@ -349,7 +360,7 @@ fn enhance_session_error(
         "Check if the session name exists and is accessible".cyan(),
         "Verify database permissions (~/.config/termai/app.db)".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_chat_error(error: anyhow::Error) -> anyhow::Error {
@@ -361,7 +372,7 @@ fn enhance_chat_error(error: anyhow::Error) -> anyhow::Error {
         "Check your internet connection for API access".cyan(),
         "Use 'termai setup' to reconfigure API credentials".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_ask_error(error: anyhow::Error) -> anyhow::Error {
@@ -373,7 +384,7 @@ fn enhance_ask_error(error: anyhow::Error) -> anyhow::Error {
         "Check if API keys are properly configured with 'termai config show'".cyan(),
         "Ensure your question is properly quoted if it contains special characters".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_completion_error(error: anyhow::Error) -> anyhow::Error {
@@ -385,7 +396,7 @@ fn enhance_completion_error(error: anyhow::Error) -> anyhow::Error {
         "Try a different shell format (bash, zsh, fish, powershell)".cyan(),
         "Ensure you have write permissions to save completion scripts".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_auth_error(error: anyhow::Error, action: &crate::args::AuthAction) -> anyhow::Error {
@@ -410,7 +421,7 @@ fn enhance_auth_error(error: anyhow::Error, action: &crate::args::AuthAction) ->
             "Check that the local configuration database is available".cyan()
         ),
     };
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_commit_error(error: anyhow::Error) -> anyhow::Error {
@@ -422,7 +433,7 @@ fn enhance_commit_error(error: anyhow::Error) -> anyhow::Error {
         "Check that you have staged changes with 'git status'".cyan(),
         "Use --force to generate messages without staged changes".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_review_error(error: anyhow::Error) -> anyhow::Error {
@@ -434,7 +445,7 @@ fn enhance_review_error(error: anyhow::Error) -> anyhow::Error {
         "Check that you have staged changes with 'git status'".cyan(),
         "Use --files to focus on specific file patterns".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_branch_error(error: anyhow::Error) -> anyhow::Error {
@@ -446,7 +457,7 @@ fn enhance_branch_error(error: anyhow::Error) -> anyhow::Error {
         "Check that the specified branch exists with 'git branch'".cyan(),
         "Use --release-notes with --from-tag for release note generation".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_hooks_error(error: anyhow::Error) -> anyhow::Error {
@@ -460,7 +471,7 @@ fn enhance_hooks_error(error: anyhow::Error) -> anyhow::Error {
         "Check that .git/hooks directory is writable".cyan(),
         "Use 'termai hooks status' to check current hook status".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_stash_error(error: anyhow::Error) -> anyhow::Error {
@@ -474,7 +485,7 @@ fn enhance_stash_error(error: anyhow::Error) -> anyhow::Error {
         "Check that you have changes to stash with 'git status'".cyan(),
         "Use 'termai stash list' to see existing stashes".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_tag_error(error: anyhow::Error) -> anyhow::Error {
@@ -486,7 +497,7 @@ fn enhance_tag_error(error: anyhow::Error) -> anyhow::Error {
         "Use semantic versioning format (e.g., v1.2.3)".cyan(),
         "Use 'termai tag list' to see existing tags".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_rebase_error(error: anyhow::Error) -> anyhow::Error {
@@ -498,7 +509,7 @@ fn enhance_rebase_error(error: anyhow::Error) -> anyhow::Error {
         "Check rebase status with 'termai rebase status'".cyan(),
         "Use 'termai rebase abort' to cancel if needed".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_conflicts_error(error: anyhow::Error) -> anyhow::Error {
@@ -512,7 +523,7 @@ fn enhance_conflicts_error(error: anyhow::Error) -> anyhow::Error {
         "Use 'termai conflicts guide' for comprehensive help".cyan(),
         "Try manual resolution with 'git mergetool'".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }
 
 fn enhance_preset_error(error: anyhow::Error) -> anyhow::Error {
@@ -526,5 +537,5 @@ fn enhance_preset_error(error: anyhow::Error) -> anyhow::Error {
         "Check preset name spelling and case sensitivity".cyan(),
         "Use 'termai preset --help' for command usage information".cyan()
     );
-    anyhow::anyhow!("{}\n{}", error, guidance)
+    anyhow::anyhow!("{:#}\n{}", error, guidance)
 }

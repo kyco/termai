@@ -43,7 +43,7 @@ pub async fn handle_config_command(
             "Delete ~/.config/termai/config.toml for defaults, then use 'termai auth logout <provider>' if you also want to clear credentials.",
         ),
         ConfigAction::Env => handle_supported_env_command(),
-        
+
         // Project configuration commands
         ConfigAction::Init { project_type, template, force } => {
             handle_config_init(project_type.as_deref(), template.as_deref(), *force)
@@ -388,7 +388,10 @@ fn settings_provider_from_cli(provider: Provider) -> SettingsProvider {
     }
 }
 
-fn redact_env_value(value: &str) -> String {
+/// Mask a secret for display: first4...last4 for long values, "[set]" for
+/// short ones. Shared with the legacy --print-config path so stored API keys
+/// are never printed in cleartext.
+pub(crate) fn redact_env_value(value: &str) -> String {
     if value.len() > 8 {
         format!("{}...{}", &value[..4], &value[value.len() - 4..])
     } else if value.is_empty() {

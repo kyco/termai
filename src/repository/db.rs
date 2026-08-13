@@ -19,9 +19,6 @@ impl SqliteRepository {
         messages_add_type_columns(&conn)?;
         sessions_add_current_column(&conn)?;
         sessions_rename_column_key_to_name(&conn)?;
-        if cfg!(debug_assertions) {
-            debug_print_tables(&conn)?;
-        }
         Ok(Self { conn })
     }
 }
@@ -59,6 +56,12 @@ fn create_table_sessions(conn: &Connection) -> Result<()> {
                 expires_at TEXT NOT NULL,
                 current INTEGER NOT NULL DEFAULT 0
             )",
+        [],
+    )?;
+    // conversation_branches declares a FK on sessions(id); without a unique
+    // index on id, SQLite rejects every branch insert with "foreign key mismatch"
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_id ON sessions (id)",
         [],
     )?;
     Ok(())
@@ -245,39 +248,5 @@ fn create_table_branch_metadata(conn: &Connection) -> Result<()> {
         )",
         [],
     )?;
-    Ok(())
-}
-
-fn debug_print_tables(conn: &Connection) -> Result<()> {
-    let mut stmt = conn.prepare(
-        "SELECT name FROM sqlite_master
-         WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-    )?;
-    let table_names = stmt.query_map([], |row| row.get::<_, String>(0))?;
-
-    for table in table_names {
-        let table_name = table?;
-        println!("Table: {}", table_name);
-
-        let mut info = conn.prepare(&format!("PRAGMA table_info({})", table_name))?;
-        let columns = info.query_map([], |row| {
-            let col_name: String = row.get(1)?;
-            let col_type: String = row.get(2)?;
-            let notnull: i64 = row.get(3)?;
-            let _default: Option<String> = row.get(4)?;
-            let pk: i64 = row.get(5)?;
-            Ok(format!(
-                "  {} {}{} {}",
-                col_name,
-                col_type,
-                if notnull == 1 { " NOT NULL" } else { "" },
-                if pk == 1 { "[PK]" } else { "" }
-            ))
-        })?;
-
-        for col in columns {
-            println!("{}", col?);
-        }
-    }
     Ok(())
 }
