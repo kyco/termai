@@ -107,6 +107,111 @@ impl GitRepository {
         &self.repo
     }
 
+    /// List all stashes in the repository
+    pub fn stash_list(&mut self) -> Result<Vec<StashEntry>> {
+        let mut entries = Vec::new();
+        self.repo.stash_foreach(|index, message, id| {
+            entries.push(StashEntry {
+                index,
+                message: message.to_string(),
+                id: *id,
+            });
+            true
+        })?;
+        Ok(entries)
+    }
+
+    /// Create a new stash from the current working directory changes
+    pub fn stash_push(&mut self, message: &str, include_untracked: bool) -> Result<git2::Oid> {
+        let signature = self
+            .repo
+            .signature()
+            .or_else(|_| git2::Signature::now("termai", "termai@localhost"))?;
+
+        let mut flags = git2::StashFlags::DEFAULT;
+        if include_untracked {
+            flags |= git2::StashFlags::INCLUDE_UNTRACKED;
+        }
+
+        let oid = self
+            .repo
+            .stash_save2(&signature, Some(message), Some(flags))
+            .context("Failed to create stash")?;
+        Ok(oid)
+    }
+
+    /// Apply a stash without removing it from the stash list
+    pub fn stash_apply(&mut self, index: usize) -> Result<()> {
+        self.repo
+            .stash_apply(index, None)
+            .with_context(|| format!("Failed to apply stash@{{{}}}", index))?;
+        Ok(())
+    }
+
+    /// Apply a stash and remove it from the stash list
+    pub fn stash_pop(&mut self, index: usize) -> Result<()> {
+        self.repo
+            .stash_pop(index, None)
+            .with_context(|| format!("Failed to pop stash@{{{}}}", index))?;
+        Ok(())
+    }
+
+    /// Drop (delete) a stash without applying it
+    pub fn stash_drop(&mut self, index: usize) -> Result<()> {
+        self.repo
+            .stash_drop(index)
+            .with_context(|| format!("Failed to drop stash@{{{}}}", index))?;
+        Ok(())
+    }
+
+    /// Get the files changed in a stash along with per-file line stats
+    pub fn stash_changed_files(&self, stash_id: git2::Oid) -> Result<Vec<(String, char)>> {
+        let commit = self.repo.find_commit(stash_id)?;
+        let parent = commit.parent(0)?;
+        let diff =
+            self.repo
+                .diff_tree_to_tree(Some(&parent.tree()?), Some(&commit.tree()?), None)?;
+
+        let mut files = Vec::new();
+        diff.foreach(
+            &mut |delta, _| {
+                if let Some(path) = delta.new_file().path().or_else(|| delta.old_file().path()) {
+                    let status = match delta.status() {
+                        git2::Delta::Added => 'A',
+                        git2::Delta::Deleted => 'D',
+                        _ => 'M',
+                    };
+                    files.push((path.to_string_lossy().to_string(), status));
+                }
+                true
+            },
+            None,
+            None,
+            None,
+        )?;
+
+        // Stashes created with --include-untracked store the untracked files
+        // on a third parent commit; include them so `stash show` lists them.
+        if let Ok(untracked_commit) = commit.parent(2) {
+            let untracked_diff =
+                self.repo
+                    .diff_tree_to_tree(None, Some(&untracked_commit.tree()?), None)?;
+            untracked_diff.foreach(
+                &mut |delta, _| {
+                    if let Some(path) = delta.new_file().path().or_else(|| delta.old_file().path())
+                    {
+                        files.push((path.to_string_lossy().to_string(), 'A'));
+                    }
+                    true
+                },
+                None,
+                None,
+                None,
+            )?;
+        }
+        Ok(files)
+    }
+
     /// Check if the repository is in a clean state
     pub fn is_clean(&self) -> Result<bool> {
         let statuses = self
@@ -437,6 +542,14 @@ impl GitRepository {
     }
 }
 
+/// A single stash entry
+#[derive(Debug, Clone)]
+pub struct StashEntry {
+    pub index: usize,
+    pub message: String,
+    pub id: git2::Oid,
+}
+
 /// Git user configuration
 #[derive(Debug, Clone)]
 pub struct UserConfig {
@@ -643,6 +756,57 @@ mod tests {
 
         assert!(!git_repo.is_merging());
         assert!(!git_repo.is_rebasing());
+    }
+
+    #[test]
+    fn test_stash_roundtrip() {
+        let (temp_dir, mut git_repo) = create_test_repo();
+        let file_path = temp_dir.path().join("tracked.txt");
+
+        // Create an initial commit so stashing has a HEAD to work from
+        fs::write(&file_path, "original\n").expect("Failed to write file");
+        {
+            let repo = git_repo.inner();
+            let mut index = repo.index().expect("Failed to get index");
+            index
+                .add_path(Path::new("tracked.txt"))
+                .expect("Failed to add file");
+            index.write().expect("Failed to write index");
+            let tree_id = index.write_tree().expect("Failed to write tree");
+            let tree = repo.find_tree(tree_id).expect("Failed to find tree");
+            let sig = repo.signature().expect("Failed to get signature");
+            repo.commit(Some("HEAD"), &sig, &sig, "initial", &tree, &[])
+                .expect("Failed to commit");
+        }
+
+        // No stashes initially
+        assert!(git_repo.stash_list().expect("stash_list failed").is_empty());
+
+        // Modify and stash
+        fs::write(&file_path, "modified\n").expect("Failed to modify file");
+        git_repo
+            .stash_push("test stash", false)
+            .expect("stash_push failed");
+
+        // Working tree restored, stash listed
+        let content = fs::read_to_string(&file_path).expect("Failed to read file");
+        assert_eq!(content, "original\n");
+
+        let stashes = git_repo.stash_list().expect("stash_list failed");
+        assert_eq!(stashes.len(), 1);
+        assert!(stashes[0].message.contains("test stash"));
+
+        let files = git_repo
+            .stash_changed_files(stashes[0].id)
+            .expect("stash_changed_files failed");
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, "tracked.txt");
+
+        // Pop restores the modification and empties the list
+        git_repo.stash_pop(0).expect("stash_pop failed");
+        let content = fs::read_to_string(&file_path).expect("Failed to read file");
+        assert_eq!(content, "modified\n");
+        assert!(git_repo.stash_list().expect("stash_list failed").is_empty());
     }
 }
 

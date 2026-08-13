@@ -226,6 +226,7 @@ impl BranchMerger {
         repo: &mut SqliteRepository,
         session_id: &str,
         cleanup_strategy: CleanupStrategy,
+        days_threshold: i64,
     ) -> Result<CleanupResult> {
         let branches = BranchService::get_session_branches(repo, session_id)?;
         let mut cleaned_branches = Vec::new();
@@ -234,8 +235,7 @@ impl BranchMerger {
         for branch in &branches {
             let should_cleanup = match cleanup_strategy {
                 CleanupStrategy::ArchiveOld => {
-                    branch.status == "archived" && Self::is_branch_old(branch, 30)
-                    // 30 days
+                    branch.status == "archived" && Self::is_branch_old(branch, days_threshold)
                 }
                 CleanupStrategy::RemoveEmpty => {
                     let messages = BranchService::get_branch_messages(repo, &branch.id)?;
@@ -303,7 +303,7 @@ impl BranchMerger {
 
         output.push_str(&format!("{}\n", "📋 Merge Preview".bright_green().bold()));
         output.push_str(&format!("{}\n", "═".repeat(15).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         // Source branches
         output.push_str(&format!("{}\n", "Source branches:".bright_cyan()));
@@ -340,7 +340,7 @@ impl BranchMerger {
             strategy_desc.bright_white()
         ));
 
-        output.push_str("\n");
+        output.push('\n');
 
         // Conflicts
         if !merge.conflicts.is_empty() {
@@ -395,7 +395,7 @@ impl BranchMerger {
         }
 
         // Resolution plan
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&format!(
             "{}\n",
             "🎯 Resolution Plan:".bright_yellow().bold()
@@ -639,7 +639,7 @@ impl BranchMerger {
             branch.created_at.format("%Y-%m-%d %H:%M:%S")
         ));
         output.push_str(&format!("Status: {}\n", branch.status));
-        output.push_str("\n");
+        output.push('\n');
 
         for (i, message) in messages.iter().enumerate() {
             output.push_str(&format!("Message {} ({:?}):\n", i + 1, message.role));

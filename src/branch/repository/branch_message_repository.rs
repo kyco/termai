@@ -62,7 +62,7 @@ impl BranchMessageRepository {
              ORDER BY sequence_number ASC",
         )?;
 
-        let rows = stmt.query_map(params![branch_id], |row| Ok(row.get::<_, String>(0)?))?;
+        let rows = stmt.query_map(params![branch_id], |row| row.get::<_, String>(0))?;
 
         let mut message_ids = Vec::new();
         for row in rows {
@@ -137,7 +137,7 @@ impl BranchMessageRepository {
             .conn
             .prepare("SELECT DISTINCT branch_id FROM branch_messages WHERE message_id = ?1")?;
 
-        let rows = stmt.query_map(params![message_id], |row| Ok(row.get::<_, String>(0)?))?;
+        let rows = stmt.query_map(params![message_id], |row| row.get::<_, String>(0))?;
 
         let mut branch_ids = Vec::new();
         for row in rows {

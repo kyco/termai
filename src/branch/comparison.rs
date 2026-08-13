@@ -171,7 +171,7 @@ impl BranchComparator {
             "📊 Side-by-Side Branch Comparison".bright_green().bold()
         ));
         output.push_str(&format!("{}\n", "═".repeat(40).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         // Branch headers
         let branch_names: Vec<String> = comparison
@@ -282,7 +282,7 @@ impl BranchComparator {
             "📋 Comparison Summary".bright_yellow().bold()
         ));
         output.push_str(&format!("{}\n", "═".repeat(20).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         let summary = &comparison.summary;
 
@@ -297,7 +297,7 @@ impl BranchComparator {
             "Overall similarity:".bright_cyan(),
             summary.similarity_percentage
         ));
-        output.push_str("\n");
+        output.push('\n');
 
         // Quality scores
         if !summary.quality_scores.is_empty() {
@@ -324,7 +324,7 @@ impl BranchComparator {
                     }
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Unique insights
@@ -350,7 +350,7 @@ impl BranchComparator {
                     insight.description
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Recommendations
@@ -710,7 +710,7 @@ impl QuickCompare {
             "🎯 Branch Outcomes Comparison".bright_green().bold()
         ));
         output.push_str(&format!("{}\n", "═".repeat(30).dimmed()));
-        output.push_str("\n");
+        output.push('\n');
 
         for (i, branch) in comparison.branches.iter().enumerate() {
             let branch_name = branch.branch_name.as_deref().unwrap_or("unnamed");
@@ -753,7 +753,7 @@ impl QuickCompare {
                 ));
             }
 
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Add recommendations

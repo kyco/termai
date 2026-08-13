@@ -45,7 +45,7 @@ impl BranchTree {
         }
 
         // Add legend
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&format!("{}\n", "Legend:".bright_yellow().bold()));
         output.push_str(&format!("  {} Current branch\n", "*".bright_green()));
         output.push_str(&format!("  {} Active branch\n", "●".bright_blue()));
@@ -69,7 +69,7 @@ impl BranchTree {
             if let Some(parent_id) = &branch.parent_branch_id {
                 children_map
                     .entry(parent_id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(branch.clone());
             }
         }
@@ -169,11 +169,7 @@ impl BranchTree {
         };
 
         // Format timestamp
-        let time_info = format!(
-            " [{}]",
-            node.branch.created_at.format("%Y-%m-%d").to_string()
-        )
-        .dimmed();
+        let time_info = format!(" [{}]", node.branch.created_at.format("%Y-%m-%d")).dimmed();
 
         // Add line to output
         output.push_str(&format!(
@@ -275,7 +271,7 @@ impl BranchTree {
             "{}\n",
             "[↑↓] Navigate  [Enter] Switch  [q] Quit".bright_yellow()
         ));
-        output.push_str("\n");
+        output.push('\n');
 
         for root_node in &tree_nodes {
             Self::render_interactive_node(&mut output, root_node, "", true, selected_branch_id)?;

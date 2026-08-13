@@ -14,11 +14,17 @@ use colored::*;
 pub fn handle_sessions_command(
     repo: &SqliteRepository,
     action: &SessionAction,
-    _args: &SessionArgs,
+    args: &SessionArgs,
 ) -> Result<()> {
     match action {
         SessionAction::List => {
-            sessions_service::fetch_all_sessions(repo, repo)?;
+            sessions_service::fetch_sessions_with_options(
+                repo,
+                repo,
+                args.filter.as_deref(),
+                args.limit,
+                &args.sort,
+            )?;
             Ok(())
         }
         SessionAction::Delete { name } => delete_session(repo, name),
@@ -136,13 +142,10 @@ fn delete_session(repo: &SqliteRepository, session_name: &str) -> Result<()> {
         .context(format!("Session '{}' not found", session_name))
         .map_err(|e| {
             let guidance = format!(
-                "\n{}\n{}\n• {}\n• {}",
+                "\n{}\n{}\n• Run '{}' to see available sessions\n• {}",
                 "💡 Session Troubleshooting:".bright_yellow().bold(),
                 "   The specified session could not be found.".white(),
-                format!(
-                    "Run '{}' to see available sessions",
-                    "termai session list".cyan()
-                ),
+                "termai session list".cyan(),
                 "Check the session name spelling and try again".white()
             );
             anyhow::anyhow!("{}\n{}", e, guidance)
@@ -311,7 +314,7 @@ fn show_session_details(repo: &SqliteRepository, session_name: &str) -> Result<(
 
 /// Handle branch creation command
 fn handle_branch_command(
-    _repo: &SqliteRepository,
+    repo: &SqliteRepository,
     session_name: &str,
     branch_name: Option<&str>,
     description: Option<&str>,
@@ -320,6 +323,11 @@ fn handle_branch_command(
     println!("{}", "🌿 Create Conversation Branch".bright_green().bold());
     println!("{}", "═══════════════════════════".white().dimmed());
     println!();
+
+    // Validate source session exists
+    let session = repo
+        .fetch_session_by_name(session_name)
+        .context(format!("Source session '{}' not found", session_name))?;
 
     // Generate branch name if not provided
     let final_branch_name = if let Some(name) = branch_name {
@@ -357,47 +365,17 @@ fn handle_branch_command(
 
     println!();
 
-    // Show what the branch would include
-    println!("📋 Branch would include:");
+    // Show what the branch includes
+    println!("📋 Branch includes:");
     if let Some(index) = from_message {
         println!("   • Messages 0 through {} from source session", index);
     } else {
         println!("   • All messages from source session");
     }
-    println!("   • Full conversation context preserved");
     println!("   • Independent conversation history going forward");
     println!();
 
-    // Show example usage
-    println!("💡 After creation, you can:");
-    println!(
-        "   • Continue with: termai chat --session '{}'",
-        final_branch_name
-    );
-    println!("   • List branches: termai session list");
-    println!(
-        "   • View details: termai session show '{}'",
-        final_branch_name
-    );
-    println!();
-
-    // TODO: Implement actual branch creation
-    // For now, show that it's not yet implemented but the command structure works
-    println!(
-        "{}",
-        "⚠️  Branch creation not yet implemented - requires mutable repository access"
-            .yellow()
-            .bold()
-    );
-    println!("   The branch command structure and validation are working correctly!");
-
-    /* TODO: Uncomment when we have mutable repository access:
-
-    // Validate source session exists
-    let session = repo.fetch_session_by_name(session_name)
-        .context(format!("Source session '{}' not found", session_name))?;
-
-    // Create the branch using BranchService
+    // Create the branch for real using BranchService
     let branch = BranchService::create_branch(
         repo,
         &session.id,
@@ -405,11 +383,24 @@ fn handle_branch_command(
         Some(final_branch_name.clone()),
         description.map(|s| s.to_string()),
         from_message,
-    )?;
+    )
+    .context("Failed to create branch")?;
 
-    println!("✅ Successfully created branch '{}'", final_branch_name);
+    println!(
+        "{}",
+        format!("✅ Successfully created branch '{}'", final_branch_name)
+            .green()
+            .bold()
+    );
     println!("   Branch ID: {}", branch.id);
-    */
+    println!();
+
+    println!("💡 Next steps:");
+    println!(
+        "   • List branches: termai session branches '{}'",
+        session_name
+    );
+    println!("   • View tree: termai session tree '{}'", session_name);
 
     Ok(())
 }
@@ -685,75 +676,59 @@ fn handle_switch_command(
 
     println!();
 
-    if create_new_session {
-        // TODO: Implement new session creation on branch
-        println!(
-            "{}",
-            "📋 Would create new chat session:".bright_blue().bold()
-        );
-        let new_session_name = format!("{}-{}", session_name, branch_name);
-        println!("   • New session name: {}", new_session_name.bright_white());
-        println!("   • Branch context preserved");
-        println!("   • Independent conversation history");
-        println!();
-        println!(
-            "{} {}",
-            "Start new session:".bright_green(),
-            format!("termai chat --session '{}'", new_session_name).bright_cyan()
-        );
-    } else {
-        // TODO: Implement in-place branch switching
-        println!(
-            "{}",
-            "📋 Would switch current context:".bright_blue().bold()
-        );
-        println!("   • Update session to use branch context");
-        println!("   • Preserve conversation state");
-        println!("   • Switch message history to branch");
-        println!();
-        println!(
-            "{} {}",
-            "Continue on branch:".bright_green(),
-            format!("termai chat --session '{}'", session_name).bright_cyan()
-        );
-    }
-
-    // TODO: Remove this when actual switching is implemented
-    println!();
-    println!(
-        "{}",
-        "⚠️  Branch switching not yet fully implemented - requires session state management"
-            .yellow()
-            .bold()
+    // Switching the active conversation context is not implemented yet.
+    // Be honest about it instead of pretending the switch happened.
+    let _ = create_new_session;
+    anyhow::bail!(
+        "Branch switching is not implemented yet.\n   \
+         The branch '{}' exists (ID: {}), but sessions cannot change their active branch context.\n   \
+         Use 'termai session branches {}' to inspect branches in the meantime.",
+        branch_name,
+        target_branch.id,
+        session_name
     );
-    println!("   Command structure and validation are working correctly!");
-
-    Ok(())
 }
 
 /// Handle bookmark command
 fn handle_bookmark_command(
-    _repo: &SqliteRepository,
+    repo: &SqliteRepository,
     session_name: &str,
     branch_identifier: &str,
     bookmark_name: Option<&str>,
     remove: bool,
 ) -> Result<()> {
+    // Validate session exists and resolve the branch by name or ID
+    let session_entity = repo
+        .fetch_session_by_name(session_name)
+        .context(format!("Session '{}' not found", session_name))?;
+
+    let branches = BranchService::get_session_branches(repo, &session_entity.id)?;
+    let target_branch = branches
+        .iter()
+        .find(|b| b.id == branch_identifier || b.branch_name.as_deref() == Some(branch_identifier))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Branch '{}' not found in session '{}'",
+                branch_identifier,
+                session_name
+            )
+        })?;
+
     if remove {
         println!("{}", "🔖 Remove Branch Bookmark".bright_red().bold());
         println!("{}", "═".repeat(25).white().dimmed());
         println!();
 
-        // TODO: Implement bookmark removal when we have mutable repository access
+        BranchService::remove_bookmark(repo, &target_branch.id)
+            .context("Failed to remove bookmark")?;
+
         println!(
             "{}",
-            "⚠️  Bookmark removal not yet implemented - requires mutable repository access"
-                .yellow()
-                .bold()
-        );
-        println!(
-            "   Would remove bookmark from branch '{}' in session '{}'",
-            branch_identifier, session_name
+            format!(
+                "✅ Removed bookmark from branch '{}' in session '{}'",
+                branch_identifier, session_name
+            )
+            .green()
         );
     } else {
         println!("{}", "🔖 Create Branch Bookmark".bright_green().bold());
@@ -779,30 +754,24 @@ fn handle_bookmark_command(
         );
         println!();
 
-        // TODO: Implement bookmark creation when we have mutable repository access
+        BranchService::bookmark_branch(repo, &target_branch.id, final_bookmark_name)
+            .context("Failed to create bookmark")?;
+
         println!(
             "{}",
-            "⚠️  Bookmark creation not yet implemented - requires mutable repository access"
-                .yellow()
+            format!("✅ Created bookmark '{}'", final_bookmark_name)
+                .green()
                 .bold()
-        );
-        println!(
-            "   Would create bookmark '{}' for branch '{}'",
-            final_bookmark_name, branch_identifier
         );
 
         println!();
-        println!("{}", "💡 Once implemented, you can:".bright_yellow().bold());
-        println!(
-            "   • Quick access: termai session switch {} {}",
-            session_name, final_bookmark_name
-        );
+        println!("{}", "💡 Next steps:".bright_yellow().bold());
         println!(
             "   • Search bookmarks: termai session search {} {}",
             session_name, final_bookmark_name
         );
         println!(
-            "   • List bookmarks: termai session branches {} --bookmarked",
+            "   • List branches: termai session branches {}",
             session_name
         );
     }
@@ -1496,7 +1465,7 @@ fn handle_cleanup_command(
     repo: &SqliteRepository,
     session_name: &str,
     strategy_str: &str,
-    _days: i64,
+    days: i64,
     preview: bool,
 ) -> Result<()> {
     println!("{}", "🧹 Branch Cleanup".bright_yellow().bold());
@@ -1523,7 +1492,7 @@ fn handle_cleanup_command(
     // Preview cleanup
     let mut repo_mut = SqliteRepository::new(repo.conn.path().unwrap_or(":memory:".as_ref()))?;
     let cleanup_result =
-        BranchMerger::cleanup_branches(&mut repo_mut, &session_entity.id, strategy)?;
+        BranchMerger::cleanup_branches(&mut repo_mut, &session_entity.id, strategy, days)?;
 
     println!(
         "{} {} branches",

@@ -21,14 +21,11 @@ use dialoguer::{Confirm, Input, Select};
 /// Handle the commit subcommand
 pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -> Result<()> {
     println!("{}", "🔍 Analyzing Git repository...".bright_blue().bold());
-    eprintln!("DEBUG: Starting commit command handler");
 
     // Discover and analyze the Git repository
-    eprintln!("DEBUG: Discovering Git repository");
     let git_repo = GitRepository::discover(".").context(
         "❌ No Git repository found. Please run this command from within a Git repository.",
     )?;
-    eprintln!("DEBUG: Git repository discovered successfully");
 
     // Check repository state
     if git_repo.is_merging() {
@@ -39,36 +36,36 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
         bail!("❌ Repository is in a rebase state. Complete the rebase before generating commit messages.");
     }
 
+    // Stage all changes first if requested
+    if args.add_all {
+        let mut index = git_repo
+            .inner()
+            .index()
+            .context("Failed to open repository index")?;
+        index
+            .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
+            .context("Failed to stage changes")?;
+        index.write().context("Failed to write index")?;
+        println!("{}", "📝 Staged all changes (--add-all)".green());
+    }
+
     // Get repository status
-    eprintln!("DEBUG: Getting repository status");
     let status = git_repo
         .status()
         .context("Failed to get repository status")?;
-    eprintln!("DEBUG: Repository status obtained");
 
     // Check for staged changes unless forced
     if !args.force && !status.has_staged_changes() {
-        if args.add_all {
-            println!(
-                "{}",
-                "📝 No staged changes found. The --add-all flag would stage all changes.".yellow()
-            );
-            println!(
-                "{}",
-                "   Note: This is a placeholder - actual staging not implemented yet.".dimmed()
-            );
-        } else {
-            println!("{}", "❌ No staged changes found.".red().bold());
-            println!();
-            println!("{}", "💡 Suggestions:".bright_yellow().bold());
-            println!(
-                "   • Stage your changes first: {}",
-                "git add <files>".cyan()
-            );
-            println!("   • Use {} to include all changes", "--add-all".cyan());
-            println!("   • Use {} to generate a message anyway", "--force".cyan());
-            return Ok(());
-        }
+        println!("{}", "❌ No staged changes found.".red().bold());
+        println!();
+        println!("{}", "💡 Suggestions:".bright_yellow().bold());
+        println!(
+            "   • Stage your changes first: {}",
+            "git add <files>".cyan()
+        );
+        println!("   • Use {} to include all changes", "--add-all".cyan());
+        println!("   • Use {} to generate a message anyway", "--force".cyan());
+        return Ok(());
     }
 
     // Display current status
@@ -78,20 +75,16 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
     }
 
     // Analyze staged changes
-    eprintln!("DEBUG: Starting diff analysis");
     let diff_analyzer = DiffAnalyzer::new(git_repo.inner());
     let diff_summary = diff_analyzer
         .analyze_staged()
         .context("Failed to analyze staged changes")?;
-    eprintln!("DEBUG: Diff analysis completed");
 
     println!("\n{}", "📋 Change Analysis:".bright_blue().bold());
     diff_summary.display_summary();
 
     // Generate commit message based on changes
-    eprintln!("DEBUG: Starting commit message generation");
     let commit_message = generate_commit_message(&diff_summary, args, repo).await?;
-    eprintln!("DEBUG: Commit message generation completed");
 
     println!("\n{}", "💬 Generated Commit Message:".bright_green().bold());
     println!("{}", "═══════════════════════════════".white().dimmed());
@@ -103,7 +96,6 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
     println!("{}", "═══════════════════════════════".white().dimmed());
 
     // Handle auto-commit or interactive approval
-    eprintln!("DEBUG: Starting interactive or auto-commit section");
     if args.auto {
         println!(
             "\n{}",
@@ -113,7 +105,6 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
         println!("{}", "✅ Commit created successfully!".green().bold());
     } else {
         // Interactive workflow
-        eprintln!("DEBUG: Creating interactive dialog");
         let actions = vec![
             "Accept and commit",
             "Edit message",
@@ -121,16 +112,11 @@ pub async fn handle_commit_command(args: &CommitArgs, repo: &SqliteRepository) -
             "Cancel",
         ];
 
-        eprintln!("DEBUG: About to show Select dialog");
         let selection = Select::new()
             .with_prompt("What would you like to do?")
             .items(&actions)
             .default(0)
             .interact()?;
-        eprintln!(
-            "DEBUG: Select dialog completed with selection: {}",
-            selection
-        );
 
         match selection {
             0 => {
@@ -238,41 +224,30 @@ async fn generate_ai_commit_message(
     let prompt = create_commit_message_prompt(diff_summary, args, &diff_context);
 
     // Call appropriate AI service
-    eprintln!(
-        "DEBUG: Using provider: {}",
-        settings.default_provider.as_str()
-    );
     let ai_response = match settings.default_provider {
         SettingsProvider::Claude => {
-            eprintln!("DEBUG: Getting Claude API key");
             let api_key =
                 config_service::fetch_with_env_fallback(repo, &ConfigKeys::ClaudeApiKey.to_key())
                     .context("Claude API key not configured")?;
-            eprintln!("DEBUG: Calling Claude API");
             generate_with_claude(&prompt, &api_key.value, &selected_model).await?
         }
         SettingsProvider::Openai => {
-            eprintln!("DEBUG: Getting OpenAI API key");
             let api_key =
                 config_service::fetch_with_env_fallback(repo, &ConfigKeys::ChatGptApiKey.to_key())
                     .context("OpenAI API key not configured")?;
-            eprintln!("DEBUG: Calling OpenAI API (falling back to Chat Completions API)");
             // For now, fall back to a simple implementation that doesn't hang
             generate_with_openai_fallback(&prompt, &api_key.value, &selected_model).await?
         }
         SettingsProvider::Codex => {
-            eprintln!("DEBUG: Getting Codex access token");
             let token_manager = crate::auth::token_manager::TokenManager::new(repo);
             let access_token = token_manager.get_valid_token().await?.ok_or_else(|| {
                 anyhow::anyhow!(
                     "Not authenticated with Codex. Run 'termai auth login codex' to authenticate."
                 )
             })?;
-            eprintln!("DEBUG: Calling Codex API");
             generate_with_codex(&prompt, &access_token, &selected_model).await?
         }
     };
-    eprintln!("DEBUG: AI response received");
 
     // Parse AI response into structured commit message
     parse_ai_commit_response(&ai_response, args)
@@ -399,7 +374,6 @@ async fn generate_with_claude(prompt: &str, api_key: &str, model: &str) -> Resul
 /// Generate commit message using OpenAI
 #[allow(dead_code)]
 async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
-    eprintln!("DEBUG: Creating OpenAI request");
     let messages = vec![
         InputMessage {
             role: "system".to_string(),
@@ -413,9 +387,7 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
 
     let request = ResponsesRequest::from_messages(Model::Gpt5.to_string(), messages);
 
-    eprintln!("DEBUG: Sending OpenAI API request");
     let response = ResponsesAdapter::chat(&request, api_key).await?;
-    eprintln!("DEBUG: OpenAI API response received");
 
     // Check if request was successful
     if response.status != "completed" {
@@ -432,8 +404,8 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
             ResponseOutput::Message { content, .. } => {
                 let message_text: String = content
                     .into_iter()
-                    .filter_map(|item| match item {
-                        ContentItem::OutputText { text, .. } => Some(text),
+                    .map(|item| match item {
+                        ContentItem::OutputText { text, .. } => text,
                     })
                     .collect::<Vec<String>>()
                     .join("\n");
@@ -451,7 +423,6 @@ async fn generate_with_openai(prompt: &str, api_key: &str) -> Result<String> {
 
 /// Fallback OpenAI implementation using standard Chat Completions API
 async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str) -> Result<String> {
-    eprintln!("DEBUG: Using OpenAI Chat Completions fallback");
     use reqwest::Client;
     use serde_json::json;
 
@@ -467,7 +438,6 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str)
         "reasoning_effort": "xhigh"
     });
 
-    eprintln!("DEBUG: Sending fallback OpenAI request");
     let response = client
         .post("https://api.openai.com/v1/chat/completions")
         .header("Content-Type", "application/json")
@@ -487,17 +457,12 @@ async fn generate_with_openai_fallback(prompt: &str, api_key: &str, model: &str)
     }
 
     let response_json: serde_json::Value = response.json().await?;
-    eprintln!(
-        "DEBUG: Fallback OpenAI response received: {:?}",
-        response_json
-    );
 
     // Extract the message content
     if let Some(choices) = response_json["choices"].as_array() {
         if let Some(choice) = choices.first() {
             if let Some(message) = choice["message"].as_object() {
                 if let Some(content) = message["content"].as_str() {
-                    eprintln!("DEBUG: Extracted content: {}", content);
                     return Ok(content.to_string());
                 }
             }
@@ -546,7 +511,6 @@ fn parse_ai_commit_response(
         .trim();
 
     let lines: Vec<&str> = cleaned_response.lines().collect();
-    eprintln!("DEBUG: Parsing response lines: {:?}", lines);
 
     // Extract subject and body from AI response
     let mut subject = None;
@@ -852,11 +816,7 @@ async fn execute_commit(
 
     // Get the current HEAD commit (parent)
     let parent_commit = if let Ok(head) = repo.head() {
-        if let Ok(commit) = head.peel_to_commit() {
-            Some(commit)
-        } else {
-            None
-        }
+        head.peel_to_commit().ok()
     } else {
         None // First commit
     };
@@ -885,19 +845,13 @@ async fn execute_commit(
 
     println!("{}", "✅ Commit created successfully!".green().bold());
     println!(
-        "{}",
-        format!(
-            "   Commit ID: {}",
-            commit_id.to_string()[..8].bright_yellow()
-        )
+        "   Commit ID: {}",
+        commit_id.to_string()[..8].bright_yellow()
     );
-    println!(
-        "{}",
-        format!("   Message: {}", commit_message.subject.bright_white())
-    );
+    println!("   Message: {}", commit_message.subject.bright_white());
 
     if let Some(ref body) = commit_message.body {
-        println!("{}", format!("   Body: {}", body.dimmed()));
+        println!("   Body: {}", body.dimmed());
     }
 
     Ok(())

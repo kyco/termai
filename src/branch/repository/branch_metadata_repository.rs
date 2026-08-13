@@ -30,8 +30,7 @@ impl BranchMetadataRepository {
             .conn
             .prepare("SELECT value FROM branch_metadata WHERE branch_id = ?1 AND key = ?2")?;
 
-        let mut rows =
-            stmt.query_map(params![branch_id, key], |row| Ok(row.get::<_, String>(0)?))?;
+        let mut rows = stmt.query_map(params![branch_id, key], |row| row.get::<_, String>(0))?;
 
         match rows.next() {
             Some(row) => Ok(Some(row?)),
@@ -95,7 +94,7 @@ impl BranchMetadataRepository {
             .conn
             .prepare("SELECT branch_id FROM branch_metadata WHERE key = ?1 AND value = ?2")?;
 
-        let rows = stmt.query_map(params![key, value], |row| Ok(row.get::<_, String>(0)?))?;
+        let rows = stmt.query_map(params![key, value], |row| row.get::<_, String>(0))?;
 
         let mut branch_ids = Vec::new();
         for row in rows {

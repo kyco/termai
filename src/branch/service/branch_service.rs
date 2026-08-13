@@ -26,7 +26,7 @@ pub struct BranchService;
 impl BranchService {
     /// Create a new conversation branch
     pub fn create_branch(
-        repo: &mut SqliteRepository,
+        repo: &SqliteRepository,
         session_id: &str,
         parent_branch_id: Option<String>,
         branch_name: Option<String>,
@@ -48,7 +48,7 @@ impl BranchService {
 
         // Copy messages if needed
         if let Some(parent_id) = &parent_branch_id {
-            Self::copy_branch_messages_to_point(repo, &parent_id, &branch_id, from_message_index)?;
+            Self::copy_branch_messages_to_point(repo, parent_id, &branch_id, from_message_index)?;
         } else {
             Self::copy_session_messages_to_point(repo, session_id, &branch_id, from_message_index)?;
         }
@@ -107,7 +107,7 @@ impl BranchService {
 
     /// Add message to branch
     pub fn add_message_to_branch(
-        repo: &mut SqliteRepository,
+        repo: &SqliteRepository,
         branch_id: &str,
         message: &Message,
     ) -> Result<()> {
@@ -153,9 +153,18 @@ impl BranchService {
         }
     }
 
-    /// Internal helper methods
+    // Internal helper methods
 
-    fn create_branch_in_db(repo: &mut SqliteRepository, branch: &BranchEntity) -> Result<()> {
+    fn create_branch_in_db(repo: &SqliteRepository, branch: &BranchEntity) -> Result<()> {
+        // The conversation_branches table declares a foreign key on sessions(id),
+        // but the sessions table has no primary key / unique index on id. With
+        // foreign key enforcement enabled (rusqlite bundled default) every insert
+        // would fail with "foreign key mismatch". Ensure the index exists.
+        repo.conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_id ON sessions (id)",
+            [],
+        )?;
+
         repo.conn.execute(
             "INSERT INTO conversation_branches (id, session_id, parent_branch_id, branch_name, description, created_at, last_activity, status)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -180,7 +189,7 @@ impl BranchService {
              ORDER BY sequence_number ASC",
         )?;
 
-        let rows = stmt.query_map(params![branch_id], |row| Ok(row.get::<_, String>(0)?))?;
+        let rows = stmt.query_map(params![branch_id], |row| row.get::<_, String>(0))?;
 
         let mut message_ids = Vec::new();
         for row in rows {
@@ -223,7 +232,7 @@ impl BranchService {
     }
 
     fn add_message_to_branch_in_db(
-        repo: &mut SqliteRepository,
+        repo: &SqliteRepository,
         branch_message: &BranchMessageEntity,
     ) -> Result<()> {
         repo.conn.execute(
@@ -239,7 +248,7 @@ impl BranchService {
         Ok(())
     }
 
-    fn update_branch_activity(repo: &mut SqliteRepository, branch_id: &str) -> Result<()> {
+    fn update_branch_activity(repo: &SqliteRepository, branch_id: &str) -> Result<()> {
         let now = chrono::Local::now().naive_local();
         repo.conn.execute(
             "UPDATE conversation_branches SET last_activity = ?1 WHERE id = ?2",
@@ -249,7 +258,7 @@ impl BranchService {
     }
 
     fn copy_session_messages_to_point(
-        repo: &mut SqliteRepository,
+        repo: &SqliteRepository,
         session_id: &str,
         new_branch_id: &str,
         up_to_index: Option<usize>,
@@ -274,7 +283,7 @@ impl BranchService {
     }
 
     fn copy_branch_messages_to_point(
-        repo: &mut SqliteRepository,
+        repo: &SqliteRepository,
         parent_branch_id: &str,
         new_branch_id: &str,
         up_to_index: Option<usize>,
@@ -321,7 +330,7 @@ impl BranchService {
 
     /// Add a bookmark to a branch for quick access
     pub fn bookmark_branch(
-        repo: &mut SqliteRepository,
+        repo: &SqliteRepository,
         branch_id: &str,
         bookmark_name: &str,
     ) -> Result<()> {
@@ -346,7 +355,7 @@ impl BranchService {
     }
 
     /// Remove a bookmark from a branch
-    pub fn remove_bookmark(repo: &mut SqliteRepository, branch_id: &str) -> Result<()> {
+    pub fn remove_bookmark(repo: &SqliteRepository, branch_id: &str) -> Result<()> {
         repo.conn.execute(
             "DELETE FROM branch_metadata WHERE branch_id = ?1 AND key = 'bookmark'",
             params![branch_id],
@@ -499,7 +508,7 @@ impl BranchService {
             if let Some(parent_id) = &branch.parent_branch_id {
                 children_map
                     .entry(parent_id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(branch);
             }
         }
@@ -546,7 +555,7 @@ impl BranchService {
             if let Some(parent_id) = &branch.parent_branch_id {
                 children_map
                     .entry(parent_id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(branch);
             }
         }
@@ -577,5 +586,112 @@ impl BranchService {
         }
 
         depth
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_repo() -> SqliteRepository {
+        SqliteRepository::new(":memory:").expect("Failed to create in-memory repository")
+    }
+
+    fn insert_session(repo: &SqliteRepository, session_id: &str) {
+        repo.conn
+            .execute(
+                "INSERT INTO sessions (id, name, expires_at, current) VALUES (?1, ?2, ?3, 0)",
+                params![session_id, session_id, "2099-01-01 00:00:00"],
+            )
+            .expect("Failed to insert test session");
+    }
+
+    #[test]
+    fn test_create_branch_and_list() {
+        let repo = test_repo();
+        insert_session(&repo, "session-1");
+
+        let branch = BranchService::create_branch(
+            &repo,
+            "session-1",
+            None,
+            Some("my-branch".to_string()),
+            Some("a test branch".to_string()),
+            None,
+        )
+        .expect("Failed to create branch");
+
+        assert_eq!(branch.session_id, "session-1");
+        assert_eq!(branch.branch_name.as_deref(), Some("my-branch"));
+
+        let branches = BranchService::get_session_branches(&repo, "session-1")
+            .expect("Failed to list branches");
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].id, branch.id);
+        assert_eq!(branches[0].description.as_deref(), Some("a test branch"));
+    }
+
+    #[test]
+    fn test_get_branch_by_id() {
+        let repo = test_repo();
+        insert_session(&repo, "session-2");
+
+        let created = BranchService::create_branch(
+            &repo,
+            "session-2",
+            None,
+            Some("lookup".to_string()),
+            None,
+            None,
+        )
+        .expect("Failed to create branch");
+
+        let fetched = BranchService::get_branch(&repo, &created.id)
+            .expect("Failed to fetch branch")
+            .expect("Branch not found");
+        assert_eq!(fetched.branch_name.as_deref(), Some("lookup"));
+
+        let missing =
+            BranchService::get_branch(&repo, "does-not-exist").expect("Query should succeed");
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn test_bookmark_branch_roundtrip() {
+        let repo = test_repo();
+        insert_session(&repo, "session-3");
+
+        let branch = BranchService::create_branch(
+            &repo,
+            "session-3",
+            None,
+            Some("bookmarked".to_string()),
+            None,
+            None,
+        )
+        .expect("Failed to create branch");
+
+        BranchService::bookmark_branch(&repo, &branch.id, "important")
+            .expect("Failed to bookmark branch");
+
+        let bookmarked = BranchService::get_bookmarked_branches(&repo, "session-3")
+            .expect("Failed to fetch bookmarks");
+        assert_eq!(bookmarked.len(), 1);
+        assert_eq!(bookmarked[0].0.id, branch.id);
+        assert_eq!(bookmarked[0].1, "important");
+
+        BranchService::remove_bookmark(&repo, &branch.id).expect("Failed to remove bookmark");
+        let bookmarked = BranchService::get_bookmarked_branches(&repo, "session-3")
+            .expect("Failed to fetch bookmarks");
+        assert!(bookmarked.is_empty());
+    }
+
+    #[test]
+    fn test_generate_branch_name() {
+        let name = BranchService::generate_branch_name("session", Some("Fix Auth Bug!"));
+        assert!(name.starts_with("fixauthbug-"));
+
+        let name = BranchService::generate_branch_name("session", None);
+        assert!(name.starts_with("branch-"));
     }
 }
