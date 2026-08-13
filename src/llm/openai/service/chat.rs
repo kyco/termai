@@ -13,6 +13,7 @@ use crate::llm::openai::{
 };
 use crate::session::model::message::{Message, MessageType};
 use crate::session::model::session::Session;
+use crate::ui::web_indicator::WebIndicator;
 use anyhow::{anyhow, Result};
 
 /// Chat without tools - simple request/response
@@ -208,7 +209,22 @@ async fn chat_internal(
 
         // Execute tools and add results to session
         for (call_id, tool_name, tool_arguments) in tool_calls {
-            let result = executor.execute(&tool_name, &tool_arguments).await?;
+            // Show a transient animated indicator while web tools execute
+            let mut web_indicator = if is_web_tool(&tool_name) {
+                let mut indicator = WebIndicator::new();
+                indicator.start(web_indicator_message(&tool_name, &tool_arguments));
+                Some(indicator)
+            } else {
+                None
+            };
+
+            let result = executor.execute(&tool_name, &tool_arguments).await;
+
+            if let Some(indicator) = web_indicator.as_mut() {
+                indicator.stop();
+            }
+
+            let result = result?;
 
             // Truncate large tool outputs to prevent context explosion
             let truncated_output = truncate_tool_output(&result.output);
@@ -280,12 +296,45 @@ async fn finish_without_tools(api_key: &str, session: &mut Session, model: &str)
     Ok(())
 }
 
+/// Whether a tool is a (read-only) web tool that shows the transient indicator
+fn is_web_tool(tool_name: &str) -> bool {
+    matches!(tool_name, "web_search" | "web_fetch")
+}
+
+/// Build the transient indicator message for a web tool call
+fn web_indicator_message(tool_name: &str, arguments: &str) -> String {
+    let parsed: serde_json::Value = serde_json::from_str(arguments).unwrap_or_default();
+    match tool_name {
+        "web_search" => match parsed.get("query").and_then(|v| v.as_str()) {
+            Some(query) if !query.is_empty() => format!("Searching the web for \"{}\"…", query),
+            _ => "Searching the web…".to_string(),
+        },
+        _ => match parsed.get("url").and_then(|v| v.as_str()) {
+            Some(url) if !url.is_empty() => format!("Fetching {}…", host_of(url)),
+            _ => "Fetching page…".to_string(),
+        },
+    }
+}
+
+/// Extract the host portion of a URL for display purposes
+fn host_of(url: &str) -> String {
+    let without_scheme = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .unwrap_or(url);
+    without_scheme
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or(without_scheme)
+        .to_string()
+}
+
 /// Extract text content from content items
 fn extract_text_from_content(content: Vec<ContentItem>) -> String {
     content
         .into_iter()
-        .filter_map(|item| match item {
-            ContentItem::OutputText { text, .. } => Some(text),
+        .map(|item| match item {
+            ContentItem::OutputText { text, .. } => text,
         })
         .collect::<Vec<String>>()
         .join("\n")
