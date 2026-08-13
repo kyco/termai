@@ -23,16 +23,6 @@ impl CodexAdapter {
     pub async fn chat(request: &CodexRequest, access_token: &str) -> Result<CodexResponse> {
         let client = Client::builder().build()?;
 
-        // Log request info for debugging large inputs
-        let input_size: usize = request.input.iter().map(|m| m.content.len()).sum();
-
-        if input_size > 10000 {
-            eprintln!(
-                "Codex Request: Large input detected ({} characters)",
-                input_size
-            );
-        }
-
         let response = client
             .post(CODEX_API_ENDPOINT)
             .header("Content-Type", "application/json")
