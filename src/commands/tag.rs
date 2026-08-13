@@ -1,12 +1,12 @@
 use crate::args::TagFormat;
-/// Git tag and release management with AI assistance
+/// Git tag and release management
 use crate::git::repository::GitRepository;
 use crate::repository::db::SqliteRepository;
 use anyhow::{Context, Result};
 use colored::*;
 use dialoguer::{Confirm, Input};
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::BTreeSet;
 
 /// Handle the tag management subcommand
 pub async fn handle_tag_command(
@@ -56,46 +56,11 @@ pub async fn handle_tag_command(
     Ok(())
 }
 
-/// List all tags with AI-generated insights
-async fn list_tags(_git_repo: &GitRepository) -> Result<()> {
+/// List all tags read from the actual repository
+async fn list_tags(git_repo: &GitRepository) -> Result<()> {
     println!("\n{}", "📋 Git Tags".bright_green().bold());
 
-    // Mock tag data for demonstration
-    // In a full implementation, this would use git2 to read actual tags
-    let tags = vec![
-        TagInfo {
-            name: "v1.2.0".to_string(),
-            commit_id: "abc123f".to_string(),
-            date: "2024-01-15".to_string(),
-            message: "feat: major feature update with OAuth2 support".to_string(),
-            tag_type: TagType::Annotated,
-            commits_since: 0,
-        },
-        TagInfo {
-            name: "v1.1.5".to_string(),
-            commit_id: "def456a".to_string(),
-            date: "2024-01-10".to_string(),
-            message: "fix: critical security patch".to_string(),
-            tag_type: TagType::Annotated,
-            commits_since: 23,
-        },
-        TagInfo {
-            name: "v1.1.4".to_string(),
-            commit_id: "ghi789b".to_string(),
-            date: "2024-01-05".to_string(),
-            message: "fix: memory leak in authentication module".to_string(),
-            tag_type: TagType::Annotated,
-            commits_since: 47,
-        },
-        TagInfo {
-            name: "v1.1.0".to_string(),
-            commit_id: "jkl012c".to_string(),
-            date: "2023-12-20".to_string(),
-            message: "feat: add new dashboard features".to_string(),
-            tag_type: TagType::Annotated,
-            commits_since: 89,
-        },
-    ];
+    let tags = collect_tags(git_repo)?;
 
     if tags.is_empty() {
         println!("   {}", "No tags found".dimmed());
@@ -106,64 +71,53 @@ async fn list_tags(_git_repo: &GitRepository) -> Result<()> {
         return Ok(());
     }
 
+    let head_id = git_repo
+        .inner()
+        .head()
+        .ok()
+        .and_then(|h| h.peel_to_commit().ok())
+        .map(|c| c.id());
+
     for tag in &tags {
         let type_indicator = match tag.tag_type {
             TagType::Annotated => "📝",
             TagType::Lightweight => "📌",
         };
 
-        let commits_info = if tag.commits_since == 0 {
+        let head_info = if Some(tag.target) == head_id {
             "HEAD".bright_green().to_string()
         } else {
-            format!("{} commits ahead", tag.commits_since)
-                .yellow()
-                .to_string()
+            String::new()
         };
 
         println!(
             "\n   {} {} {} {}",
             type_indicator.cyan(),
             tag.name.bright_yellow().bold(),
-            tag.commit_id.dimmed(),
-            commits_info
+            short_id(&tag.target.to_string()).dimmed(),
+            head_info
         );
         println!("      {} {}", tag.date.bright_blue(), tag.message.white());
     }
 
-    // AI Analysis
-    println!("\n{}", "🤖 AI Release Analysis:".bright_cyan().bold());
-    println!(
-        "   • {} is the latest release (current HEAD)",
-        "v1.2.0".bright_yellow()
-    );
-    println!(
-        "   • {} commits since last release - consider creating v1.2.1",
-        "23".yellow()
-    );
-    println!("   • Release frequency: ~5 days between releases");
-    println!("   • Pattern: Following semantic versioning correctly");
-
-    // Version Analysis
-    analyze_version_pattern(&tags).await?;
-
     println!("\n{}", "💡 Suggested Actions:".bright_green().bold());
     println!(
-        "   • {} - Create next patch release",
+        "   • {} - Suggest the next version",
         "termai tag suggest".cyan()
     );
     println!(
         "   • {} - Generate release notes",
-        "termai tag release-notes --from-tag v1.1.5".cyan()
+        "termai tag release-notes".cyan()
     );
     println!(
         "   • {} - Show detailed tag info",
-        "termai tag show v1.2.0".cyan()
+        "termai tag show <tag>".cyan()
     );
 
     Ok(())
 }
 
-/// Create a new tag with AI assistance
+/// Create a new tag using git2
 async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Result<()> {
     println!("\n{}", "🏷️  Creating Git Tag".bright_green().bold());
 
@@ -171,9 +125,9 @@ async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Re
     let tag_name = if let Some(name) = &args.tag_name {
         name.clone()
     } else {
-        let suggested_name = suggest_tag_name(git_repo).await?;
+        let suggested_name = suggest_tag_name(git_repo)?;
 
-        println!("\n{}", "💡 AI Suggested Tag Name:".bright_cyan().bold());
+        println!("\n{}", "💡 Suggested Tag Name:".bright_cyan().bold());
         println!("   {}", suggested_name.bright_yellow().bold());
 
         let input = Input::<String>::new();
@@ -195,12 +149,9 @@ async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Re
     let tag_message = if let Some(message) = &args.message {
         message.clone()
     } else if !args.lightweight {
-        let suggested_message = generate_tag_message(git_repo, &tag_name).await?;
+        let suggested_message = format!("Release {}", tag_name);
 
-        println!(
-            "\n{}",
-            "💭 AI Generated Release Message:".bright_cyan().bold()
-        );
+        println!("\n{}", "💭 Suggested Release Message:".bright_cyan().bold());
         println!("   {}", suggested_message.bright_white());
 
         let input = Input::<String>::new();
@@ -213,14 +164,15 @@ async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Re
     };
 
     // Check if tag already exists
-    if tag_exists(&tag_name) && !args.force {
+    if tag_exists(git_repo, &tag_name) && !args.force {
         println!("\n{}", "⚠️  Warning:".bright_yellow().bold());
         println!("   Tag '{}' already exists", tag_name.bright_yellow());
 
-        if !Confirm::new()
-            .with_prompt("Overwrite existing tag?")
-            .default(false)
-            .interact()?
+        if !args.yes
+            && !Confirm::new()
+                .with_prompt("Overwrite existing tag?")
+                .default(false)
+                .interact()?
         {
             println!("{}", "Tag creation cancelled".yellow());
             return Ok(());
@@ -228,9 +180,12 @@ async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Re
     }
 
     // Show what will be tagged
-    let current_commit = git_repo
-        .current_branch()
-        .unwrap_or_else(|_| "HEAD".to_string());
+    let repo = git_repo.inner();
+    let head_commit = repo
+        .head()
+        .context("Repository has no HEAD to tag")?
+        .peel_to_commit()
+        .context("Failed to resolve HEAD commit")?;
 
     println!("\n{}", "📊 Tag Summary:".bright_cyan().bold());
     println!(
@@ -249,30 +204,41 @@ async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Re
         .cyan()
     );
     println!(
-        "   {} {}",
+        "   {} {} ({})",
         "Target:".bright_white(),
-        current_commit.bright_blue()
+        short_id(&head_commit.id().to_string()).bright_blue(),
+        head_commit.summary().unwrap_or("").white()
     );
 
     if !tag_message.is_empty() {
         println!("   {} {}", "Message:".bright_white(), tag_message.white());
     }
 
-    // Confirm creation
-    if !Confirm::new()
-        .with_prompt("Create this tag?")
-        .default(true)
-        .interact()?
+    // Confirm creation (skipped with --yes for non-interactive use)
+    if !args.yes
+        && !Confirm::new()
+            .with_prompt("Create this tag?")
+            .default(true)
+            .interact()?
     {
         println!("{}", "Tag creation cancelled".yellow());
         return Ok(());
     }
 
-    // Create the tag
+    // Create the tag for real
     println!("\n{}", "🔄 Creating tag...".cyan());
+    let target = head_commit.as_object();
+    if args.lightweight {
+        repo.tag_lightweight(&tag_name, target, true)
+            .with_context(|| format!("Failed to create lightweight tag '{}'", tag_name))?;
+    } else {
+        let signature = repo
+            .signature()
+            .context("Failed to determine tagger identity (set user.name/user.email)")?;
+        repo.tag(&tag_name, target, &signature, &tag_message, true)
+            .with_context(|| format!("Failed to create annotated tag '{}'", tag_name))?;
+    }
 
-    // In a full implementation, this would use git2 to create the actual tag
-    // For now, show what would happen
     let tag_type = if args.lightweight {
         "lightweight"
     } else {
@@ -298,7 +264,7 @@ async fn create_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Re
 }
 
 /// Delete a tag with safety checks
-async fn delete_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> Result<()> {
+async fn delete_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Result<()> {
     let tag_name = args
         .tag_name
         .as_ref()
@@ -306,25 +272,35 @@ async fn delete_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> R
 
     println!("\n{}", "🗑️  Deleting Git Tag".bright_red().bold());
 
+    if !tag_exists(git_repo, tag_name) {
+        anyhow::bail!("Tag '{}' does not exist", tag_name);
+    }
+
     // Safety warnings
     println!("\n{}", "⚠️  Warning:".bright_yellow().bold());
     println!("   This will delete tag '{}'", tag_name.bright_yellow());
     println!("   This action cannot be undone");
     println!("   If the tag is pushed to remote, you'll need to delete it there too");
 
-    if !Confirm::new()
-        .with_prompt(&format!(
-            "Are you sure you want to delete tag '{}'?",
-            tag_name
-        ))
-        .default(false)
-        .interact()?
+    if !args.yes
+        && !Confirm::new()
+            .with_prompt(format!(
+                "Are you sure you want to delete tag '{}'?",
+                tag_name
+            ))
+            .default(false)
+            .interact()?
     {
         println!("{}", "Tag deletion cancelled".yellow());
         return Ok(());
     }
 
-    // Delete the tag
+    // Delete the tag for real
+    git_repo
+        .inner()
+        .tag_delete(tag_name)
+        .with_context(|| format!("Failed to delete tag '{}'", tag_name))?;
+
     println!(
         "\n   {} Tag '{}' deleted successfully",
         "✅".green(),
@@ -340,8 +316,8 @@ async fn delete_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> R
     Ok(())
 }
 
-/// Show detailed information about a tag
-async fn show_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> Result<()> {
+/// Show detailed information about a tag, read from the repository
+async fn show_tag(git_repo: &GitRepository, args: &crate::args::TagArgs) -> Result<()> {
     let tag_name = args
         .tag_name
         .as_ref()
@@ -355,62 +331,89 @@ async fn show_tag(_git_repo: &GitRepository, args: &crate::args::TagArgs) -> Res
     );
     println!("{}", "═══════════════════════════════".white().dimmed());
 
-    // Mock tag details
+    let repo = git_repo.inner();
+    let obj = repo
+        .revparse_single(&format!("refs/tags/{}", tag_name))
+        .with_context(|| format!("Tag '{}' not found", tag_name))?;
+
     println!("\n{}", "📋 Tag Information:".bright_cyan().bold());
-    println!("   {} v1.2.0", "Name:".bright_white());
-    println!("   {} Annotated", "Type:".bright_white());
-    println!("   {} abc123f4567890abcdef", "Commit:".bright_white());
-    println!("   {} 2024-01-15 14:30:25 UTC", "Date:".bright_white());
-    println!(
-        "   {} John Doe <john@example.com>",
-        "Tagger:".bright_white()
-    );
+    println!("   {} {}", "Name:".bright_white(), tag_name);
 
-    println!("\n{}", "💭 Tag Message:".bright_cyan().bold());
-    println!("   feat: major feature update with OAuth2 support");
-    println!("");
-    println!("   This release includes:");
-    println!("   - OAuth2 authentication integration");
-    println!("   - Performance improvements");
-    println!("   - Bug fixes in user management");
-    println!("   - Enhanced security features");
+    if let Some(tag) = obj.as_tag() {
+        let commit = tag.target()?.peel_to_commit()?;
+        println!("   {} Annotated", "Type:".bright_white());
+        println!("   {} {}", "Commit:".bright_white(), commit.id());
+        if let Some(tagger) = tag.tagger() {
+            println!(
+                "   {} {}",
+                "Date:".bright_white(),
+                format_git_time(tagger.when())
+            );
+            println!(
+                "   {} {} <{}>",
+                "Tagger:".bright_white(),
+                tagger.name().unwrap_or("unknown"),
+                tagger.email().unwrap_or("unknown")
+            );
+        }
 
-    println!("\n{}", "📊 Release Statistics:".bright_cyan().bold());
-    println!(
-        "   {} 47 commits since previous tag",
-        "Commits:".bright_white()
-    );
-    println!("   {} 23 files changed", "Files:".bright_white());
-    println!("   {} +1,247 lines added", "Additions:".bright_white());
-    println!("   {} -389 lines removed", "Deletions:".bright_white());
+        let message = tag.message().unwrap_or("").trim();
+        if !message.is_empty() {
+            println!("\n{}", "💭 Tag Message:".bright_cyan().bold());
+            for line in message.lines() {
+                println!("   {}", line);
+            }
+        }
 
-    println!("\n{}", "🤖 AI Analysis:".bright_cyan().bold());
-    println!("   • This is a major feature release");
-    println!("   • Includes significant authentication improvements");
-    println!("   • High impact changes - recommend thorough testing");
-    println!("   • Good release notes documentation");
+        println!("\n{}", "📝 Tagged Commit:".bright_cyan().bold());
+        println!("   {}", commit.summary().unwrap_or(""));
+    } else {
+        let commit = obj.peel_to_commit()?;
+        println!("   {} Lightweight", "Type:".bright_white());
+        println!("   {} {}", "Commit:".bright_white(), commit.id());
+        println!(
+            "   {} {}",
+            "Date:".bright_white(),
+            format_git_time(commit.time())
+        );
+
+        println!("\n{}", "📝 Tagged Commit:".bright_cyan().bold());
+        println!("   {}", commit.summary().unwrap_or(""));
+    }
 
     Ok(())
 }
 
-/// Generate comprehensive release notes between tags
+/// Generate release notes from the actual commit history between two revs
 async fn generate_release_notes(
     git_repo: &GitRepository,
     args: &crate::args::TagArgs,
 ) -> Result<()> {
-    let from_tag = args.from_tag.as_deref().unwrap_or("HEAD~10");
-    let to_tag = args.to_tag.as_deref().unwrap_or("HEAD");
+    let latest_tag = collect_tags(git_repo)?.first().map(|t| t.name.clone());
+
+    let from_rev = args.from_tag.clone().or(latest_tag).unwrap_or_default();
+    let to_rev = args.to_tag.as_deref().unwrap_or("HEAD").to_string();
 
     println!("\n{}", "📝 Generating Release Notes".bright_green().bold());
     println!("{}", "═══════════════════════════════".white().dimmed());
 
+    let range_label = if from_rev.is_empty() {
+        format!("(start) → {}", to_rev)
+    } else {
+        format!("{} → {}", from_rev, to_rev)
+    };
     println!(
         "\n{}",
-        format!("📊 Analyzing changes: {} → {}", from_tag, to_tag).bright_blue()
+        format!("📊 Analyzing changes: {}", range_label).bright_blue()
     );
 
-    // Analyze commits and categorize changes
-    let release_data = analyze_release_changes(git_repo, from_tag, to_tag).await?;
+    // Analyze commits and categorize changes for real
+    let release_data = analyze_release_changes(git_repo, &from_rev, &to_rev)?;
+
+    if release_data.stats.commits == 0 {
+        println!("\n   {}", "No commits found in the given range".yellow());
+        return Ok(());
+    }
 
     // Generate release notes based on format
     match args.format {
@@ -422,36 +425,24 @@ async fn generate_release_notes(
     Ok(())
 }
 
-/// Suggest the next appropriate tag name based on changes
-async fn suggest_next_tag(_git_repo: &GitRepository) -> Result<()> {
-    println!("\n{}", "🎯 AI Tag Suggestion".bright_green().bold());
+/// Suggest the next appropriate tag name based on the real commit history
+async fn suggest_next_tag(git_repo: &GitRepository) -> Result<()> {
+    println!("\n{}", "🎯 Tag Suggestion".bright_green().bold());
     println!("{}", "═══════════════════════════".white().dimmed());
 
-    // Analyze recent changes to determine version bump type
     println!("\n{}", "🔍 Analyzing recent changes...".cyan());
 
-    // Mock analysis for demonstration
-    let current_version = "v1.2.0";
-    let analysis = ChangeAnalysis {
-        breaking_changes: false,
-        new_features: true,
-        bug_fixes: true,
-        commits_since_last: 23,
-        major_changes: vec![
-            "Add OAuth2 token refresh mechanism".to_string(),
-            "Implement new dashboard widgets".to_string(),
-        ],
-        bug_fixes_list: vec![
-            "Fix memory leak in auth module".to_string(),
-            "Resolve timeout issues in API calls".to_string(),
-        ],
-    };
+    let analysis = analyze_changes_since_last_tag(git_repo)?;
 
     println!("\n{}", "📊 Change Analysis:".bright_cyan().bold());
     println!(
         "   {} {}",
         "Current version:".bright_white(),
-        current_version.bright_yellow()
+        analysis
+            .current_version
+            .as_deref()
+            .unwrap_or("(no tags yet)")
+            .bright_yellow()
     );
     println!(
         "   {} {}",
@@ -470,7 +461,7 @@ async fn suggest_next_tag(_git_repo: &GitRepository) -> Result<()> {
     println!(
         "   {} {}",
         "New features:".bright_white(),
-        if analysis.new_features {
+        if !analysis.features.is_empty() {
             "Yes".green()
         } else {
             "No".dimmed()
@@ -479,25 +470,24 @@ async fn suggest_next_tag(_git_repo: &GitRepository) -> Result<()> {
     println!(
         "   {} {}",
         "Bug fixes:".bright_white(),
-        if analysis.bug_fixes {
+        if !analysis.fixes.is_empty() {
             "Yes".yellow()
         } else {
             "No".dimmed()
         }
     );
 
-    // Suggest version based on semantic versioning
-    let suggested_version = if analysis.breaking_changes {
-        "v2.0.0"
-    } else if analysis.new_features {
-        "v1.3.0"
-    } else if analysis.bug_fixes {
-        "v1.2.1"
-    } else {
-        "v1.2.1"
-    };
+    if analysis.commits_since_last == 0 {
+        println!(
+            "\n   {} No new commits since the last tag - nothing to release",
+            "ℹ️".cyan()
+        );
+        return Ok(());
+    }
 
-    println!("\n{}", "🎯 AI Recommendation:".bright_green().bold());
+    let suggested_version = suggest_version_bump(&analysis);
+
+    println!("\n{}", "🎯 Recommendation:".bright_green().bold());
     println!(
         "   {} {}",
         "Suggested tag:".bright_white(),
@@ -506,25 +496,27 @@ async fn suggest_next_tag(_git_repo: &GitRepository) -> Result<()> {
 
     let rationale = if analysis.breaking_changes {
         "Major version bump due to breaking changes"
-    } else if analysis.new_features {
+    } else if !analysis.features.is_empty() {
         "Minor version bump due to new features"
+    } else if !analysis.fixes.is_empty() {
+        "Patch version bump for bug fixes"
     } else {
-        "Patch version bump for bug fixes and improvements"
+        "Patch version bump for miscellaneous changes"
     };
 
     println!("   {} {}", "Rationale:".bright_white(), rationale.cyan());
 
-    // Show what's included
-    if !analysis.major_changes.is_empty() {
+    // Show what's included, from real commit subjects
+    if !analysis.features.is_empty() {
         println!("\n{}", "✨ New Features:".bright_green().bold());
-        for feature in &analysis.major_changes {
+        for feature in &analysis.features {
             println!("   • {}", feature);
         }
     }
 
-    if !analysis.bug_fixes_list.is_empty() {
+    if !analysis.fixes.is_empty() {
         println!("\n{}", "🐛 Bug Fixes:".bright_yellow().bold());
-        for fix in &analysis.bug_fixes_list {
+        for fix in &analysis.fixes {
             println!("   • {}", fix);
         }
     }
@@ -545,26 +537,127 @@ async fn suggest_next_tag(_git_repo: &GitRepository) -> Result<()> {
 
 // Helper functions
 
-async fn suggest_tag_name(_git_repo: &GitRepository) -> Result<String> {
-    // In a full implementation, this would analyze the repository
-    // to suggest the next appropriate version
-    Ok("v1.3.0".to_string())
+/// Collect real tags from the repository, newest first (by target commit time)
+fn collect_tags(git_repo: &GitRepository) -> Result<Vec<TagInfo>> {
+    let repo = git_repo.inner();
+    let mut tags = Vec::new();
+
+    let names = repo.tag_names(None)?;
+    for name in names.iter().flatten() {
+        let obj = match repo.revparse_single(&format!("refs/tags/{}", name)) {
+            Ok(obj) => obj,
+            Err(_) => continue,
+        };
+
+        if let Some(tag) = obj.as_tag() {
+            let commit = tag.target()?.peel_to_commit()?;
+            let time = tag
+                .tagger()
+                .map(|t| t.when())
+                .unwrap_or_else(|| commit.time());
+            tags.push(TagInfo {
+                name: name.to_string(),
+                target: commit.id(),
+                date: format_git_time(time),
+                sort_key: time.seconds(),
+                message: tag.message().unwrap_or("").trim().to_string(),
+                tag_type: TagType::Annotated,
+            });
+        } else if let Ok(commit) = obj.peel_to_commit() {
+            tags.push(TagInfo {
+                name: name.to_string(),
+                target: commit.id(),
+                date: format_git_time(commit.time()),
+                sort_key: commit.time().seconds(),
+                message: commit.summary().unwrap_or("").to_string(),
+                tag_type: TagType::Lightweight,
+            });
+        }
+    }
+
+    tags.sort_by_key(|b| std::cmp::Reverse(b.sort_key));
+    Ok(tags)
 }
 
-async fn generate_tag_message(_git_repo: &GitRepository, tag_name: &str) -> Result<String> {
-    // Generate intelligent tag message based on recent changes
-    let version_type = if tag_name.contains(".0.0") {
-        "major"
-    } else if tag_name.ends_with(".0") {
-        "minor"
-    } else {
-        "patch"
+/// Suggest a tag name based on the real repository history
+fn suggest_tag_name(git_repo: &GitRepository) -> Result<String> {
+    let analysis = analyze_changes_since_last_tag(git_repo)?;
+    Ok(suggest_version_bump(&analysis))
+}
+
+/// Analyze the real commits since the most recent tag
+fn analyze_changes_since_last_tag(git_repo: &GitRepository) -> Result<ChangeAnalysis> {
+    let repo = git_repo.inner();
+    let tags = collect_tags(git_repo)?;
+    let latest_tag = tags.first();
+
+    let mut analysis = ChangeAnalysis {
+        current_version: latest_tag.map(|t| t.name.clone()),
+        commits_since_last: 0,
+        breaking_changes: false,
+        features: Vec::new(),
+        fixes: Vec::new(),
     };
 
-    Ok(format!(
-        "Release {}: {} update with new features and improvements",
-        tag_name, version_type
-    ))
+    let head = match repo.head().ok().and_then(|h| h.peel_to_commit().ok()) {
+        Some(commit) => commit,
+        None => return Ok(analysis),
+    };
+
+    let mut walker = repo.revwalk()?;
+    walker.push(head.id())?;
+    if let Some(tag) = latest_tag {
+        let _ = walker.hide(tag.target);
+    }
+
+    for oid in walker.take(500) {
+        let oid = oid?;
+        let commit = repo.find_commit(oid)?;
+        let subject = commit.summary().unwrap_or("").to_string();
+        let message = commit.message().unwrap_or("");
+
+        analysis.commits_since_last += 1;
+
+        let prefix = subject.split(':').next().unwrap_or("");
+        if prefix.contains('!') || message.contains("BREAKING CHANGE") {
+            analysis.breaking_changes = true;
+        }
+        if prefix.starts_with("feat") {
+            analysis.features.push(subject.clone());
+        } else if prefix.starts_with("fix") {
+            analysis.fixes.push(subject.clone());
+        }
+    }
+
+    Ok(analysis)
+}
+
+/// Compute the suggested next semantic version from a real change analysis
+fn suggest_version_bump(analysis: &ChangeAnalysis) -> String {
+    let (major, minor, patch) = analysis
+        .current_version
+        .as_deref()
+        .and_then(parse_semver)
+        .unwrap_or((0, 0, 0));
+
+    if analysis.breaking_changes {
+        format!("v{}.0.0", major + 1)
+    } else if !analysis.features.is_empty() {
+        format!("v{}.{}.0", major, minor + 1)
+    } else {
+        format!("v{}.{}.{}", major, minor, patch + 1)
+    }
+}
+
+/// Parse a version string like "v1.2.3" or "1.2.3"
+fn parse_semver(version: &str) -> Option<(u64, u64, u64)> {
+    let version = version.trim_start_matches('v');
+    let core = version.split('-').next()?;
+    let mut parts = core.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let patch = parts.next()?.parse().ok()?;
+    Some((major, minor, patch))
 }
 
 fn is_valid_tag_name(name: &str) -> bool {
@@ -573,71 +666,98 @@ fn is_valid_tag_name(name: &str) -> bool {
     version_regex.is_match(name)
 }
 
-fn tag_exists(_name: &str) -> bool {
-    // In a full implementation, this would check if the tag exists
-    false
+/// Check whether a tag actually exists in the repository
+fn tag_exists(git_repo: &GitRepository, name: &str) -> bool {
+    git_repo
+        .inner()
+        .find_reference(&format!("refs/tags/{}", name))
+        .is_ok()
 }
 
-async fn analyze_version_pattern(tags: &[TagInfo]) -> Result<()> {
-    println!("\n{}", "📈 Version Pattern Analysis:".bright_cyan().bold());
+fn short_id(id: &str) -> String {
+    id.chars().take(7).collect()
+}
 
-    let mut version_counts = HashMap::new();
-    for tag in tags {
-        if let Some(version_type) = classify_version_change(&tag.name) {
-            *version_counts.entry(version_type).or_insert(0) += 1;
+fn format_git_time(time: git2::Time) -> String {
+    chrono::DateTime::from_timestamp(time.seconds(), 0)
+        .map(|dt| dt.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Analyze the real commit history between two revisions
+fn analyze_release_changes(git_repo: &GitRepository, from: &str, to: &str) -> Result<ReleaseData> {
+    let repo = git_repo.inner();
+
+    let to_commit = repo
+        .revparse_single(to)
+        .with_context(|| format!("Cannot resolve revision '{}'", to))?
+        .peel_to_commit()?;
+
+    let from_commit = if from.is_empty() {
+        None
+    } else {
+        Some(
+            repo.revparse_single(from)
+                .with_context(|| format!("Cannot resolve revision '{}'", from))?
+                .peel_to_commit()?,
+        )
+    };
+
+    let mut walker = repo.revwalk()?;
+    walker.push(to_commit.id())?;
+    if let Some(from_commit) = &from_commit {
+        walker.hide(from_commit.id())?;
+    }
+
+    let mut features = Vec::new();
+    let mut fixes = Vec::new();
+    let mut breaking_changes = Vec::new();
+    let mut contributors = BTreeSet::new();
+    let mut commit_count = 0usize;
+
+    for oid in walker.take(500) {
+        let oid = oid?;
+        let commit = repo.find_commit(oid)?;
+        let subject = commit.summary().unwrap_or("").to_string();
+        let message = commit.message().unwrap_or("");
+
+        commit_count += 1;
+        if let Some(author) = commit.author().name() {
+            contributors.insert(author.to_string());
+        }
+
+        let prefix = subject.split(':').next().unwrap_or("");
+        if prefix.contains('!') || message.contains("BREAKING CHANGE") {
+            breaking_changes.push(subject.clone());
+        }
+        if prefix.starts_with("feat") {
+            features.push(subject.clone());
+        } else if prefix.starts_with("fix") {
+            fixes.push(subject.clone());
         }
     }
 
-    for (version_type, count) in version_counts {
-        println!("   • {} {} releases", count, version_type.cyan());
-    }
+    // Real diff statistics between the two trees
+    let from_tree = from_commit.as_ref().map(|c| c.tree()).transpose()?;
+    let diff = repo.diff_tree_to_tree(from_tree.as_ref(), Some(&to_commit.tree()?), None)?;
+    let stats = diff.stats()?;
 
-    println!("   • {} Average time between releases", "5.2 days".cyan());
-    println!("   • {} Semantic versioning compliance", "✅ Good".green());
-
-    Ok(())
-}
-
-fn classify_version_change(tag_name: &str) -> Option<String> {
-    if tag_name.contains(".0.0") {
-        Some("Major".to_string())
-    } else if tag_name.ends_with(".0") {
-        Some("Minor".to_string())
-    } else {
-        Some("Patch".to_string())
-    }
-}
-
-async fn analyze_release_changes(
-    _git_repo: &GitRepository,
-    _from: &str,
-    _to: &str,
-) -> Result<ReleaseData> {
-    // In a full implementation, this would analyze git log between tags
     Ok(ReleaseData {
-        version: "v1.3.0".to_string(),
-        date: "2024-01-20".to_string(),
-        features: vec![
-            "OAuth2 token refresh mechanism".to_string(),
-            "New dashboard widgets".to_string(),
-            "Enhanced user profile management".to_string(),
-        ],
-        fixes: vec![
-            "Fix memory leak in authentication module".to_string(),
-            "Resolve timeout issues in API calls".to_string(),
-            "Fix responsive layout on mobile devices".to_string(),
-        ],
-        breaking_changes: vec![],
-        contributors: vec![
-            "John Doe".to_string(),
-            "Jane Smith".to_string(),
-            "Bob Johnson".to_string(),
-        ],
+        version: if to == "HEAD" {
+            "unreleased".to_string()
+        } else {
+            to.to_string()
+        },
+        date: chrono::Local::now().format("%Y-%m-%d").to_string(),
+        features,
+        fixes,
+        breaking_changes,
+        contributors: contributors.into_iter().collect(),
         stats: ReleaseStats {
-            commits: 23,
-            files_changed: 47,
-            insertions: 1247,
-            deletions: 389,
+            commits: commit_count,
+            files_changed: stats.files_changed(),
+            insertions: stats.insertions(),
+            deletions: stats.deletions(),
         },
     })
 }
@@ -647,7 +767,7 @@ async fn generate_markdown_release_notes(data: &ReleaseData) -> Result<()> {
     println!("{}", "═══════════════════════════════".white().dimmed());
 
     println!("\n# Release {}", data.version);
-    println!("*Released on {}*", data.date);
+    println!("*Generated on {}*", data.date);
 
     if !data.breaking_changes.is_empty() {
         println!("\n## ⚠️  Breaking Changes");
@@ -670,9 +790,11 @@ async fn generate_markdown_release_notes(data: &ReleaseData) -> Result<()> {
         }
     }
 
-    println!("\n## 👥 Contributors");
-    for contributor in &data.contributors {
-        println!("- @{}", contributor.to_lowercase().replace(" ", ""));
+    if !data.contributors.is_empty() {
+        println!("\n## 👥 Contributors");
+        for contributor in &data.contributors {
+            println!("- {}", contributor);
+        }
     }
 
     println!("\n## 📊 Statistics");
@@ -718,20 +840,19 @@ async fn generate_json_release_notes(data: &ReleaseData) -> Result<()> {
     println!("\n{}", "📝 Release Notes (JSON):".bright_green().bold());
     println!("{}", "═══════════════════════════".white().dimmed());
 
-    // In a full implementation, this would use serde_json
     println!("\n{{");
     println!("  \"version\": \"{}\",", data.version);
     println!("  \"date\": \"{}\",", data.date);
     println!("  \"features\": [");
     for (i, feature) in data.features.iter().enumerate() {
         let comma = if i < data.features.len() - 1 { "," } else { "" };
-        println!("    \"{}\"{}", feature, comma);
+        println!("    \"{}\"{}", feature.replace('"', "\\\""), comma);
     }
     println!("  ],");
     println!("  \"fixes\": [");
     for (i, fix) in data.fixes.iter().enumerate() {
         let comma = if i < data.fixes.len() - 1 { "," } else { "" };
-        println!("    \"{}\"{}", fix, comma);
+        println!("    \"{}\"{}", fix.replace('"', "\\\""), comma);
     }
     println!("  ]");
     println!("}}");
@@ -743,15 +864,14 @@ async fn generate_json_release_notes(data: &ReleaseData) -> Result<()> {
 #[derive(Debug, Clone)]
 struct TagInfo {
     name: String,
-    commit_id: String,
+    target: git2::Oid,
     date: String,
+    sort_key: i64,
     message: String,
     tag_type: TagType,
-    commits_since: usize,
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 enum TagType {
     Annotated,
     Lightweight,
@@ -759,12 +879,11 @@ enum TagType {
 
 #[derive(Debug)]
 struct ChangeAnalysis {
-    breaking_changes: bool,
-    new_features: bool,
-    bug_fixes: bool,
+    current_version: Option<String>,
     commits_since_last: usize,
-    major_changes: Vec<String>,
-    bug_fixes_list: Vec<String>,
+    breaking_changes: bool,
+    features: Vec<String>,
+    fixes: Vec<String>,
 }
 
 #[derive(Debug)]

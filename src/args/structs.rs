@@ -353,7 +353,7 @@ pub struct StashArgs {
     pub message: Option<String>,
 
     /// Include untracked files when stashing
-    #[arg(long, short)]
+    #[arg(long, short = 'u')]
     pub include_untracked: bool,
 
     /// Interactive stash selection
@@ -362,6 +362,10 @@ pub struct StashArgs {
 
     /// Specific stash index (for pop, apply, drop operations)
     pub stash_index: Option<usize>,
+
+    /// Skip confirmation prompts and proceed as if confirmed (for scripting/CI)
+    #[arg(long, short = 'y')]
+    pub yes: bool,
 }
 
 /// Arguments for Git tag and release management
@@ -396,6 +400,10 @@ pub struct TagArgs {
     /// Output format for release notes
     #[arg(long, value_enum, default_value = "markdown")]
     pub format: TagFormat,
+
+    /// Skip confirmation prompts and proceed as if confirmed (for scripting/CI)
+    #[arg(long, short = 'y')]
+    pub yes: bool,
 }
 
 /// Tag output format options
