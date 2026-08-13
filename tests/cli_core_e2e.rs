@@ -583,3 +583,49 @@ fn db_bootstrap_creates_expected_schema() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// 9. Interactive chat: non-TTY fallback mode
+// ---------------------------------------------------------------------------
+
+/// With piped stdin/stdout, `termai chat` must run in the plain line-based
+/// fallback: no raw mode, no bottom-anchored UI, and a clean exit on /exit.
+#[test]
+fn chat_piped_stdin_exits_cleanly_in_fallback_mode() {
+    let home = temp_home();
+    let assert = termai(home.path())
+        .arg("chat")
+        .write_stdin("/exit\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TermAI Interactive Chat Mode"))
+        .stdout(predicate::str::contains("Goodbye"));
+
+    let output = assert.get_output();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Raw-mode/anchored-UI escape sequences must never leak into piped output
+    for (seq, label) in [
+        ("\u{1b}[?2004h", "bracketed paste enable"),
+        ("\u{1b}[?2004l", "bracketed paste disable"),
+        ("\u{1b}[2K", "clear-line (anchor erase)"),
+        ("\u{1b}[1A", "cursor-up (anchor repaint)"),
+    ] {
+        assert!(
+            !stdout.contains(seq),
+            "piped chat output should not contain {} escape sequence",
+            label
+        );
+    }
+}
+
+/// EOF on stdin (no input at all) must also exit the fallback loop cleanly.
+#[test]
+fn chat_piped_stdin_eof_exits_cleanly() {
+    let home = temp_home();
+    termai(home.path())
+        .arg("chat")
+        .write_stdin("")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Goodbye"));
+}

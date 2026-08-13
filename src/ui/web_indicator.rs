@@ -76,3 +76,72 @@ impl Drop for WebIndicator {
         self.running.store(false, Ordering::SeqCst);
     }
 }
+
+/// Routing for web-tool activity when the bottom-anchored chat UI is active.
+///
+/// The anchored chat UI owns the terminal's bottom lines, so the standalone
+/// `WebIndicator` spinner (which redraws its own line with `\r`) would fight
+/// it. While anchored mode is active, web tools publish their activity here
+/// instead and the chat status line renders it as a `🌐 …` spinner segment.
+/// Non-chat paths (e.g. `ask`) keep using the standalone `WebIndicator`.
+pub mod activity {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
+    use std::time::Instant;
+
+    static ANCHORED: AtomicBool = AtomicBool::new(false);
+    static CURRENT: Mutex<Option<(String, Instant)>> = Mutex::new(None);
+
+    /// Enable/disable anchored routing (set by the interactive chat UI).
+    pub fn set_anchored(on: bool) {
+        ANCHORED.store(on, Ordering::SeqCst);
+        if !on {
+            end();
+        }
+    }
+
+    pub fn is_anchored() -> bool {
+        ANCHORED.load(Ordering::SeqCst)
+    }
+
+    /// Record that a web tool started executing, e.g. "Searching the web…".
+    pub fn begin(label: String) {
+        if let Ok(mut current) = CURRENT.lock() {
+            *current = Some((label, Instant::now()));
+        }
+    }
+
+    /// Record that the web tool finished.
+    pub fn end() {
+        if let Ok(mut current) = CURRENT.lock() {
+            *current = None;
+        }
+    }
+
+    /// The in-flight web activity, if any: (label, elapsed seconds).
+    pub fn current() -> Option<(String, f32)> {
+        CURRENT.lock().ok().and_then(|c| {
+            c.as_ref()
+                .map(|(l, t)| (l.clone(), t.elapsed().as_secs_f32()))
+        })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn activity_round_trip() {
+            set_anchored(true);
+            assert!(is_anchored());
+            begin("Searching the web…".to_string());
+            let (label, secs) = current().expect("activity should be set");
+            assert_eq!(label, "Searching the web…");
+            assert!(secs >= 0.0);
+            end();
+            assert!(current().is_none());
+            set_anchored(false);
+            assert!(!is_anchored());
+        }
+    }
+}

@@ -209,11 +209,19 @@ async fn chat_internal(
 
         // Execute tools and add results to session
         for (call_id, tool_name, tool_arguments) in tool_calls {
-            // Show a transient animated indicator while web tools execute
+            // Show a transient animated indicator while web tools execute.
+            // In bottom-anchored chat mode the indicator is routed into the
+            // chat status line instead of drawing its own line.
             let mut web_indicator = if is_web_tool(&tool_name) {
-                let mut indicator = WebIndicator::new();
-                indicator.start(web_indicator_message(&tool_name, &tool_arguments));
-                Some(indicator)
+                let message = web_indicator_message(&tool_name, &tool_arguments);
+                if crate::ui::web_indicator::activity::is_anchored() {
+                    crate::ui::web_indicator::activity::begin(message);
+                    None
+                } else {
+                    let mut indicator = WebIndicator::new();
+                    indicator.start(message);
+                    Some(indicator)
+                }
             } else {
                 None
             };
@@ -222,6 +230,9 @@ async fn chat_internal(
 
             if let Some(indicator) = web_indicator.as_mut() {
                 indicator.stop();
+            }
+            if is_web_tool(&tool_name) {
+                crate::ui::web_indicator::activity::end();
             }
 
             let result = result?;

@@ -526,6 +526,12 @@ impl ChatFormatter {
         self.enable_streaming = enabled;
     }
 
+    /// Show or hide the role/timestamp prefix on formatted messages.
+    /// The bottom-anchored chat UI prints its own minimal `ai ›` prefix.
+    pub fn set_show_role_labels(&mut self, show: bool) {
+        self.show_role_labels = show;
+    }
+
     /// Enable or disable markdown formatting
     #[allow(dead_code)]
     pub fn set_markdown(&mut self, enabled: bool) {
