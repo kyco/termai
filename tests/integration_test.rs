@@ -50,14 +50,29 @@ fn test_config_storage() {
 
     cmd.assert().success();
 
-    // Verify key was stored by checking config
+    // Verify the key was really stored by reading the SQLite store directly.
+    let db_path = config_dir.join("app.db");
+    let conn = Connection::open(&db_path).unwrap();
+    let stored: String = conn
+        .query_row(
+            "SELECT value FROM config WHERE key = 'chat_gpt_api_key'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("chat_gpt_api_key should be stored in config table");
+    assert_eq!(stored, test_key);
+
+    // --print-config must show the key as configured but MASKED: the full
+    // cleartext secret must never reach stdout.
     let mut cmd = cargo_bin_cmd!("termai");
     cmd.env("HOME", home_dir.to_str().unwrap())
         .arg("--print-config");
 
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains(test_key));
+        .stdout(predicate::str::contains("chat_gpt_api_key"))
+        .stdout(predicate::str::contains("test..._123"))
+        .stdout(predicate::str::contains(test_key).not());
 }
 
 #[test]

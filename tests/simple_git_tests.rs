@@ -57,7 +57,7 @@ fn test_git_command_validation() {
 
     // Create a simple git repository
     Command::new("git")
-        .args(&["init"])
+        .args(["init"])
         .current_dir(temp_dir.path())
         .assert()
         .success();

@@ -2,10 +2,10 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
-/// Integration tests for Smart Context Discovery CLI functionality
-///
-/// These tests verify that the --smart-context flag works correctly
-/// with various project types and configurations.
+// Integration tests for Smart Context Discovery CLI functionality
+//
+// These tests verify that the --smart-context flag works correctly
+// with various project types and configurations.
 
 #[cfg(test)]
 mod cli_integration_tests {
@@ -496,7 +496,7 @@ impl DataStructure{} {{
 "#,
                 i, i, i, i, i
             );
-            fs::write(path.join(&format!("src/module_{}.rs", i)), content).unwrap();
+            fs::write(path.join(format!("src/module_{}.rs", i)), content).unwrap();
         }
 
         fs::write(

@@ -18,20 +18,20 @@ mod git_integration_tests {
 
         // Initialize git repository
         Command::new("git")
-            .args(&["init"])
+            .args(["init"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         // Set up git config for tests
         Command::new("git")
-            .args(&["config", "user.email", "test@example.com"])
+            .args(["config", "user.email", "test@example.com"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         Command::new("git")
-            .args(&["config", "user.name", "Test User"])
+            .args(["config", "user.name", "Test User"])
             .current_dir(repo_path)
             .assert()
             .success();
@@ -43,13 +43,13 @@ mod git_integration_tests {
         )?;
 
         Command::new("git")
-            .args(&["add", "README.md"])
+            .args(["add", "README.md"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         Command::new("git")
-            .args(&["commit", "-m", "Initial commit"])
+            .args(["commit", "-m", "Initial commit"])
             .current_dir(repo_path)
             .assert()
             .success();
@@ -117,13 +117,13 @@ mod tests {
         )?;
 
         Command::new("git")
-            .args(&["add", "src/auth.rs"])
+            .args(["add", "src/auth.rs"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         Command::new("git")
-            .args(&["commit", "-m", "feat: add authentication module"])
+            .args(["commit", "-m", "feat: add authentication module"])
             .current_dir(repo_path)
             .assert()
             .success();
@@ -140,13 +140,13 @@ mod tests {
         )?;
 
         Command::new("git")
-            .args(&["add", "src/auth.rs"])
+            .args(["add", "src/auth.rs"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         Command::new("git")
-            .args(&["commit", "-m", "fix: add input validation to auth"])
+            .args(["commit", "-m", "fix: add input validation to auth"])
             .current_dir(repo_path)
             .assert()
             .success();
@@ -183,13 +183,13 @@ mod tests {
         )?;
 
         Command::new("git")
-            .args(&["add", "src/auth.rs"])
+            .args(["add", "src/auth.rs"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         Command::new("git")
-            .args(&["commit", "-m", "test: add comprehensive auth tests"])
+            .args(["commit", "-m", "test: add comprehensive auth tests"])
             .current_dir(repo_path)
             .assert()
             .success();
@@ -207,13 +207,13 @@ mod tests {
 
         // Create some test tags
         Command::new("git")
-            .args(&["tag", "v0.1.0"])
+            .args(["tag", "v0.1.0"])
             .current_dir(repo_path)
             .assert()
             .success();
 
         Command::new("git")
-            .args(&["tag", "-a", "v0.2.0", "-m", "Version 0.2.0 release"])
+            .args(["tag", "-a", "v0.2.0", "-m", "Version 0.2.0 release"])
             .current_dir(repo_path)
             .assert()
             .success();
@@ -229,7 +229,11 @@ mod tests {
                 "🏷️  TermAI Git Tag & Release Management",
             ))
             .stdout(predicate::str::contains("📋 Git Tags"))
-            .stdout(predicate::str::contains("🤖 AI Release Analysis"));
+            // Real tags created in the fixture must be listed
+            .stdout(predicate::str::contains("v0.1.0"))
+            .stdout(predicate::str::contains("v0.2.0"))
+            // Annotated tag message must come from the real tag object
+            .stdout(predicate::str::contains("Version 0.2.0 release"));
     }
 
     #[test]
@@ -247,10 +251,12 @@ mod tests {
             .current_dir(repo_path)
             .assert()
             .success()
-            .stdout(predicate::str::contains("🎯 AI Tag Suggestion"))
+            .stdout(predicate::str::contains("🎯 Tag Suggestion"))
             .stdout(predicate::str::contains("🔍 Analyzing recent changes"))
             .stdout(predicate::str::contains("📊 Change Analysis"))
-            .stdout(predicate::str::contains("🎯 AI Recommendation"));
+            .stdout(predicate::str::contains("🎯 Recommendation"))
+            // Analysis must be derived from real commits in the fixture
+            .stdout(predicate::str::contains("add authentication module"));
     }
 
     #[test]
@@ -339,8 +345,10 @@ mod tests {
             .success()
             .stdout(predicate::str::contains("📋 Rebase Plan Generation"))
             .stdout(predicate::str::contains("🎯 Rebase Target Analysis"))
-            .stdout(predicate::str::contains("🤖 AI Rebase Recommendations"))
-            .stdout(predicate::str::contains("📋 Suggested Rebase Plan"));
+            .stdout(predicate::str::contains("📝 Rebase Recommendations"))
+            .stdout(predicate::str::contains("📋 Suggested Rebase Plan"))
+            // Plan must list real commits from the fixture, not mock data
+            .stdout(predicate::str::contains("add input validation to auth"));
     }
 
     #[test]
@@ -423,7 +431,85 @@ mod tests {
             .assert()
             .success()
             .stdout(predicate::str::contains("📊 Conflict Status"))
-            .stdout(predicate::str::contains("🔄 Current Merge Operation"));
+            // Clean fixture repo: status must honestly report no operation
+            .stdout(predicate::str::contains("No merge operation in progress"));
+    }
+
+    #[test]
+    fn test_stash_list_empty() {
+        let temp_repo = setup_test_repo().expect("Failed to setup test repo");
+        let repo_path = temp_repo.path();
+
+        let mut cmd = cargo_bin_cmd!("termai");
+        cmd.arg("stash")
+            .arg("list")
+            .current_dir(repo_path)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("📋 Git Stashes"))
+            .stdout(predicate::str::contains("No stashes found"));
+    }
+
+    #[test]
+    fn test_stash_push_list_and_pop() {
+        let temp_repo = setup_test_repo().expect("Failed to setup test repo");
+        let repo_path = temp_repo.path();
+
+        let original =
+            fs::read_to_string(repo_path.join("README.md")).expect("Failed to read README");
+
+        // Modify a tracked file so there is something to stash
+        fs::write(repo_path.join("README.md"), "# Modified for stash test\n")
+            .expect("Failed to modify README");
+
+        // Push a real stash
+        let mut cmd = cargo_bin_cmd!("termai");
+        cmd.arg("stash")
+            .arg("push")
+            .arg("--message")
+            .arg("WIP: stash e2e test")
+            .current_dir(repo_path)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Stash created"));
+
+        // The working tree must actually be restored to the committed state
+        let after_push =
+            fs::read_to_string(repo_path.join("README.md")).expect("Failed to read README");
+        assert_eq!(after_push, original, "stash push must restore working tree");
+
+        // The real stash must show up in the list
+        let mut cmd = cargo_bin_cmd!("termai");
+        cmd.arg("stash")
+            .arg("list")
+            .current_dir(repo_path)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("stash@{0}"))
+            .stdout(predicate::str::contains("WIP: stash e2e test"));
+
+        // Pop must actually re-apply the changes and remove the stash
+        let mut cmd = cargo_bin_cmd!("termai");
+        cmd.arg("stash")
+            .arg("pop")
+            .current_dir(repo_path)
+            .assert()
+            .success();
+
+        let after_pop =
+            fs::read_to_string(repo_path.join("README.md")).expect("Failed to read README");
+        assert_eq!(
+            after_pop, "# Modified for stash test\n",
+            "stash pop must restore stashed changes"
+        );
+
+        let mut cmd = cargo_bin_cmd!("termai");
+        cmd.arg("stash")
+            .arg("list")
+            .current_dir(repo_path)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("No stashes found"));
     }
 
     #[test]
@@ -470,7 +556,7 @@ mod tests {
             .current_dir(repo_path)
             .assert()
             .success()
-            .stdout(predicate::str::contains("AI Tag Suggestion"));
+            .stdout(predicate::str::contains("Tag Suggestion"));
 
         // 5. Test conflict detection
         let mut cmd = cargo_bin_cmd!("termai");
@@ -612,7 +698,7 @@ pub mod session;
         .expect("Failed to create auth mod.rs");
 
         Command::new("git")
-            .args(&["add", "."])
+            .args(["add", "."])
             .current_dir(repo_path)
             .assert()
             .success();
