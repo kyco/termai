@@ -18,28 +18,6 @@ pub struct CustomTool {
     pub grammar: Option<String>,
 }
 
-impl CustomTool {
-    /// Create a new custom tool
-    pub fn new(name: String, description: String) -> Self {
-        Self {
-            tool_type: "custom".to_string(),
-            name,
-            description,
-            grammar: None,
-        }
-    }
-
-    /// Create a custom tool with grammar constraints
-    pub fn with_grammar(name: String, description: String, grammar: String) -> Self {
-        Self {
-            tool_type: "custom".to_string(),
-            name,
-            description,
-            grammar: Some(grammar),
-        }
-    }
-}
-
 /// Tool choice configuration for allowed tools
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AllowedToolsChoice {
@@ -108,22 +86,13 @@ impl AllowedToolReference {
 }
 
 /// Preamble configuration for tool calls
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct PreambleConfig {
     /// Whether to enable preambles (explanations before tool calls)
     pub enabled: bool,
 
     /// Custom instruction for preambles (optional)
     pub instruction: Option<String>,
-}
-
-impl Default for PreambleConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            instruction: None,
-        }
-    }
 }
 
 #[allow(dead_code)]

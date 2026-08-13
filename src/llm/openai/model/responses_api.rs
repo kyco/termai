@@ -362,11 +362,4 @@ impl ResponsesRequest {
             verbosity: None,
         }
     }
-
-    /// Create a request with custom reasoning effort
-    pub fn with_reasoning(model: String, input: String, effort: ReasoningEffort) -> Self {
-        let mut request = Self::simple(model, input);
-        request.reasoning = Some(ReasoningConfig { effort });
-        request
-    }
 }
